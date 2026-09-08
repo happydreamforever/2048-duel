@@ -16,5 +16,5 @@ captures/
 keystore.properties
 android/keystore/
 # server JSON database
-data/
-server/data/
+/data/
+/server/data/
