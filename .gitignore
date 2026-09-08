@@ -1,0 +1,20 @@
+.gradle/
+build/
+**/build/
+.reference/
+local.properties
+.idea/
+*.iml
+.DS_Store
+.kotlin/
+captures/
+*.apk
+*.aab
+*.log
+
+# release signing material (created by tools/create-keystore.*); keep private
+keystore.properties
+android/keystore/
+# server JSON database
+data/
+server/data/

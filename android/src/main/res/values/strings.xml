@@ -1,0 +1,134 @@
+<resources>
+    <!-- App / home -->
+    <string name="app_name">2048 Duel</string>
+    <string name="duel">DUEL</string>
+    <string name="quick_match">QUICK MATCH</string>
+    <string name="quick_match_sub">online 1v1 · a bot fills in if nobody is around</string>
+    <string name="practice_bot">PRACTICE VS BOT</string>
+    <string name="practice_bot_sub">instant online match against the server bot</string>
+    <string name="training">TRAINING</string>
+    <string name="training_sub">offline duel against a bot on this device</string>
+    <string name="solo_zen">SOLO ZEN</string>
+    <string name="solo_sub">classic 2048, offline</string>
+    <string name="wins">WINS</string>
+    <string name="losses">LOSSES</string>
+    <string name="draws">DRAWS</string>
+    <string name="best_solo">BEST SOLO</string>
+    <string name="theme">THEME</string>
+    <string name="ok">OK</string>
+    <string name="error_hint">Is the server running? Open http://&lt;server&gt;:&lt;port&gt;/ in this device\'s browser to test. Emulator: ws://10.0.2.2:8080/ws · phone: same Wi-Fi + PC firewall open. Training and Solo work offline.</string>
+
+    <!-- Settings -->
+    <string name="settings">Settings</string>
+    <string name="settings_title">SETTINGS</string>
+    <string name="player_name">Player name</string>
+    <string name="server_url">Server WebSocket URL</string>
+    <string name="server_hint">Emulator: ws://10.0.2.2:8080/ws · Device on the same Wi-Fi: ws://&lt;your-pc-ip&gt;:8080/ws</string>
+    <string name="haptics">Haptics</string>
+    <string name="sound_effects">Sound effects</string>
+    <string name="reduce_effects">Reduce effects (weak devices)</string>
+    <string name="language">Language</string>
+    <string name="language_system">System</string>
+
+    <!-- Account -->
+    <string name="logged_in_as">Logged in as %1$s</string>
+    <string name="not_logged_in">Not logged in</string>
+    <string name="account_stats">%1$d W · %2$d L · %3$d D</string>
+    <string name="training_record">Training record</string>
+    <string name="log_in">LOG IN</string>
+    <string name="log_out">LOG OUT</string>
+    <string name="create_account">CREATE ACCOUNT</string>
+    <string name="username">Username</string>
+    <string name="password">Password</string>
+    <string name="login_title">ACCOUNT</string>
+    <string name="login_subtitle">Log in or create an account to play online. Training and Solo work without one.</string>
+    <string name="play_offline">PLAY OFFLINE</string>
+    <string name="connecting_short">Connecting…</string>
+
+    <!-- Errors -->
+    <string name="err_name_taken">That name is already taken</string>
+    <string name="err_invalid_name">Name must be 3–16 letters, digits or _</string>
+    <string name="err_invalid_password">Password must have at least 4 characters</string>
+    <string name="err_bad_credentials">Wrong name or password</string>
+    <string name="err_session_expired">Session expired, please log in again</string>
+    <string name="err_not_logged_in">Log in first</string>
+    <string name="err_connect_failed">Can\'t reach server: %1$s</string>
+    <string name="err_connection_lost">Connection lost</string>
+    <string name="err_timeout">The server did not answer</string>
+    <string name="err_version">Server/app version mismatch: %1$s</string>
+    <string name="err_server">Server error: %1$s</string>
+
+    <!-- Matchmaking -->
+    <string name="connecting">Connecting to server…</string>
+    <string name="summoning_bot">Summoning a bot…</string>
+    <string name="searching_opponent">Searching for an opponent…</string>
+    <string name="bot_fallback_in">A bot steps in if nobody joins within %1$ds</string>
+    <string name="online_elapsed">%1$d online · %2$ds</string>
+    <string name="cancel">CANCEL</string>
+
+    <!-- Duel -->
+    <string name="opponent">Opponent</string>
+    <string name="you">You</string>
+    <string name="time">TIME</string>
+    <string name="sent">SENT</string>
+    <string name="received">RECEIVED</string>
+    <string name="max_tile">MAX TILE</string>
+    <string name="ping">PING</string>
+    <string name="offline">OFFLINE</string>
+    <string name="incoming">⚠ INCOMING ×%1$d</string>
+    <string name="attack_meter_label">ATTACK METER · %1$d energy = 1 garbage tile</string>
+    <string name="hint_playing">Swipe to move · garbage shatters after 2 merges next to it</string>
+    <string name="get_ready">Get ready…</string>
+    <string name="leave">LEAVE</string>
+    <string name="continue_label">CONTINUE</string>
+    <string name="leave_title">Leave the duel?</string>
+    <string name="leave_text">Leaving counts as a loss.</string>
+    <string name="stay">STAY</string>
+    <string name="go">GO!</string>
+    <string name="victory">VICTORY</string>
+    <string name="defeat">DEFEAT</string>
+    <string name="draw">DRAW</string>
+
+    <!-- Result -->
+    <string name="reason_board_full_won">The opponent\'s board filled up</string>
+    <string name="reason_board_full_lost">Your board filled up</string>
+    <string name="reason_board_full_draw">Both boards filled up</string>
+    <string name="reason_time_up">Time\'s up</string>
+    <string name="reason_forfeit_won">The opponent left</string>
+    <string name="reason_forfeit_lost">You left the duel</string>
+    <string name="score">Score</string>
+    <string name="moves">Moves</string>
+    <string name="merges">Merges</string>
+    <string name="best_combo">Best combo</string>
+    <string name="garbage_sent">Garbage sent</string>
+    <string name="garbage_received">Garbage received</string>
+    <string name="play_again">PLAY AGAIN</string>
+    <string name="home">HOME</string>
+
+    <!-- Solo -->
+    <string name="score_caps">SCORE</string>
+    <string name="best">BEST</string>
+    <string name="game_over">GAME OVER</string>
+    <string name="score_and_tile">Score %1$d · max tile %2$d</string>
+    <string name="new_game">NEW GAME</string>
+    <string name="swipe_moves">Swipe to move · %1$d moves</string>
+
+    <!-- Training -->
+    <string name="training_title">TRAINING</string>
+    <string name="training_text">Offline duel against a bot running on this device. Same rules as online.</string>
+    <string name="difficulty">Difficulty</string>
+    <string name="easy">Easy</string>
+    <string name="easy_sub">slow bot</string>
+    <string name="normal">Normal</string>
+    <string name="normal_sub">same as the online bot</string>
+    <string name="hard">Hard</string>
+    <string name="hard_sub">fast, smarter bot</string>
+    <string name="start">START</string>
+    <string name="bot_name">Trainer</string>
+
+    <!-- Floating effect texts -->
+    <string name="fx_combo">COMBO ×%1$d</string>
+    <string name="fx_attack">ATTACK ×%1$d</string>
+    <string name="fx_garbage">+%1$d GARBAGE</string>
+    <string name="fx_shattered">SHATTERED</string>
+</resources>

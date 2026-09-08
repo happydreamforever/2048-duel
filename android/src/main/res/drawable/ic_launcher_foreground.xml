@@ -1,0 +1,25 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- two overlapping neon tiles: the "duel" -->
+    <path android:pathData="M26,30 h34 a8,8 0 0 1 8,8 v34 a8,8 0 0 1 -8,8 h-34 a8,8 0 0 1 -8,-8 v-34 a8,8 0 0 1 8,-8 z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:startX="18" android:startY="30" android:endX="68" android:endY="80" android:type="linear">
+                <item android:offset="0" android:color="#FF00D4E4" />
+                <item android:offset="1" android:color="#FF5F4BFF" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <path android:pathData="M48,40 h34 a8,8 0 0 1 8,8 v34 a8,8 0 0 1 -8,8 h-34 a8,8 0 0 1 -8,-8 v-34 a8,8 0 0 1 8,-8 z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:startX="40" android:startY="40" android:endX="90" android:endY="90" android:type="linear">
+                <item android:offset="0" android:color="#FFFF2BD6" />
+                <item android:offset="1" android:color="#FFFF9E00" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <path android:fillColor="#FFFFFFFF" android:pathData="M56,52 h18 v18 h-18 z" android:fillAlpha="0.9" />
+</vector>
