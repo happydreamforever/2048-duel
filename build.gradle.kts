@@ -25,11 +25,34 @@ val offlineDistDir: File = rootDir.resolve("offline")
 
 fun isWindows(): Boolean = System.getProperty("os.name").lowercase().contains("win")
 
+/**
+ * Copies the Gradle distribution this build is running on into the fresh home so the child
+ * build does not download the same ~130 MB zip again. Only works when started via the wrapper.
+ */
+fun seedGradleDistribution() {
+    val home = gradle.gradleHomeDir ?: return                       // .../wrapper/dists/gradle-x-bin/<hash>/gradle-x
+    val hashDir = home.parentFile ?: return
+    val distsRoot = hashDir.parentFile?.parentFile ?: return
+    if (distsRoot.name != "dists" || !hashDir.listFiles().orEmpty().any { it.name.endsWith(".zip.ok") }) return
+    val target = offlineHome.resolve("wrapper/dists/${hashDir.parentFile.name}/${hashDir.name}")
+    if (target.resolve(home.name).isDirectory) return
+    logger.lifecycle("Reusing the current Gradle distribution (${home.name}) for the child build.")
+    hashDir.copyRecursively(target, overwrite = true)
+    target.resolve("${home.name}/bin/gradle").setExecutable(true)
+}
+
 fun runChildGradle(vararg args: String) {
     val launcher = if (isWindows()) listOf("cmd", "/c", rootDir.resolve("gradlew.bat").absolutePath) else listOf(rootDir.resolve("gradlew").absolutePath)
-    val command = launcher + listOf("--no-daemon", "-Dduel2048.offlineRepo=false") + args
-    logger.lifecycle("> child build: ${args.joinToString(" ")}  (GRADLE_USER_HOME=$offlineHome)")
-    val process = ProcessBuilder(command).directory(rootDir).inheritIO().also { it.environment()["GRADLE_USER_HOME"] = offlineHome.absolutePath }.start()
+    val command = launcher + listOf("--no-daemon", "--console=plain", "-Dduel2048.offlineRepo=false") + args
+    logger.lifecycle("> child build: ${args.joinToString(" ")}")
+    logger.lifecycle("  GRADLE_USER_HOME=$offlineHome")
+    val process = ProcessBuilder(command)
+        .directory(rootDir)
+        .redirectErrorStream(true)
+        .also { it.environment()["GRADLE_USER_HOME"] = offlineHome.absolutePath }
+        .start()
+    // Stream the child's output through this build's logger; inheritIO would go to the daemon, not the console.
+    process.inputStream.bufferedReader().useLines { lines -> lines.forEach { logger.lifecycle("  | $it") } }
     val code = process.waitFor()
     if (code != 0) throw GradleException("child build failed with exit code $code: ${args.joinToString(" ")}")
 }
@@ -39,11 +62,11 @@ fun runChildGradle(vararg args: String) {
  * stores, e.g. `material3-release.aar`) and a repository `url` (what a Maven repository must be
  * called, e.g. `material3-android-1.3.1.aar`). Returns name -> url for one version directory.
  */
+@Suppress("UNCHECKED_CAST")
 fun artifactRenames(versionDir: File): Map<String, String> {
     val moduleFile = versionDir.walkTopDown().maxDepth(2).firstOrNull { it.isFile && it.name.endsWith(".module") } ?: return emptyMap()
     val renames = HashMap<String, String>()
     try {
-        @Suppress("UNCHECKED_CAST")
         val root = groovy.json.JsonSlurper().parseText(moduleFile.readText()) as Map<String, Any?>
         val variants = root["variants"] as? List<Map<String, Any?>> ?: return emptyMap()
         for (variant in variants) {
@@ -127,6 +150,12 @@ tasks.register("downloadDependencies") {
     group = "offline"
     description = "Downloads every dependency, Gradle plugin, tool and the Gradle distribution into offline-repo/ and offline/ (needs internet once)."
     doLast {
+        logger.lifecycle("")
+        logger.lifecycle("downloadDependencies: runs the complete build once in $offlineHome and downloads about 450 MB of")
+        logger.lifecycle("dependencies (plus the 130 MB Gradle distribution if it is not already cached). Progress is shown below;")
+        logger.lifecycle("on a slow connection this can take a long time. Interrupting and re-running continues where it stopped.")
+        logger.lifecycle("")
+        seedGradleDistribution()
         val tasksToRun = mutableListOf(":shared:test", ":server:test", ":server:installDist", ":android:assembleDebug", ":android:testDebugUnitTest")
         if (rootDir.resolve("keystore.properties").isFile) tasksToRun += ":android:assembleRelease" else logger.warn("keystore.properties not found: release-only tools are skipped (run tools/create-keystore first to include them)")
         runChildGradle(*tasksToRun.toTypedArray())

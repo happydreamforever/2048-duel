@@ -215,7 +215,10 @@ Once, on a machine with internet:
 gradlew.bat downloadDependencies        # Windows      (Linux/macOS: ./gradlew downloadDependencies)
 ```
 
-This runs the whole build in a fresh project-local Gradle home, then exports everything it fetched:
+This runs the whole build in a fresh project-local Gradle home (`.gradle-offline-home/`), streams its
+progress to the console, and downloads about 450 MB (the Gradle distribution is reused from your normal
+Gradle cache). Expect 5 to 10 minutes on a normal connection; if interrupted, re-running continues. It then
+exports everything it fetched:
 
 | Folder | Contents | Size |
 |---|---|---|
