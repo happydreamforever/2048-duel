@@ -1,5 +1,14 @@
 pluginManagement {
     repositories {
+        // Project-local Maven repository written by `gradlew downloadDependencies` (offline builds).
+        // Listed first so nothing is fetched from the internet when it is present.
+        val offlineRepo = File(rootDir, "offline-repo")
+        if (offlineRepo.isDirectory && System.getProperty("duel2048.offlineRepo") != "false") {
+            maven {
+                name = "offlineRepo"
+                url = offlineRepo.toURI()
+            }
+        }
         google {
             content {
                 includeGroupByRegex("com\\.android.*")
@@ -15,6 +24,13 @@ pluginManagement {
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
+        val offlineRepo = File(rootDir, "offline-repo")
+        if (offlineRepo.isDirectory && System.getProperty("duel2048.offlineRepo") != "false") {
+            maven {
+                name = "offlineRepo"
+                url = offlineRepo.toURI()
+            }
+        }
         google()
         mavenCentral()
     }

@@ -135,29 +135,28 @@ updated after every online match, shown on the home screen, and listed on the in
 
 ### Where the credentials live
 
-Copy `server.env.example` to **`server.env`** next to it and edit. The file is git-ignored and
-the server reads it on start (from the working directory or its parent, or the path in
-`CONFIG_FILE`). Environment variables override the file. Three ways to describe the database:
+Copy **`database.json.example`** to **`database.json`** in the project root (next to `gradlew.bat`)
+and edit it. The file is git-ignored and the server reads it on start (from the working directory,
+its parent, or the path in `DB_CONFIG`):
 
-```
-# A: MySQL, JDBC URL plus separate credentials (defaults)
-DB_URL=jdbc:mysql://127.0.0.1:3306/duel2048
-DB_USER=duel2048
-DB_PASSWORD=duel2048
-
-# B: MySQL, one cloud-style URI with the credentials inside, e.g. Aiven
-DB_URL=mysql://avnadmin:PASSWORD@mysql-xxxx.aivencloud.com:28650/defaultdb?ssl-mode=REQUIRED
-
-# C: MariaDB (its own driver is bundled), either form
-DB_URL=jdbc:mariadb://127.0.0.1:3306/duel2048
-DB_USER=duel2048
-DB_PASSWORD=duel2048
-DB_URL=mariadb://user:password@host:3306/duel2048?ssl-mode=REQUIRED
+```json
+{
+  "type": "mariadb",
+  "host": "127.0.0.1",
+  "port": 3306,
+  "user": "root",
+  "password": "",
+  "database": "duel2048",
+  "charset": "utf8mb4"
+}
 ```
 
-`ssl-mode=REQUIRED` is translated to the driver's SSL option automatically (`sslMode=REQUIRED` for
-MySQL Connector/J, `sslMode=trust` for MariaDB Connector/J).
-Never commit `server.env`; if a password has been shared in chat or email, rotate it.
+`type` is `mariadb` (default) or `mysql`; add `"ssl": true` for a TLS-only server. The same
+values can be given as `DB_TYPE`, `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`,
+`DB_CHARSET`, `DB_SSL` in `server.env` or the environment (handy for Docker). For a cloud MySQL
+such as Aiven, `DB_URL=mysql://user:password@host:port/db?ssl-mode=REQUIRED` in `server.env`
+also works. Other server options (port, bot timing) live in `server.env`, see `server.env.example`.
+Never commit `database.json` or `server.env`; if a password has been shared in chat or email, rotate it.
 
 Create the database once (MySQL 8.x or MariaDB 10.6+):
 
@@ -207,6 +206,36 @@ The server needs no signing; ship it with `./gradlew :server:distZip` or the Doc
 The app follows the system language and can be overridden in settings. To add a language,
 copy `android/src/main/res/values/strings.xml` to `values-<tag>/strings.xml`, translate the
 values, and add the tag to `Languages.all` in `android/.../ui/Localization.kt`.
+
+## Building without internet
+
+Once, on a machine with internet:
+
+```
+gradlew.bat downloadDependencies        # Windows      (Linux/macOS: ./gradlew downloadDependencies)
+```
+
+This runs the whole build in a fresh project-local Gradle home, then exports everything it fetched:
+
+| Folder | Contents | Size |
+|---|---|---|
+| `offline-repo/` | every dependency, Gradle plugin, Kotlin compiler, Android build tool and `aapt2` for Windows, macOS and Linux, in Maven layout | ~375 MB |
+| `offline/gradle-8.11.1/` | the Gradle distribution itself | ~146 MB |
+
+Both folders are **git-ignored**: they are generated, not committed. To build on a machine without
+internet, copy the whole project folder (or a zip of it) including those two folders. There:
+
+```
+gradlew-offline.bat :android:assembleRelease     # Windows
+./gradlew-offline.sh :android:assembleRelease    # Linux/macOS
+```
+
+`gradlew-offline` uses the bundled Gradle, passes `--offline`, and keeps its cache in
+`.gradle-user-home/` inside the project, so nothing outside the folder is needed except a JDK 17+
+and the Android SDK (platform 35, build-tools 35.0.0). Those two cannot be bundled; install them
+with Android Studio beforehand. `settings.gradle.kts` also puts `offline-repo/` first in the
+repository list whenever it exists, so the normal `gradlew` stops downloading as well. After
+changing any version in `gradle/libs.versions.toml`, run `downloadDependencies` again while online.
 
 ## Tests
 

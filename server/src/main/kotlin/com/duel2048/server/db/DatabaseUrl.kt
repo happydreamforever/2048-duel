@@ -6,23 +6,18 @@ import java.net.URLDecoder
 data class DbConnection(val jdbcUrl: String, val user: String?, val password: String?)
 
 /**
- * Accepts the common ways of writing a MySQL or MariaDB address:
+ * Parses DB_URL. Accepted forms:
  *  - `jdbc:mysql://host:3306/db?sslMode=REQUIRED` or `jdbc:mariadb://host:3306/db` (JDBC, credentials separate)
- *  - `mysql://user:password@host:3306/db?ssl-mode=REQUIRED` or `mariadb://user:password@host/db` (URI, credentials inside)
+ *  - `mysql://user:password@host:3306/db?ssl-mode=REQUIRED` (cloud MySQL URI, credentials inside)
  *  - `host:3306/db` (shorthand, MySQL driver)
- * The MariaDB driver is picked for `mariadb` schemes, MySQL Connector/J otherwise.
+ * MariaDB is configured with database.json or the DB_HOST/DB_PORT/... fields instead (see DbSettings).
  */
 object DatabaseUrl {
 
     fun parse(raw: String): DbConnection {
         val s = raw.trim()
         if (s.startsWith("jdbc:")) return DbConnection(s, null, null)
-        val scheme = when {
-            s.startsWith("mysql://", ignoreCase = true) -> "mysql"
-            s.startsWith("mariadb://", ignoreCase = true) -> "mariadb"
-            else -> null
-        }
-        if (scheme != null) {
+        if (s.startsWith("mysql://", ignoreCase = true)) {
             val uri = URI(s)
             val userInfo = uri.rawUserInfo?.split(":", limit = 2)
             val user = userInfo?.getOrNull(0)?.let { URLDecoder.decode(it, "UTF-8") }
@@ -33,29 +28,17 @@ object DatabaseUrl {
             val params = LinkedHashMap<String, String>()
             uri.rawQuery?.split("&")?.filter { it.isNotBlank() }?.forEach { kv ->
                 val parts = kv.split("=", limit = 2)
-                val (key, value) = translateParam(scheme, parts[0], parts.getOrElse(1) { "" })
-                params[key] = value
+                params[translateParam(parts[0])] = parts.getOrElse(1) { "" }
             }
             val query = if (params.isEmpty()) "" else "?" + params.entries.joinToString("&") { "${it.key}=${it.value}" }
-            return DbConnection("jdbc:$scheme://$host:$port/$db$query", user, password)
+            return DbConnection("jdbc:mysql://$host:$port/$db$query", user, password)
         }
         return DbConnection("jdbc:mysql://$s", null, null)
     }
 
-    /**
-     * Provider URIs say `ssl-mode=REQUIRED`. MySQL Connector/J wants `sslMode=REQUIRED`;
-     * MariaDB Connector/J wants `sslMode=trust|verify-ca|verify-full|disable`.
-     */
-    private fun translateParam(scheme: String, key: String, value: String): Pair<String, String> {
-        if (key.lowercase() != "ssl-mode" && key.lowercase() != "sslmode") return key to value
-        if (scheme == "mysql") return "sslMode" to value
-        val mapped = when (value.uppercase()) {
-            "REQUIRED", "PREFERRED", "TRUST" -> "trust"
-            "VERIFY_CA", "VERIFY-CA" -> "verify-ca"
-            "VERIFY_IDENTITY", "VERIFY-FULL", "VERIFY_FULL" -> "verify-full"
-            "DISABLED", "DISABLE" -> "disable"
-            else -> value
-        }
-        return "sslMode" to mapped
+    /** Provider URIs say `ssl-mode`; MySQL Connector/J wants `sslMode`. */
+    private fun translateParam(key: String): String = when (key.lowercase()) {
+        "ssl-mode", "sslmode" -> "sslMode"
+        else -> key
     }
 }

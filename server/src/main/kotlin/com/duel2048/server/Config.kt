@@ -1,6 +1,7 @@
 package com.duel2048.server
 
 import com.duel2048.server.db.DatabaseUrl
+import com.duel2048.server.db.DbSettings
 import com.duel2048.shared.engine.Rules
 import java.io.File
 
@@ -24,6 +25,8 @@ data class ServerConfig(
     val dataDir: String,
     /** The server.env file that was loaded, if any. */
     val configFile: String?,
+    /** The database.json file that was loaded, if any. */
+    val dbConfigFile: String?,
 ) {
     companion object {
         /**
@@ -33,7 +36,22 @@ data class ServerConfig(
         fun fromEnv(env: Map<String, String> = System.getenv()): ServerConfig {
             val (file, fileValues) = loadEnvFile(env["CONFIG_FILE"])
             fun get(key: String): String? = env[key]?.takeIf { it.isNotBlank() } ?: fileValues[key]?.takeIf { it.isNotBlank() }
-            val conn = DatabaseUrl.parse(get("DB_URL") ?: "jdbc:mysql://127.0.0.1:3306/duel2048")
+            // Database: database.json wins, then DB_HOST/DB_PORT/... fields, then DB_URL.
+            val dbJson = DbSettings.load(get("DB_CONFIG"))
+            val fromFields = if (dbJson == null && get("DB_HOST") != null) {
+                DbSettings(
+                    type = get("DB_TYPE") ?: "mariadb",
+                    host = get("DB_HOST")!!,
+                    port = get("DB_PORT")?.toIntOrNull() ?: 3306,
+                    user = get("DB_USER") ?: "root",
+                    password = get("DB_PASSWORD") ?: "",
+                    database = get("DB_NAME") ?: "duel2048",
+                    charset = get("DB_CHARSET") ?: "utf8mb4",
+                    ssl = get("DB_SSL")?.lowercase() == "true",
+                )
+            } else null
+            val settings = dbJson?.second ?: fromFields
+            val conn = settings?.toConnection() ?: DatabaseUrl.parse(get("DB_URL") ?: "jdbc:mysql://127.0.0.1:3306/duel2048")
             return ServerConfig(
                 port = get("PORT")?.toIntOrNull() ?: 8080,
                 host = get("HOST") ?: "0.0.0.0",
@@ -45,10 +63,11 @@ data class ServerConfig(
                 boardSize = get("BOARD_SIZE")?.toIntOrNull() ?: Rules.BOARD_SIZE,
                 dbKind = (get("DB") ?: "mysql").lowercase(),
                 dbUrl = conn.jdbcUrl,
-                dbUser = get("DB_USER") ?: conn.user ?: "duel2048",
-                dbPassword = get("DB_PASSWORD") ?: conn.password ?: "duel2048",
+                dbUser = if (settings != null) settings.user else get("DB_USER") ?: conn.user ?: "duel2048",
+                dbPassword = if (settings != null) settings.password else get("DB_PASSWORD") ?: conn.password ?: "duel2048",
                 dataDir = get("DATA_DIR") ?: "data",
                 configFile = file,
+                dbConfigFile = dbJson?.first?.path,
             )
         }
 

@@ -1,6 +1,7 @@
 package com.duel2048.server
 
 import com.duel2048.server.db.DatabaseUrl
+import com.duel2048.server.db.DbSettings
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -23,12 +24,13 @@ class DatabaseUrlTest {
     }
 
     @Test
-    fun `mariadb uri uses the mariadb driver and maps ssl mode`() {
-        val c = DatabaseUrl.parse("mariadb://app:pw@db.local:3307/duel2048?ssl-mode=REQUIRED")
-        assertEquals("jdbc:mariadb://db.local:3307/duel2048?sslMode=trust", c.jdbcUrl)
-        assertEquals("app", c.user)
-        assertEquals("pw", c.password)
-        assertEquals("jdbc:mariadb://h:3306/d", DatabaseUrl.parse("jdbc:mariadb://h:3306/d").jdbcUrl)
+    fun `database json settings build driver urls`() {
+        val maria = DbSettings.parse("""{ "host": "db.local", "port": 3307, "user": "root", "password": "", "database": "game", "charset": "utf8mb4" }""")
+        assertEquals("jdbc:mariadb://db.local:3307/game?connectionCollation=utf8mb4_general_ci", maria.toConnection().jdbcUrl)
+        assertEquals("root", maria.toConnection().user)
+        val mysql = DbSettings.parse("""{ "type": "mysql", "host": "h", "port": 3306, "user": "u", "password": "p", "database": "d", "charset": "utf8mb4", "ssl": true }""")
+        assertEquals("jdbc:mysql://h:3306/d?characterEncoding=UTF-8&connectionCollation=utf8mb4_general_ci&sslMode=REQUIRED", mysql.toConnection().jdbcUrl)
+        assertEquals("p", mysql.toConnection().password)
     }
 
     @Test

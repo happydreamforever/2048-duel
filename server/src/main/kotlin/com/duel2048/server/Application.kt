@@ -53,8 +53,8 @@ fun createStore(config: ServerConfig): UserStore {
     } catch (e: Exception) {
         log.error("Cannot connect to MySQL at ${config.dbUrl} as ${config.dbUser}: ${e.message}")
         println()
-        println(" MySQL/MariaDB is not reachable. Either start it and set DB_URL / DB_USER / DB_PASSWORD, e.g.")
-        println("   DB_URL=jdbc:mysql://127.0.0.1:3306/duel2048  DB_USER=duel2048  DB_PASSWORD=duel2048   (MariaDB: jdbc:mariadb://...)")
+        println(" MariaDB/MySQL is not reachable. Check database.json (copy database.json.example next to gradlew):")
+        println("""   { "type": "mariadb", "host": "127.0.0.1", "port": 3306, "user": "root", "password": "", "database": "duel2048", "charset": "utf8mb4" }""")
         println(" create the database once with:")
         println("   CREATE DATABASE duel2048 CHARACTER SET utf8mb4;")
         println("   CREATE USER 'duel2048'@'%' IDENTIFIED BY 'duel2048';")
@@ -123,7 +123,7 @@ private fun printBanner(config: ServerConfig, db: UserStore) {
     lines += ""
     val users = runBlocking { db.userCount() }
     lines += " Database: ${db.description}  ($users users)"
-    lines += " Config: " + (config.configFile ?: "environment variables only (create server.env from server.env.example)")
+    lines += " Config: " + (config.configFile ?: "no server.env (environment variables only)") + " · database settings: " + (config.dbConfigFile ?: "environment / server.env")
     lines += " Browser check: http://localhost:$port/   (from the phone: http://<PC IP>:$port/)"
     lines += " Phone can't connect? Allow inbound TCP $port in the PC firewall, e.g. on Windows (admin):"
     lines += "   netsh advfirewall firewall add rule name=\"2048 Duel\" dir=in action=allow protocol=TCP localport=$port"
