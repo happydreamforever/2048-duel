@@ -14,32 +14,14 @@ import java.nio.file.StandardCopyOption
 import java.util.UUID
 
 @Serializable
-data class UserRecord(
-    val id: String,
-    val name: String,
-    val nameLower: String,
-    val passwordHash: String,
-    val salt: String,
-    val token: String? = null,
-    val createdAt: Long,
-    val lastLoginAt: Long = 0L,
-    val stats: AccountStats = AccountStats(),
-)
-
-@Serializable
 data class DbFile(val version: Int = 1, val users: List<UserRecord> = emptyList())
-
-sealed interface AuthResult {
-    data class Ok(val user: UserRecord) : AuthResult
-    data class Failed(val code: String, val message: String) : AuthResult
-}
 
 /**
  * Tiny JSON-file database: everything lives in memory and the whole file is rewritten
  * atomically (temp file + rename) after each change. Good enough for a hobby server;
  * swap for a real database when the user list grows.
  */
-class JsonDb(val file: File) {
+class JsonDb(val file: File) : UserStore {
 
     private val log = LoggerFactory.getLogger("JsonDb")
     private val json = Json { prettyPrint = true; ignoreUnknownKeys = true; encodeDefaults = true }
@@ -59,9 +41,11 @@ class JsonDb(val file: File) {
         return this
     }
 
-    val userCount: Int get() = users.size
+    override val description: String get() = "JSON file ${file.absolutePath}"
 
-    suspend fun register(name: String, password: String): AuthResult = mutex.withLock {
+    override suspend fun userCount(): Int = mutex.withLock { users.size }
+
+    override suspend fun register(name: String, password: String): AuthResult = mutex.withLock {
         val trimmed = name.trim()
         Accounts.validateName(trimmed)?.let { return AuthResult.Failed(it, "Name must be ${Accounts.NAME_MIN}-${Accounts.NAME_MAX} letters, digits or _") }
         Accounts.validatePassword(password)?.let { return AuthResult.Failed(it, "Password must have at least ${Accounts.PASSWORD_MIN} characters") }
@@ -84,7 +68,7 @@ class JsonDb(val file: File) {
         AuthResult.Ok(user)
     }
 
-    suspend fun login(name: String, password: String): AuthResult = mutex.withLock {
+    override suspend fun login(name: String, password: String): AuthResult = mutex.withLock {
         val id = idByName[name.trim().lowercase()] ?: return AuthResult.Failed("bad_credentials", "Wrong name or password")
         val user = users[id] ?: return AuthResult.Failed("bad_credentials", "Wrong name or password")
         if (!Passwords.verify(password, user.salt, user.passwordHash)) return AuthResult.Failed("bad_credentials", "Wrong name or password")
@@ -94,17 +78,19 @@ class JsonDb(val file: File) {
         AuthResult.Ok(updated)
     }
 
-    suspend fun authByToken(token: String): UserRecord? = mutex.withLock {
+    override suspend fun authByToken(token: String): UserRecord? = mutex.withLock {
         idByToken[token]?.let { users[it] }
     }
 
-    suspend fun logout(userId: String) = mutex.withLock {
-        val user = users[userId] ?: return@withLock
-        replace(user, user.copy(token = null))
-        saveLocked()
+    override suspend fun logout(userId: String) {
+        mutex.withLock {
+            val user = users[userId] ?: return
+            replace(user, user.copy(token = null))
+            saveLocked()
+        }
     }
 
-    suspend fun updateStats(userId: String, transform: (AccountStats) -> AccountStats): UserRecord? = mutex.withLock {
+    override suspend fun updateStats(userId: String, transform: (AccountStats) -> AccountStats): UserRecord? = mutex.withLock {
         val user = users[userId] ?: return@withLock null
         val updated = user.copy(stats = transform(user.stats))
         replace(user, updated)
@@ -112,7 +98,7 @@ class JsonDb(val file: File) {
         updated
     }
 
-    suspend fun leaderboard(limit: Int = 20): List<LeaderboardEntry> = mutex.withLock {
+    override suspend fun leaderboard(limit: Int): List<LeaderboardEntry> = mutex.withLock {
         users.values
             .sortedWith(compareByDescending<UserRecord> { it.stats.wins }.thenByDescending { it.stats.bestScore })
             .take(limit)

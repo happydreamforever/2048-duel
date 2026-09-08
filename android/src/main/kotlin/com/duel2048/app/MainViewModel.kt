@@ -14,9 +14,11 @@ import com.duel2048.app.game.SoloController
 import com.duel2048.app.game.TrainingProfile
 import com.duel2048.app.net.AccountClient
 import com.duel2048.app.net.DuelClient
+import com.duel2048.app.net.LeaderboardClient
 import com.duel2048.shared.protocol.AccountStats
 import com.duel2048.shared.protocol.Accounts
 import com.duel2048.shared.protocol.ClientMessage
+import com.duel2048.shared.protocol.LeaderboardEntry
 import com.duel2048.shared.protocol.Login
 import com.duel2048.shared.protocol.MatchMode
 import com.duel2048.shared.protocol.Register
@@ -37,9 +39,12 @@ sealed interface Screen {
     data object Duel : Screen
     data object Result : Screen
     data object Solo : Screen
+    data object Leaderboard : Screen
 }
 
 data class LoginUiState(val busy: Boolean = false, val error: DuelError? = null)
+
+data class LeaderboardUiState(val loading: Boolean = false, val entries: List<LeaderboardEntry> = emptyList(), val error: DuelError? = null)
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class MainViewModel(app: Application) : AndroidViewModel(app) {
@@ -49,6 +54,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     val client = DuelClient()
     private val account = AccountClient()
+    private val leaderboardClient = LeaderboardClient()
     val match = MatchController(client, viewModelScope, onStats = ::saveAccountStats, onSessionExpired = ::onSessionExpired)
     val solo = SoloController(initialBest = settings.value.bestSolo) { best ->
         settingsStore.update { it.copy(bestSolo = best) }
@@ -63,6 +69,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     private val _login = MutableStateFlow(LoginUiState())
     val login: StateFlow<LoginUiState> = _login.asStateFlow()
+
+    private val _leaderboard = MutableStateFlow(LeaderboardUiState())
+    val leaderboard: StateFlow<LeaderboardUiState> = _leaderboard.asStateFlow()
 
     private var pendingMode: MatchMode? = null
 
@@ -172,6 +181,25 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun openSolo() {
         solo.ensureGame()
         _screen.value = Screen.Solo
+    }
+
+    // ------------------------------------------------------------------ leaderboard
+
+    fun openLeaderboard() {
+        _screen.value = Screen.Leaderboard
+        refreshLeaderboard()
+    }
+
+    fun refreshLeaderboard() {
+        if (_leaderboard.value.loading) return
+        _leaderboard.value = _leaderboard.value.copy(loading = true, error = null)
+        val url = settings.value.serverUrl
+        viewModelScope.launch {
+            leaderboardClient.fetch(url).fold(
+                onSuccess = { entries -> _leaderboard.value = LeaderboardUiState(entries = entries) },
+                onFailure = { e -> _leaderboard.value = _leaderboard.value.copy(loading = false, error = DuelError("connect_failed", e.message ?: "")) },
+            )
+        }
     }
 
     // ------------------------------------------------------------------ common

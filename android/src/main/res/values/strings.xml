@@ -131,4 +131,17 @@
     <string name="fx_attack">ATTACK ×%1$d</string>
     <string name="fx_garbage">+%1$d GARBAGE</string>
     <string name="fx_shattered">SHATTERED</string>
+
+    <!-- Leaderboard -->
+    <string name="leaderboard">LEADERBOARD</string>
+    <string name="leaderboard_sub">top players on this server</string>
+    <string name="leaderboard_top">Top %1$d players</string>
+    <string name="leaderboard_empty">No players yet. Win a match to appear here.</string>
+    <string name="refresh">Refresh</string>
+    <string name="rank">#</string>
+    <string name="record">W · L · D</string>
+    <string name="best_score">BEST SCORE</string>
+    <string name="loading">Loading…</string>
+    <string name="retry">RETRY</string>
+    <string name="matches_played">%1$d matches</string>
 </resources>

@@ -35,7 +35,7 @@ class JsonDbTest {
         db.updateStats(login.user.id) { it.copy(wins = it.wins + 1, matches = it.matches + 1, bestScore = 1234) }
 
         val reloaded = JsonDb(file).load()
-        assertEquals(1, reloaded.userCount)
+        assertEquals(1, reloaded.userCount())
         val user = reloaded.authByToken(token)
         assertNotNull(user)
         assertEquals(1, user.stats.wins)

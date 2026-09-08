@@ -112,4 +112,17 @@
     <string name="fx_attack">ATAQUE ×%1$d</string>
     <string name="fx_garbage">+%1$d BASURA</string>
     <string name="fx_shattered">¡ROTA!</string>
+
+    <!-- Leaderboard -->
+    <string name="leaderboard">CLASIFICACIÓN</string>
+    <string name="leaderboard_sub">mejores jugadores de este servidor</string>
+    <string name="leaderboard_top">Top %1$d jugadores</string>
+    <string name="leaderboard_empty">Aún no hay jugadores. Gana una partida para aparecer aquí.</string>
+    <string name="refresh">Actualizar</string>
+    <string name="rank">#</string>
+    <string name="record">V · D · E</string>
+    <string name="best_score">MEJOR PUNTUACIÓN</string>
+    <string name="loading">Cargando…</string>
+    <string name="retry">REINTENTAR</string>
+    <string name="matches_played">%1$d partidas</string>
 </resources>

@@ -112,4 +112,17 @@
     <string name="fx_attack">攻撃 ×%1$d</string>
     <string name="fx_garbage">ゴミ +%1$d</string>
     <string name="fx_shattered">破壊!</string>
+
+    <!-- Leaderboard -->
+    <string name="leaderboard">ランキング</string>
+    <string name="leaderboard_sub">このサーバーの上位プレイヤー</string>
+    <string name="leaderboard_top">上位 %1$d 人</string>
+    <string name="leaderboard_empty">まだプレイヤーがいません。対戦に勝つと表示されます。</string>
+    <string name="refresh">更新</string>
+    <string name="rank">#</string>
+    <string name="record">勝 · 敗 · 分</string>
+    <string name="best_score">最高スコア</string>
+    <string name="loading">読み込み中…</string>
+    <string name="retry">再試行</string>
+    <string name="matches_played">%1$d 戦</string>
 </resources>

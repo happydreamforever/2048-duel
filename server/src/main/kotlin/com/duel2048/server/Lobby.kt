@@ -1,7 +1,8 @@
 package com.duel2048.server
 
 import com.duel2048.server.db.AuthResult
-import com.duel2048.server.db.JsonDb
+import com.duel2048.server.db.MatchRecord
+import com.duel2048.server.db.UserStore
 import com.duel2048.server.db.UserRecord
 import com.duel2048.shared.bot.Bot
 import com.duel2048.shared.protocol.Auth
@@ -50,7 +51,7 @@ import java.util.concurrent.atomic.AtomicInteger
  * If nobody shows up within [ServerConfig.botFallbackMs] a bot fills in so the game is
  * always playable.
  */
-class Lobby(private val config: ServerConfig, private val scope: CoroutineScope, private val db: JsonDb) {
+class Lobby(private val config: ServerConfig, private val scope: CoroutineScope, private val db: UserStore) {
 
     private val log = LoggerFactory.getLogger("Lobby")
     private val players = ConcurrentHashMap<String, PlayerSession>()
@@ -64,7 +65,7 @@ class Lobby(private val config: ServerConfig, private val scope: CoroutineScope,
         val session = PlayerSession(UUID.randomUUID().toString().substring(0, 8), ws)
         players[session.id] = session
         log.info("connected ${session.id} (online=${players.size})")
-        session.send(Welcome(session.id, Protocol.VERSION, players.size, db.userCount))
+        session.send(Welcome(session.id, Protocol.VERSION, players.size, db.userCount()))
         try {
             for (frame in ws.incoming) {
                 if (frame !is Frame.Text) continue
@@ -201,12 +202,29 @@ class Lobby(private val config: ServerConfig, private val scope: CoroutineScope,
             Participant(PlayerInfo("bot-" + UUID.randomUUID().toString().substring(0, 4), profile.name, isBot = true), null, profile)
         }
         val id = "m" + UUID.randomUUID().toString().substring(0, 8)
+        val startedAt = System.currentTimeMillis()
         val match = Match(id, p1, p2, seed, config, scope) { finished, over ->
             matches.remove(finished.id)
             if (a.match === finished) a.match = null
             if (b != null && b.match === finished) b.match = null
             recordStats(a, over)
             if (b != null) recordStats(b, over)
+            val r1 = over.results.firstOrNull { it.playerId == p1.info.id }
+            val r2 = over.results.firstOrNull { it.playerId == p2.info.id }
+            scope.launch {
+                try {
+                    db.recordMatch(
+                        MatchRecord(
+                            matchId = id, playedAt = startedAt, durationMs = System.currentTimeMillis() - startedAt,
+                            reason = over.reason.name, winnerName = listOf(p1, p2).firstOrNull { it.info.id == over.winnerId }?.info?.name,
+                            p1Name = p1.info.name, p1UserId = a.userId, p1Score = r1?.score ?: 0,
+                            p2Name = p2.info.name, p2UserId = b?.userId, p2Score = r2?.score ?: 0,
+                        ),
+                    )
+                } catch (e: Exception) {
+                    log.warn("could not record match $id: ${e.message}")
+                }
+            }
         }
         matches[id] = match
         a.match = match

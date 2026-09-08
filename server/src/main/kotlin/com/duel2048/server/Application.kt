@@ -1,6 +1,10 @@
 package com.duel2048.server
 
 import com.duel2048.server.db.JsonDb
+import com.duel2048.server.db.MySqlStore
+import com.duel2048.server.db.UserStore
+import kotlinx.coroutines.runBlocking
+import kotlin.system.exitProcess
 import com.duel2048.shared.protocol.Protocol
 import com.duel2048.shared.protocol.ServerStats
 import io.ktor.http.ContentType
@@ -32,7 +36,7 @@ private val log = LoggerFactory.getLogger("Server")
 fun main() {
     val config = ServerConfig.fromEnv()
     log.info("2048 Duel server starting on ${config.host}:${config.port} (bot fallback ${config.botFallbackMs} ms, match ${config.matchDurationMs} ms)")
-    val db = JsonDb(File(config.dataDir, DB_FILE_NAME)).load()
+    val db = createStore(config)
     embeddedServer(Netty, port = config.port, host = config.host) { module(config, db) }.start(wait = false)
     printBanner(config, db)
     // Block the main thread; Ctrl+C stops the process.
@@ -41,7 +45,26 @@ fun main() {
 
 const val DB_FILE_NAME = "duel2048-db.json"
 
-fun Application.module(config: ServerConfig = ServerConfig.fromEnv(), db: JsonDb = JsonDb(File(config.dataDir, DB_FILE_NAME)).load()) {
+/** MySQL by default; DB=json switches to the file store for development. */
+fun createStore(config: ServerConfig): UserStore {
+    if (config.dbKind == "json") return JsonDb(File(config.dataDir, DB_FILE_NAME)).load()
+    return try {
+        MySqlStore(config.dbUrl, config.dbUser, config.dbPassword)
+    } catch (e: Exception) {
+        log.error("Cannot connect to MySQL at ${config.dbUrl} as ${config.dbUser}: ${e.message}")
+        println()
+        println(" MySQL is not reachable. Either start it and set DB_URL / DB_USER / DB_PASSWORD, e.g.")
+        println("   DB_URL=jdbc:mysql://127.0.0.1:3306/duel2048  DB_USER=duel2048  DB_PASSWORD=duel2048")
+        println(" create the database once with:")
+        println("   CREATE DATABASE duel2048 CHARACTER SET utf8mb4;")
+        println("   CREATE USER 'duel2048'@'%' IDENTIFIED BY 'duel2048';")
+        println("   GRANT ALL PRIVILEGES ON duel2048.* TO 'duel2048'@'%';")
+        println(" or run `docker compose up` (starts MySQL + server), or set DB=json for a file-based store.")
+        exitProcess(1)
+    }
+}
+
+fun Application.module(config: ServerConfig = ServerConfig.fromEnv(), db: UserStore = createStore(config)) {
     install(WebSockets) {
         pingPeriodMillis = 20_000
         timeoutMillis = 60_000
@@ -61,7 +84,10 @@ fun Application.module(config: ServerConfig = ServerConfig.fromEnv(), db: JsonDb
         get("/") { call.respondText(statusPage(config, lobby.stats()), ContentType.Text.Html) }
         get("/health") { call.respondText("ok") }
         get("/stats") { call.respond(lobby.stats()) }
-        get("/leaderboard") { call.respond(db.leaderboard()) }
+        get("/leaderboard") {
+            val limit = call.request.queryParameters["limit"]?.toIntOrNull()?.coerceIn(1, 100) ?: 50
+            call.respond(db.leaderboard(limit))
+        }
         webSocket(Protocol.WS_PATH) { lobby.handleSession(this) }
     }
 }
@@ -78,7 +104,7 @@ fun lanAddresses(): List<String> = try {
     emptyList()
 }
 
-private fun printBanner(config: ServerConfig, db: JsonDb) {
+private fun printBanner(config: ServerConfig, db: UserStore) {
     val port = config.port
     val ws = Protocol.WS_PATH
     val lan = lanAddresses()
@@ -95,7 +121,9 @@ private fun printBanner(config: ServerConfig, db: JsonDb) {
         for (ip in lan) lines += "   Phone on the same Wi-Fi     : ws://$ip:$port$ws"
     }
     lines += ""
-    lines += " Accounts database: ${db.file.absolutePath}  (${db.userCount} users)"
+    val users = runBlocking { db.userCount() }
+    lines += " Database: ${db.description}  ($users users)"
+    lines += " Config: " + (config.configFile ?: "environment variables only (create server.env from server.env.example)")
     lines += " Browser check: http://localhost:$port/   (from the phone: http://<PC IP>:$port/)"
     lines += " Phone can't connect? Allow inbound TCP $port in the PC firewall, e.g. on Windows (admin):"
     lines += "   netsh advfirewall firewall add rule name=\"2048 Duel\" dir=in action=allow protocol=TCP localport=$port"

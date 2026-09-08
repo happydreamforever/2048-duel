@@ -112,4 +112,17 @@
     <string name="fx_attack">攻击 ×%1$d</string>
     <string name="fx_garbage">垃圾 +%1$d</string>
     <string name="fx_shattered">击碎!</string>
+
+    <!-- Leaderboard -->
+    <string name="leaderboard">排行榜</string>
+    <string name="leaderboard_sub">本服务器的顶尖玩家</string>
+    <string name="leaderboard_top">前 %1$d 名</string>
+    <string name="leaderboard_empty">还没有玩家。赢一场比赛即可上榜。</string>
+    <string name="refresh">刷新</string>
+    <string name="rank">#</string>
+    <string name="record">胜 · 负 · 平</string>
+    <string name="best_score">最高分</string>
+    <string name="loading">加载中…</string>
+    <string name="retry">重试</string>
+    <string name="matches_played">%1$d 场</string>
 </resources>

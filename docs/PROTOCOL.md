@@ -60,7 +60,7 @@ client                                   server
   │◄── garbage(target=me) ─────────────────│  when the opponent's attack meter fires
   │◄── tick ... ───────────────────────────│
   │◄── match_over ─────────────────────────│
-  │◄── stats ──────────────────────────────│  persisted in data/duel2048-db.json
+  │◄── stats ──────────────────────────────│  persisted in MySQL (users, match_history)
 ```
 
 ## Game state
@@ -68,3 +68,12 @@ client                                   server
 `GameState` is fully serializable (board cells with tile ids, score, RNG state,
 attack energy, counters) so any message that carries it lets the client resync
 without extra round-trips. `GameState.syncKey()` is the comparison used for prediction.
+
+## HTTP
+
+| Endpoint | Returns |
+|---|---|
+| `GET /` | HTML status page |
+| `GET /health` | `ok` |
+| `GET /stats` | `{onlinePlayers, queued, activeMatches, totalMatches}` |
+| `GET /leaderboard?limit=50` | `[{name, wins, losses, draws, matches, bestScore, bestTile}]`, sorted by wins then best score |

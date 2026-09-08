@@ -18,3 +18,5 @@ android/keystore/
 # server JSON database
 /data/
 /server/data/
+# server credentials (copy from server.env.example)
+server.env

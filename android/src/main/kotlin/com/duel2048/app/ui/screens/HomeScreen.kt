@@ -141,6 +141,13 @@ fun HomeScreen(vm: MainViewModel) {
             if (!settings.loggedIn) {
                 Text(stringResource(R.string.training_record), style = MaterialTheme.typography.labelSmall, color = palette.textSecondary, modifier = Modifier.padding(top = 4.dp))
             }
+            Spacer(Modifier.height(14.dp))
+            NeonButton(
+                "🏆 " + stringResource(R.string.leaderboard),
+                subtitle = stringResource(R.string.leaderboard_sub),
+                colors = listOf(Color(0xFFB8860B), Color(0xFF7A4B00)),
+                modifier = Modifier.fillMaxWidth(),
+            ) { vm.openLeaderboard() }
             Spacer(Modifier.height(18.dp))
             ThemeRow(settings.themeId) { id -> vm.updateSettings { it.copy(themeId = id) } }
             Spacer(Modifier.height(10.dp))

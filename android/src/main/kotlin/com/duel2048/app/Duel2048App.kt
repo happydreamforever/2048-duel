@@ -24,6 +24,7 @@ import com.duel2048.app.ui.components.AmbientBackground
 import com.duel2048.app.ui.rememberLocalizedContext
 import com.duel2048.app.ui.screens.DuelScreen
 import com.duel2048.app.ui.screens.HomeScreen
+import com.duel2048.app.ui.screens.LeaderboardScreen
 import com.duel2048.app.ui.screens.LoginScreen
 import com.duel2048.app.ui.screens.MatchmakingScreen
 import com.duel2048.app.ui.screens.ResultScreen
@@ -69,6 +70,7 @@ fun Duel2048App(vm: MainViewModel) {
                             Screen.Duel -> DuelScreen(vm)
                             Screen.Result -> ResultScreen(vm)
                             Screen.Solo -> SoloScreen(vm)
+                            Screen.Leaderboard -> LeaderboardScreen(vm)
                         }
                     }
                 }

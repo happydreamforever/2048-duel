@@ -21,8 +21,8 @@ so the game is always playable.
 | Module | What it is |
 |---|---|
 | `shared/` | Deterministic game engine (SplitMix64 RNG, attack energy, garbage tiles), heuristic bot, and the WebSocket message types. Used by both sides, so the client predicts moves instantly and the server verifies them. |
-| `server/` | Ktor server: accounts in a JSON-file database, FIFO matchmaking with bot fallback, authoritative match loop, countdown/timer, `/stats` and `/leaderboard` endpoints. |
-| `android/` | Jetpack Compose client: login, home, matchmaking, duel, result, offline **training** (full duel rules vs an on-device bot) and solo screens. |
+| `server/` | Ktor server: accounts and match history in MySQL (HikariCP + JDBC), FIFO matchmaking with bot fallback, authoritative match loop, countdown/timer, `/stats` and `/leaderboard` endpoints. |
+| `android/` | Jetpack Compose client: login, home, leaderboard, matchmaking, duel, result, offline **training** (full duel rules vs an on-device bot) and solo screens. |
 
 ## Visual effects in the client
 
@@ -45,9 +45,9 @@ Captured on an API 35 emulator (software renderer, so **Reduce effects** was on:
 |---|---|---|---|---|
 | ![home](docs/screenshots/home.png) | ![login](docs/screenshots/login.png) | ![duel](docs/screenshots/duel.png) | ![result](docs/screenshots/result.png) | ![solo](docs/screenshots/solo.png) |
 
-| Training chooser | Training duel (offline) | Countdown |
-|---|---|---|
-| ![training sheet](docs/screenshots/training-sheet.png) | ![training](docs/screenshots/training.png) | ![countdown](docs/screenshots/countdown.png) |
+| Training chooser | Training duel (offline) | Countdown | Leaderboard |
+|---|---|---|---|
+| ![training sheet](docs/screenshots/training-sheet.png) | ![training](docs/screenshots/training.png) | ![countdown](docs/screenshots/countdown.png) | ![leaderboard](docs/screenshots/leaderboard.png) |
 
 ## Requirements
 
@@ -74,12 +74,14 @@ On start the server prints the exact URLs to enter in the app, for example:
    Phone on the same Wi-Fi     : ws://192.168.1.23:8080/ws
 ```
 
-Environment variables: `PORT` (8080), `BOT_FALLBACK_MS` (8000), `MATCH_DURATION_MS` (150000),
-`COUNTDOWN_SECONDS` (3), `BOT_INTERVAL_MS` (550), `BOT_JITTER_MS` (250).
+Environment variables: `PORT` (8080), `DB_URL`, `DB_USER`, `DB_PASSWORD` (see the database section),
+`DB` (`mysql` or `json`), `BOT_FALLBACK_MS` (8000), `MATCH_DURATION_MS` (150000), `COUNTDOWN_SECONDS` (3),
+`BOT_INTERVAL_MS` (550), `BOT_JITTER_MS` (250).
 
 Endpoints: `GET /` (status page), `GET /health`, `GET /stats`, `WS /ws`.
 
-Docker: `docker build -t duel2048-server -f server/Dockerfile . && docker run -p 8080:8080 duel2048-server`
+Docker: `docker compose up --build` (MySQL + server), or just the server image with
+`docker build -t duel2048-server -f server/Dockerfile .`
 
 ### The app says "Can't reach server"
 
@@ -122,16 +124,48 @@ adb shell settings put global duel2048_server ws://10.0.2.2:8080/ws
 adb shell settings put global duel2048_lang ja
 ```
 
-## Accounts and the JSON database
+## Accounts and the MySQL database
 
-Online play needs an account. The app's login screen registers or logs in; the server keeps
-users in `data/duel2048-db.json` (override the folder with `DATA_DIR`). Passwords are stored as
-PBKDF2-SHA256 hashes with a per-user salt; a login token is saved on the phone so you stay
-signed in. Wins, losses, draws, best score and best tile are updated after every online match
-and shown on the home screen. `GET /leaderboard` returns the top players as JSON.
+Online play needs an account. The app's login screen registers or logs in; the server stores
+users and a match history in **MySQL** (tables are created automatically on first start).
+Passwords are PBKDF2-SHA256 hashes with per-user salts, never plain text. A login token is
+saved on the phone so you stay signed in. Wins, losses, draws, best score and best tile are
+updated after every online match, shown on the home screen, and listed on the in-app
+**Leaderboard** page (`GET /leaderboard?limit=50`).
 
-The file is plain JSON and is rewritten atomically after each change, which is fine for a
-hobby server. Swap `JsonDb` for a real database when the user list grows.
+### Where the credentials live
+
+Copy `server.env.example` to **`server.env`** next to it and edit. The file is git-ignored and
+the server reads it on start (from the working directory or its parent, or the path in
+`CONFIG_FILE`). Environment variables override the file. Two ways to describe the database:
+
+```
+# A: JDBC URL plus separate credentials (defaults)
+DB_URL=jdbc:mysql://127.0.0.1:3306/duel2048
+DB_USER=duel2048
+DB_PASSWORD=duel2048
+
+# B: one cloud-style URI with the credentials inside, e.g. Aiven
+DB_URL=mysql://avnadmin:PASSWORD@mysql-xxxx.aivencloud.com:28650/defaultdb?ssl-mode=REQUIRED
+```
+
+`ssl-mode=REQUIRED` is translated to the JDBC `sslMode=REQUIRED` option automatically.
+Never commit `server.env`; if a password has been shared in chat or email, rotate it.
+
+Create the database once (MySQL 8.x):
+
+```sql
+CREATE DATABASE duel2048 CHARACTER SET utf8mb4;
+CREATE USER 'duel2048'@'%' IDENTIFIED BY 'duel2048';
+GRANT ALL PRIVILEGES ON duel2048.* TO 'duel2048'@'%';
+```
+
+Or skip the setup entirely with Docker: `docker compose up --build` starts MySQL and the server
+(data persists in the `mysql-data` volume). If MySQL is unreachable the server explains what
+to do and exits. For quick local development without MySQL set `DB=json`, which keeps users in
+`data/duel2048-db.json` instead.
+
+Tables: `users` (credentials + stats) and `match_history` (one row per finished match).
 
 ## Training mode (offline)
 
@@ -171,7 +205,7 @@ values, and add the tag to `Languages.all` in `android/.../ui/Localization.kt`.
 
 ```bash
 ./gradlew :shared:test        # engine determinism, merge rules, garbage, energy, protocol round-trips
-./gradlew :server:test        # JSON database: register/login/token/stats persistence
+./gradlew :server:test        # JSON store: register/login/token/stats persistence (MySQL is covered by the smoke test)
 ./gradlew :android:testDebugUnitTest
 ```
 

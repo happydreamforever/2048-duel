@@ -29,7 +29,15 @@ data class AccountStats(
 )
 
 @Serializable
-data class LeaderboardEntry(val name: String, val wins: Int, val losses: Int, val bestScore: Int, val bestTile: Int)
+data class LeaderboardEntry(
+    val name: String,
+    val wins: Int,
+    val losses: Int,
+    val bestScore: Int,
+    val bestTile: Int,
+    val draws: Int = 0,
+    val matches: Int = 0,
+)
 
 /** Validation rules shared by client and server. Functions return an error code or null. */
 object Accounts {
