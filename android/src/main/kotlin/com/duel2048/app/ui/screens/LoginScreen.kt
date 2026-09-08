@@ -54,9 +54,6 @@ fun LoginScreen(vm: MainViewModel) {
     BackHandler { vm.cancelLogin() }
 
     Box(Modifier.fillMaxSize().systemBarsPadding().imePadding()) {
-        IconButton(onClick = { showSettings = true }, modifier = Modifier.align(Alignment.TopEnd).padding(8.dp)) {
-            Icon(Icons.Default.Settings, contentDescription = stringResource(R.string.settings), tint = palette.textSecondary)
-        }
         Column(
             Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -68,6 +65,20 @@ fun LoginScreen(vm: MainViewModel) {
             Spacer(Modifier.height(22.dp))
             GlassCard(Modifier.fillMaxWidth()) {
                 val colors = duelFieldColors()
+                OutlinedTextField(
+                    value = settings.serverUrl,
+                    onValueChange = { v -> vm.updateSettings { it.copy(serverUrl = v) } },
+                    label = { Text(stringResource(R.string.server_url)) },
+                    singleLine = true,
+                    colors = colors,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Text(
+                    stringResource(R.string.server_hint),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = palette.textSecondary,
+                    modifier = Modifier.padding(top = 4.dp, bottom = 8.dp),
+                )
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it.take(16) },
@@ -109,7 +120,10 @@ fun LoginScreen(vm: MainViewModel) {
             TextButton(onClick = { vm.cancelLogin() }) {
                 Text(stringResource(R.string.play_offline), color = palette.textSecondary, fontWeight = FontWeight.Bold)
             }
-            Text(settings.serverUrl, style = MaterialTheme.typography.labelSmall, color = palette.textSecondary)
+        }
+        // Declared after the scrolling column so it stays on top and receives taps.
+        IconButton(onClick = { showSettings = true }, modifier = Modifier.align(Alignment.TopEnd).padding(8.dp)) {
+            Icon(Icons.Default.Settings, contentDescription = stringResource(R.string.settings), tint = palette.textSecondary)
         }
     }
 

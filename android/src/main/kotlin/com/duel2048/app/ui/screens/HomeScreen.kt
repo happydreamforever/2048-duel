@@ -77,9 +77,6 @@ fun HomeScreen(vm: MainViewModel) {
     val botName = stringResource(R.string.bot_name)
 
     Box(Modifier.fillMaxSize().systemBarsPadding()) {
-        IconButton(onClick = { showSettings = true }, modifier = Modifier.align(Alignment.TopEnd).padding(8.dp)) {
-            Icon(Icons.Default.Settings, contentDescription = stringResource(R.string.settings), tint = palette.textSecondary)
-        }
         Column(
             Modifier
                 .fillMaxSize()
@@ -148,6 +145,11 @@ fun HomeScreen(vm: MainViewModel) {
             ThemeRow(settings.themeId) { id -> vm.updateSettings { it.copy(themeId = id) } }
             Spacer(Modifier.height(10.dp))
             Text(settings.serverUrl, style = MaterialTheme.typography.labelSmall, color = palette.textSecondary)
+        }
+
+        // Declared after the scrolling column so it stays on top and receives taps.
+        IconButton(onClick = { showSettings = true }, modifier = Modifier.align(Alignment.TopEnd).padding(8.dp)) {
+            Icon(Icons.Default.Settings, contentDescription = stringResource(R.string.settings), tint = palette.textSecondary)
         }
 
         duel.error?.let { err ->
