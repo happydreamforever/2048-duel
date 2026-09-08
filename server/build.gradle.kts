@@ -35,6 +35,7 @@ dependencies {
     implementation(libs.logback.classic)
     implementation(libs.hikaricp)
     implementation(libs.mysql.connector)
+    implementation(libs.mariadb.client)
     testImplementation(kotlin("test"))
 }
 

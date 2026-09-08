@@ -53,8 +53,8 @@ fun createStore(config: ServerConfig): UserStore {
     } catch (e: Exception) {
         log.error("Cannot connect to MySQL at ${config.dbUrl} as ${config.dbUser}: ${e.message}")
         println()
-        println(" MySQL is not reachable. Either start it and set DB_URL / DB_USER / DB_PASSWORD, e.g.")
-        println("   DB_URL=jdbc:mysql://127.0.0.1:3306/duel2048  DB_USER=duel2048  DB_PASSWORD=duel2048")
+        println(" MySQL/MariaDB is not reachable. Either start it and set DB_URL / DB_USER / DB_PASSWORD, e.g.")
+        println("   DB_URL=jdbc:mysql://127.0.0.1:3306/duel2048  DB_USER=duel2048  DB_PASSWORD=duel2048   (MariaDB: jdbc:mariadb://...)")
         println(" create the database once with:")
         println("   CREATE DATABASE duel2048 CHARACTER SET utf8mb4;")
         println("   CREATE USER 'duel2048'@'%' IDENTIFIED BY 'duel2048';")

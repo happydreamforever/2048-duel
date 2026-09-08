@@ -14,7 +14,7 @@ import java.sql.SQLIntegrityConstraintViolationException
 import java.util.UUID
 
 /**
- * MySQL-backed store (plain JDBC through a HikariCP pool). Tables are created on first start.
+ * MySQL/MariaDB-backed store (plain JDBC through a HikariCP pool). Tables are created on first start.
  * JDBC calls block, so every access runs on Dispatchers.IO.
  */
 class MySqlStore(jdbcUrl: String, user: String, password: String) : UserStore {
@@ -34,7 +34,7 @@ class MySqlStore(jdbcUrl: String, user: String, password: String) : UserStore {
         },
     )
 
-    override val description: String = "MySQL $jdbcUrl"
+    override val description: String = (if (jdbcUrl.startsWith("jdbc:mariadb:")) "MariaDB " else "MySQL ") + jdbcUrl
 
     init {
         pool.connection.use { c ->

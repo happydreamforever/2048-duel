@@ -124,10 +124,10 @@ adb shell settings put global duel2048_server ws://10.0.2.2:8080/ws
 adb shell settings put global duel2048_lang ja
 ```
 
-## Accounts and the MySQL database
+## Accounts and the MySQL / MariaDB database
 
 Online play needs an account. The app's login screen registers or logs in; the server stores
-users and a match history in **MySQL** (tables are created automatically on first start).
+users and a match history in **MySQL or MariaDB** (tables are created automatically on first start).
 Passwords are PBKDF2-SHA256 hashes with per-user salts, never plain text. A login token is
 saved on the phone so you stay signed in. Wins, losses, draws, best score and best tile are
 updated after every online match, shown on the home screen, and listed on the in-app
@@ -137,22 +137,29 @@ updated after every online match, shown on the home screen, and listed on the in
 
 Copy `server.env.example` to **`server.env`** next to it and edit. The file is git-ignored and
 the server reads it on start (from the working directory or its parent, or the path in
-`CONFIG_FILE`). Environment variables override the file. Two ways to describe the database:
+`CONFIG_FILE`). Environment variables override the file. Three ways to describe the database:
 
 ```
-# A: JDBC URL plus separate credentials (defaults)
+# A: MySQL, JDBC URL plus separate credentials (defaults)
 DB_URL=jdbc:mysql://127.0.0.1:3306/duel2048
 DB_USER=duel2048
 DB_PASSWORD=duel2048
 
-# B: one cloud-style URI with the credentials inside, e.g. Aiven
+# B: MySQL, one cloud-style URI with the credentials inside, e.g. Aiven
 DB_URL=mysql://avnadmin:PASSWORD@mysql-xxxx.aivencloud.com:28650/defaultdb?ssl-mode=REQUIRED
+
+# C: MariaDB (its own driver is bundled), either form
+DB_URL=jdbc:mariadb://127.0.0.1:3306/duel2048
+DB_USER=duel2048
+DB_PASSWORD=duel2048
+DB_URL=mariadb://user:password@host:3306/duel2048?ssl-mode=REQUIRED
 ```
 
-`ssl-mode=REQUIRED` is translated to the JDBC `sslMode=REQUIRED` option automatically.
+`ssl-mode=REQUIRED` is translated to the driver's SSL option automatically (`sslMode=REQUIRED` for
+MySQL Connector/J, `sslMode=trust` for MariaDB Connector/J).
 Never commit `server.env`; if a password has been shared in chat or email, rotate it.
 
-Create the database once (MySQL 8.x):
+Create the database once (MySQL 8.x or MariaDB 10.6+):
 
 ```sql
 CREATE DATABASE duel2048 CHARACTER SET utf8mb4;

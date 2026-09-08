@@ -23,6 +23,15 @@ class DatabaseUrlTest {
     }
 
     @Test
+    fun `mariadb uri uses the mariadb driver and maps ssl mode`() {
+        val c = DatabaseUrl.parse("mariadb://app:pw@db.local:3307/duel2048?ssl-mode=REQUIRED")
+        assertEquals("jdbc:mariadb://db.local:3307/duel2048?sslMode=trust", c.jdbcUrl)
+        assertEquals("app", c.user)
+        assertEquals("pw", c.password)
+        assertEquals("jdbc:mariadb://h:3306/d", DatabaseUrl.parse("jdbc:mariadb://h:3306/d").jdbcUrl)
+    }
+
+    @Test
     fun `shorthand and defaults`() {
         assertEquals("jdbc:mysql://db.local:3307/game", DatabaseUrl.parse("db.local:3307/game").jdbcUrl)
         assertEquals("jdbc:mysql://h:3306/duel2048", DatabaseUrl.parse("mysql://h").jdbcUrl)
