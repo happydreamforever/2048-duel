@@ -144,8 +144,13 @@ fun exportDependencyCache() {
 fun exportGradleDistribution() {
     val dists = offlineHome.resolve("wrapper/dists")
     val dist = dists.walkTopDown().maxDepth(3).firstOrNull { it.isDirectory && it.name.startsWith("gradle-") && it.resolve("bin").isDirectory }
+        ?: gradle.gradleHomeDir?.takeIf { it.resolve("bin").isDirectory }   // already running on the bundled copy
         ?: throw GradleException("no Gradle distribution under $dists")
     val target = offlineDistDir.resolve(dist.name)
+    if (dist.canonicalFile == target.canonicalFile) {
+        logger.lifecycle("offline/${dist.name}: Gradle distribution already in place")
+        return
+    }
     val stats = LongArray(3)
     dist.walkTopDown().filter { it.isFile }.forEach { f -> syncFile(f, target.resolve(f.relativeTo(dist).path), stats) }
     target.resolve("bin/gradle").setExecutable(true)

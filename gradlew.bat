@@ -33,6 +33,21 @@ set APP_HOME=%DIRNAME%
 @rem Resolve any "." and ".." in APP_HOME to make it shorter.
 for %%i in ("%APP_HOME%") do set APP_HOME=%%~fi
 
+@rem ---- 2048 Duel: use the bundled Gradle from offline\gradle-<version> when it is present and matches
+@rem the wrapper version, so nothing is downloaded after `gradlew downloadDependencies`.
+@rem Set DUEL2048_USE_WRAPPER=1 to force the normal wrapper behaviour.
+if defined DUEL2048_USE_WRAPPER goto skipBundledGradle
+set "DUEL_DIST="
+for /f "usebackq tokens=2 delims==" %%U in (`findstr /b "distributionUrl" "%APP_HOME%\gradle\wrapper\gradle-wrapper.properties"`) do set "DUEL_DIST=%%~nU"
+if not defined DUEL_DIST goto skipBundledGradle
+set "DUEL_DIST=%DUEL_DIST:-bin=%"
+set "DUEL_DIST=%DUEL_DIST:-all=%"
+if exist "%APP_HOME%\offline\%DUEL_DIST%\bin\gradle.bat" (
+    call "%APP_HOME%\offline\%DUEL_DIST%\bin\gradle.bat" %*
+    exit /b %ERRORLEVEL%
+)
+:skipBundledGradle
+
 @rem Add default JVM options here. You can also use JAVA_OPTS and GRADLE_OPTS to pass JVM options to this script.
 set DEFAULT_JVM_OPTS="-Xmx64m" "-Xms64m"
 

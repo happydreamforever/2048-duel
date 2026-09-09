@@ -225,7 +225,11 @@ exports everything it fetched:
 | `offline-repo/` | every dependency, Gradle plugin, Kotlin compiler, Android build tool and `aapt2` for Windows, macOS and Linux, in Maven layout | ~375 MB |
 | `offline/gradle-8.11.1/` | the Gradle distribution itself | ~146 MB |
 
-Both folders are **git-ignored**: they are generated, not committed. To build on a machine without
+Both folders are **git-ignored**: they are generated, not committed. From then on the normal
+`gradlew` / `gradlew.bat` also runs on the bundled Gradle (whenever `offline/gradle-<version>` matches
+`gradle-wrapper.properties`) and resolves from `offline-repo/`, so nothing is downloaded any more;
+`gradlew-offline` is the same plus `--offline`, which forbids network access outright. Set
+`DUEL2048_USE_WRAPPER=1` to force the stock wrapper behaviour. To build on a machine without
 internet, copy the whole project folder (or a zip of it) including those two folders. There:
 
 ```

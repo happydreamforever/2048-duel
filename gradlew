@@ -86,6 +86,17 @@ APP_BASE_NAME=${0##*/}
 # Discard cd standard output in case $CDPATH is set (https://github.com/gradle/gradle/issues/25036)
 APP_HOME=$( cd "${APP_HOME:-./}" > /dev/null && pwd -P ) || exit
 
+# ---- 2048 Duel: use the bundled Gradle from offline/gradle-<version> when it is present and matches
+# the wrapper version, so nothing is downloaded after `gradlew downloadDependencies`.
+# Set DUEL2048_USE_WRAPPER=1 to force the normal wrapper behaviour.
+if [ -z "$DUEL2048_USE_WRAPPER" ]; then
+    _duel_dist=$( sed -nE 's#^distributionUrl=.*/(gradle-[0-9.]+)-(bin|all)\.zip$#\1#p' "$APP_HOME/gradle/wrapper/gradle-wrapper.properties" 2>/dev/null )
+    if [ -n "$_duel_dist" ] && [ -f "$APP_HOME/offline/$_duel_dist/bin/gradle" ]; then
+        chmod +x "$APP_HOME/offline/$_duel_dist/bin/gradle" 2>/dev/null || true
+        exec "$APP_HOME/offline/$_duel_dist/bin/gradle" "$@"
+    fi
+fi
+
 # Use the maximum available, or set MAX_FD != -1 to use that value.
 MAX_FD=maximum
 
