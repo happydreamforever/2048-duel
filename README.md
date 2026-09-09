@@ -240,6 +240,10 @@ with Android Studio beforehand. `settings.gradle.kts` also puts `offline-repo/` 
 repository list whenever it exists, so the normal `gradlew` stops downloading as well. After
 changing any version in `gradle/libs.versions.toml`, run `downloadDependencies` again while online.
 
+If `downloadDependencies` reports that a file cannot be written, another program is holding an
+exported jar open (Android Studio with the project open, or a Gradle daemon): close it, run
+`gradlew --stop`, and re-run. Already exported files are kept.
+
 ## Tests
 
 ```bash

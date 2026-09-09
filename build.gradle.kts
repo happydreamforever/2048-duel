@@ -83,14 +83,37 @@ fun artifactRenames(versionDir: File): Map<String, String> {
     return renames
 }
 
+/**
+ * Copies [source] to [target] unless an identical file (same size) is already there. Existing
+ * files are updated in place rather than deleted first, so a jar held open by another process
+ * (Android Studio, a Gradle daemon) on Windows does not abort the export when it is unchanged.
+ */
+fun syncFile(source: File, target: File, stats: LongArray) {
+    if (target.isFile && target.length() == source.length()) {
+        stats[2]++
+        return
+    }
+    target.parentFile.mkdirs()
+    try {
+        source.copyTo(target, overwrite = true)
+        stats[0]++
+        stats[1] += source.length()
+    } catch (e: Exception) {
+        throw GradleException(
+            "Cannot write $target (${e.message}). Another program holds it open: close Android Studio, run " +
+                "`gradlew --stop`, then re-run. Files already exported are kept.",
+        )
+    }
+}
+
 /** files-2.1/<group>/<module>/<version>/<sha1>/<file>  ->  offline-repo/<group/as/path>/<module>/<version>/<url-name> */
 fun exportDependencyCache() {
     val files21 = offlineHome.resolve("caches/modules-2/files-2.1")
     require(files21.isDirectory) { "no dependency cache at $files21; run the child build first" }
-    offlineRepo.deleteRecursively()
-    var count = 0
-    var bytes = 0L
+    offlineRepo.mkdirs()
+    val stats = LongArray(3) // copied, bytes, unchanged
     var renamed = 0
+    val wanted = HashSet<File>()
     for (group in files21.listFiles()!!.filter { it.isDirectory }) {
         val groupPath = group.name.replace('.', '/')
         for (module in group.listFiles()!!.filter { it.isDirectory }) {
@@ -102,16 +125,20 @@ fun exportDependencyCache() {
                         val targetName = renames[file.name] ?: file.name
                         if (targetName != file.name) renamed++
                         val target = offlineRepo.resolve("$groupPath/${module.name}/${version.name}/$targetName")
-                        target.parentFile.mkdirs()
-                        file.copyTo(target, overwrite = true)
-                        count++
-                        bytes += file.length()
+                        wanted += target.absoluteFile
+                        syncFile(file, target, stats)
                     }
                 }
             }
         }
     }
-    logger.lifecycle("offline-repo: $count files, ${bytes / 1_048_576} MB ($renamed renamed per module metadata)")
+    // Remove leftovers from older versions; failures (locked files) are only reported.
+    var stale = 0
+    var locked = 0
+    offlineRepo.walkBottomUp().forEach { f ->
+        if (f.isFile && f.absoluteFile !in wanted) { if (f.delete()) stale++ else locked++ } else if (f.isDirectory && f != offlineRepo && f.listFiles().isNullOrEmpty()) f.delete()
+    }
+    logger.lifecycle("offline-repo: ${wanted.size} files (${stats[0]} copied, ${stats[1] / 1_048_576} MB; ${stats[2]} unchanged; $renamed renamed per module metadata; $stale stale removed" + (if (locked > 0) "; $locked stale files locked, delete them later" else "") + ")")
 }
 
 fun exportGradleDistribution() {
@@ -119,10 +146,10 @@ fun exportGradleDistribution() {
     val dist = dists.walkTopDown().maxDepth(3).firstOrNull { it.isDirectory && it.name.startsWith("gradle-") && it.resolve("bin").isDirectory }
         ?: throw GradleException("no Gradle distribution under $dists")
     val target = offlineDistDir.resolve(dist.name)
-    target.deleteRecursively()
-    dist.copyRecursively(target, overwrite = true)
+    val stats = LongArray(3)
+    dist.walkTopDown().filter { it.isFile }.forEach { f -> syncFile(f, target.resolve(f.relativeTo(dist).path), stats) }
     target.resolve("bin/gradle").setExecutable(true)
-    logger.lifecycle("offline/${dist.name}: Gradle distribution copied")
+    logger.lifecycle("offline/${dist.name}: Gradle distribution ready (${stats[0]} files copied, ${stats[2]} unchanged)")
 }
 
 tasks.register("fetchPlatformArtifacts") {
