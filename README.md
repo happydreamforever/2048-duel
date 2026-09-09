@@ -233,10 +233,16 @@ gradlew-offline.bat :android:assembleRelease     # Windows
 ./gradlew-offline.sh :android:assembleRelease    # Linux/macOS
 ```
 
-`gradlew-offline` uses the bundled Gradle, passes `--offline`, and keeps its cache in
-`.gradle-user-home/` inside the project, so nothing outside the folder is needed except a JDK 17+
-and the Android SDK (platform 35, build-tools 35.0.0). Those two cannot be bundled; install them
-with Android Studio beforehand. `settings.gradle.kts` also puts `offline-repo/` first in the
+`gradlew-offline` uses the bundled Gradle and passes `--offline`; dependencies come from
+`offline-repo/`, so the only things the machine needs are a JDK 17+ and the Android SDK
+(platform 35, build-tools 35.0.0). Those two cannot be bundled; install them with Android Studio
+beforehand. Gradle's own working cache goes to the usual `~/.gradle` (`%USERPROFILE%\.gradle`) and
+is created automatically if missing; set `GRADLE_USER_HOME` to put it elsewhere.
+
+Windows note: if a build stops with "Could not move temporary workspace ... to immutable location",
+an antivirus scanner is holding freshly written files in Gradle's transform cache. Delete the
+`caches\8.11.1\transforms` folder of the Gradle home it names, add the project and Gradle home
+folders to the scanner's exclusions, and re-run. `settings.gradle.kts` also puts `offline-repo/` first in the
 repository list whenever it exists, so the normal `gradlew` stops downloading as well. After
 changing any version in `gradle/libs.versions.toml`, run `downloadDependencies` again while online.
 
