@@ -239,6 +239,19 @@ gradlew-offline.bat :android:assembleRelease     # Windows
 beforehand. Gradle's own working cache goes to the usual `~/.gradle` (`%USERPROFILE%\.gradle`) and
 is created automatically if missing; set `GRADLE_USER_HOME` to put it elsewhere.
 
+### Server without internet
+
+```
+run-server-offline.bat        # Windows   (Linux/macOS: ./run-server-offline.sh)
+```
+
+This builds `server/build/install/server/` with the bundled Gradle and starts it. The server
+itself never needs the internet, only a database on the local machine or LAN: install MariaDB or
+MySQL there and point `database.json` at it, or put `DB=json` in `server.env` to keep accounts in
+`data/duel2048-db.json` with no database server at all. Once built, the distribution is a plain
+folder; `server\build\install\server\bin\server.bat` (or `bin/server`) starts it directly, and it
+can be copied to another machine that only has a JDK.
+
 Windows note: if a build stops with "Could not move temporary workspace ... to immutable location",
 an antivirus scanner is holding freshly written files in Gradle's transform cache. Delete the
 `caches\8.11.1\transforms` folder of the Gradle home it names, add the project and Gradle home
