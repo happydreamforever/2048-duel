@@ -5,5 +5,5 @@
 # MySQL: DB_URL=jdbc:mysql://127.0.0.1:3306/duel2048 DB_USER=duel2048 DB_PASSWORD=duel2048 (defaults); DB=json for the file store
 set -e
 cd "$(dirname "$0")"
-./gradlew -q :server:installDist
+./gradlew -q -Pduel2048.serverOnly :server:installDist
 exec server/build/install/server/bin/server

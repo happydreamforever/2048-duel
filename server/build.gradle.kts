@@ -1,4 +1,4 @@
-import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
     alias(libs.plugins.kotlin.jvm)
@@ -7,15 +7,14 @@ plugins {
 }
 
 // Authoritative match server: Ktor WebSockets + the shared engine.
+// Java 8 bytecode: the deployment target is a JRE 8 host (logback 1.3 / HikariCP 4 match this).
 java {
-    sourceCompatibility = JavaVersion.VERSION_17
-    targetCompatibility = JavaVersion.VERSION_17
+    sourceCompatibility = JavaVersion.VERSION_1_8
+    targetCompatibility = JavaVersion.VERSION_1_8
 }
 
-kotlin {
-    compilerOptions {
-        jvmTarget.set(JvmTarget.JVM_17)
-    }
+tasks.withType<KotlinCompile>().configureEach {
+    kotlinOptions.jvmTarget = "1.8"
 }
 
 application {

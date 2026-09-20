@@ -51,9 +51,14 @@ Captured on an API 35 emulator (software renderer, so **Reduce effects** was on:
 
 ## Requirements
 
-- JDK 17+ (the project was built with JDK 21)
-- Android SDK with platform 35 and build-tools 35 (`local.properties` → `sdk.dir=...`)
-- Gradle wrapper is included (Gradle 8.11.1, AGP 8.7.3, Kotlin 2.1.10, Compose BOM 2025.01.01)
+- JDK 11 to 18 for the app (AGP 7.3.1 needs JDK 11+, and Gradle 7.4.2 supports up to Java 18 — not 21)
+- Android SDK with platform 33 and build-tools 33 (`local.properties` → `sdk.dir=...`)
+- Gradle wrapper is included (Gradle 7.4.2, AGP 7.3.1, Kotlin 1.9.24, Compose BOM 2023.06.00)
+
+JDK 11+ and the Android SDK are only needed for the **app**. The **server** builds with plain
+JDK 8 (`./gradlew -Pduel2048.serverOnly :server:installDist`) and the built distribution runs on
+a JRE 8: `:server` and `:shared` target Java 8 bytecode, and the server dependencies stay on
+Java 8 lines (logback 1.3, HikariCP 4).
 
 ## Run the server
 
@@ -223,7 +228,7 @@ exports everything it fetched:
 | Folder | Contents | Size |
 |---|---|---|
 | `offline-repo/` | every dependency, Gradle plugin, Kotlin compiler, Android build tool and `aapt2` for Windows, macOS and Linux, in Maven layout | ~375 MB |
-| `offline/gradle-8.11.1/` | the Gradle distribution itself | ~146 MB |
+| `offline/gradle-7.4.2/` | the Gradle distribution itself | ~146 MB |
 
 Both folders are **git-ignored**: they are generated, not committed. From then on the normal
 `gradlew` / `gradlew.bat` also runs on the bundled Gradle (whenever `offline/gradle-<version>` matches
@@ -238,8 +243,8 @@ gradlew-offline.bat :android:assembleRelease     # Windows
 ```
 
 `gradlew-offline` uses the bundled Gradle and passes `--offline`; dependencies come from
-`offline-repo/`, so the only things the machine needs are a JDK 17+ and the Android SDK
-(platform 35, build-tools 35.0.0). Those two cannot be bundled; install them with Android Studio
+`offline-repo/`, so the only things the machine needs are a JDK 11–18 and the Android SDK
+(platform 33, build-tools 33.0.0). Those two cannot be bundled; install them with Android Studio
 beforehand. Gradle's own working cache goes to the usual `~/.gradle` (`%USERPROFILE%\.gradle`) and
 is created automatically if missing; set `GRADLE_USER_HOME` to put it elsewhere.
 
@@ -254,11 +259,33 @@ itself never needs the internet, only a database on the local machine or LAN: in
 MySQL there and point `database.json` at it, or put `DB=json` in `server.env` to keep accounts in
 `data/duel2048-db.json` with no database server at all. Once built, the distribution is a plain
 folder; `server\build\install\server\bin\server.bat` (or `bin/server`) starts it directly, and it
-can be copied to another machine that only has a JDK.
+can be copied to another machine that only has a JRE 8.
+
+### Old machine with only JDK 8, no Android SDK
+
+Add `-Pduel2048.serverOnly`: the `:android` module is skipped, so AGP (which requires JDK 11+)
+is never resolved and no Android SDK is needed. On the machine with internet, export a
+server-only offline bundle:
+
+```
+gradlew downloadDependencies -Pduel2048.serverOnly     # online, once
+```
+
+Copy the project folder including `offline-repo/` and `offline/` to the old machine, and there:
+
+```
+gradlew-offline.bat -Pduel2048.serverOnly :server:installDist    # Windows
+./gradlew-offline.sh -Pduel2048.serverOnly :server:installDist   # Linux/macOS
+run-server-offline.bat                                           # or build + run in one step (serverOnly is built in)
+```
+
+A server-only bundle contains no Android/AGP artifacts, so on that machine the flag is required,
+not optional. (Alternatively, skip Gradle on the old machine entirely: copy a ready-made
+`server/build/install/server/` from any machine — it runs on a JRE 8 with nothing else installed.)
 
 Windows note: if a build stops with "Could not move temporary workspace ... to immutable location",
 an antivirus scanner is holding freshly written files in Gradle's transform cache. Delete the
-`caches\8.11.1\transforms` folder of the Gradle home it names, add the project and Gradle home
+`caches\7.4.2\transforms` folder of the Gradle home it names, add the project and Gradle home
 folders to the scanner's exclusions, and re-run. `settings.gradle.kts` also puts `offline-repo/` first in the
 repository list whenever it exists, so the normal `gradlew` stops downloading as well. After
 changing any version in `gradle/libs.versions.toml`, run `downloadDependencies` again while online.

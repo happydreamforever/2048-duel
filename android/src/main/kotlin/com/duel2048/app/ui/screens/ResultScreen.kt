@@ -19,7 +19,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Divider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -125,7 +125,7 @@ fun ResultScreen(vm: MainViewModel) {
                         Text(stringResource(R.string.you).uppercase(), Modifier.weight(1f), style = MaterialTheme.typography.labelSmall, color = palette.accent, textAlign = TextAlign.End)
                         Text((duel.opponent.info?.name ?: stringResource(R.string.opponent)).uppercase().take(8), Modifier.weight(1f), style = MaterialTheme.typography.labelSmall, color = palette.danger, textAlign = TextAlign.End, maxLines = 1)
                     }
-                    HorizontalDivider(Modifier.padding(vertical = 8.dp), color = palette.surfaceBorder)
+                    Divider(Modifier.padding(vertical = 8.dp), color = palette.surfaceBorder)
                     ResultRow(stringResource(R.string.score), me, opp) { it.score }
                     ResultRow(stringResource(R.string.max_tile), me, opp) { it.maxTile }
                     ResultRow(stringResource(R.string.moves), me, opp) { it.moves }

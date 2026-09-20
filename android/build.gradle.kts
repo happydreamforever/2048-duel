@@ -1,10 +1,9 @@
-import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 import java.util.Properties
 
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
-    alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
 }
 
@@ -51,21 +50,25 @@ android {
     }
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
+        // AGP 7.3.1 era: Java 8 targets are the safest input for its D8; the module is pure Kotlin.
+        sourceCompatibility = JavaVersion.VERSION_1_8
+        targetCompatibility = JavaVersion.VERSION_1_8
     }
 
     buildFeatures { compose = true }
 
-    packaging {
-        resources { excludes += "/META-INF/{AL2.0,LGPL2.1}" }
+    composeOptions {
+        // Kotlin 1.9.24 pairs with Compose compiler 1.5.14 (see gradle/libs.versions.toml).
+        kotlinCompilerExtensionVersion = libs.versions.composeCompiler.get()
+    }
+
+    packagingOptions {
+        excludes += "/META-INF/{AL2.0,LGPL2.1}"
     }
 }
 
-kotlin {
-    compilerOptions {
-        jvmTarget.set(JvmTarget.JVM_17)
-    }
+tasks.withType<KotlinCompile>().configureEach {
+    kotlinOptions.jvmTarget = "1.8"
 }
 
 // Refuse to produce an unsigned release build; explain how to create the key.

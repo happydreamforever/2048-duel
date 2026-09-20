@@ -1,11 +1,10 @@
 // Root build file. Module builds live in shared/, server/ and android/.
-plugins {
-    alias(libs.plugins.android.application) apply false
-    alias(libs.plugins.kotlin.android) apply false
-    alias(libs.plugins.kotlin.jvm) apply false
-    alias(libs.plugins.kotlin.compose) apply false
-    alias(libs.plugins.kotlin.serialization) apply false
-}
+//
+// Deliberately NO plugins {} block: modules version their own plugins via gradle/libs.versions.toml.
+// Declaring a subset here breaks the android module ("already on the classpath with an unknown
+// version"), and declaring all of them would force every build - including server-only builds on
+// hosts without JDK 17/Android SDK (-Pduel2048.serverOnly) - to resolve AGP 8, which is Java 17
+// bytecode.
 
 // ---------------------------------------------------------------------------------------------
 // Offline builds.
@@ -23,7 +22,8 @@ val offlineHome: File = rootDir.resolve(".gradle-offline-home")
 val offlineRepo: File = rootDir.resolve("offline-repo")
 val offlineDistDir: File = rootDir.resolve("offline")
 
-fun isWindows(): Boolean = System.getProperty("os.name").lowercase().contains("win")
+// No String.lowercase() here: build scripts compile against Gradle 7.4.2's embedded Kotlin 1.5.
+fun isWindows(): Boolean = System.getProperty("os.name").startsWith("Windows")
 
 /**
  * Copies the Gradle distribution this build is running on into the fresh home so the child
@@ -42,8 +42,10 @@ fun seedGradleDistribution() {
 }
 
 fun runChildGradle(vararg args: String) {
+    val serverOnly = providers.gradleProperty("duel2048.serverOnly").isPresent
     val launcher = if (isWindows()) listOf("cmd", "/c", rootDir.resolve("gradlew.bat").absolutePath) else listOf(rootDir.resolve("gradlew").absolutePath)
-    val command = launcher + listOf("--no-daemon", "--console=plain", "-Dduel2048.offlineRepo=false") + args
+    val command = launcher + listOf("--no-daemon", "--console=plain", "-Dduel2048.offlineRepo=false") +
+        (if (serverOnly) listOf("-Pduel2048.serverOnly") else emptyList()) + args
     logger.lifecycle("> child build: ${args.joinToString(" ")}")
     logger.lifecycle("  GRADLE_USER_HOME=$offlineHome")
     val process = ProcessBuilder(command)
@@ -188,8 +190,13 @@ tasks.register("downloadDependencies") {
         logger.lifecycle("on a slow connection this can take a long time. Interrupting and re-running continues where it stopped.")
         logger.lifecycle("")
         seedGradleDistribution()
-        val tasksToRun = mutableListOf(":shared:test", ":server:test", ":server:installDist", ":android:assembleDebug", ":android:testDebugUnitTest")
-        if (rootDir.resolve("keystore.properties").isFile) tasksToRun += ":android:assembleRelease" else logger.warn("keystore.properties not found: release-only tools are skipped (run tools/create-keystore first to include them)")
+        val serverOnly = providers.gradleProperty("duel2048.serverOnly").isPresent
+        val tasksToRun = mutableListOf(":shared:test", ":server:test", ":server:installDist")
+        if (!serverOnly) {
+            // AGP needs JDK 17 and the Android SDK; skipped for server-only bundles.
+            tasksToRun += listOf(":android:assembleDebug", ":android:testDebugUnitTest")
+            if (rootDir.resolve("keystore.properties").isFile) tasksToRun += ":android:assembleRelease" else logger.warn("keystore.properties not found: release-only tools are skipped (run tools/create-keystore first to include them)")
+        }
         runChildGradle(*tasksToRun.toTypedArray())
         val aapt2Versions = offlineHome.resolve("caches/modules-2/files-2.1/com.android.tools.build/aapt2").listFiles()?.filter { it.isDirectory }?.map { it.name }.orEmpty()
         for (v in aapt2Versions) runChildGradle("fetchPlatformArtifacts", "-Paapt2Version=$v")

@@ -4,6 +4,6 @@ rem Usage: run-server.bat            (port 8080)
 rem        set PORT=8765 && run-server.bat
 setlocal
 cd /d "%~dp0"
-call gradlew.bat -q :server:installDist
+call gradlew.bat -q -Pduel2048.serverOnly :server:installDist
 if errorlevel 1 exit /b 1
 call "%~dp0server\build\install\server\bin\server.bat"

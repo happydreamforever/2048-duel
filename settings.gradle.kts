@@ -41,4 +41,12 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "duel2048"
-include(":shared", ":server", ":android")
+
+// -Pduel2048.serverOnly excludes the Android module so :shared/:server can be built on hosts
+// without the Android SDK or a JDK new enough for AGP 8 (which requires JDK 17): Gradle 8 itself
+// runs on JDK 8. Server-only offline bundles (gradlew downloadDependencies -Pduel2048.serverOnly)
+// do not contain AGP, so such hosts MUST set this property.
+val serverOnly = providers.gradleProperty("duel2048.serverOnly").isPresent
+if (serverOnly) logger.lifecycle("duel2048.serverOnly: :android is excluded from this build")
+include(":shared", ":server")
+if (!serverOnly) include(":android")
