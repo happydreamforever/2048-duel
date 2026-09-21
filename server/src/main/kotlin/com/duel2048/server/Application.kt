@@ -61,7 +61,7 @@ fun createStore(config: ServerConfig): UserStore {
         println("   CREATE DATABASE duel2048 CHARACTER SET utf8mb4;")
         println("   CREATE USER 'duel2048'@'%' IDENTIFIED BY 'duel2048';")
         println("   GRANT ALL PRIVILEGES ON duel2048.* TO 'duel2048'@'%';")
-        println(" or run `docker compose up` (starts MySQL + server), or set DB=json for a file-based store.")
+        println(" or set DB=json for a file-based store (no MySQL needed).")
         exitProcess(1)
     }
 }

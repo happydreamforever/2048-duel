@@ -5,7 +5,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
@@ -41,7 +41,7 @@ fun AmbientBackground(palette: DuelPalette, modifier: Modifier = Modifier.fillMa
         val rnd = Random(palette.id.hashCode() + 99)
         List(46) { Star(rnd.nextFloat(), rnd.nextFloat(), 0.6f + rnd.nextFloat() * 1.4f, rnd.nextFloat() * 6.28f) }
     }
-    var t by remember { mutableFloatStateOf(0f) }
+    var t by remember { mutableStateOf(0f) }
     LaunchedEffect(palette.id, animated) {
         if (!animated) return@LaunchedEffect
         val start = withFrameNanos { it }

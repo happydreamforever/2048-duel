@@ -23,7 +23,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameMillis
@@ -49,7 +49,7 @@ fun MatchmakingScreen(vm: MainViewModel) {
     val duel by session.state.collectAsStateWithLifecycle()
     val settings by vm.settings.collectAsStateWithLifecycle()
     val palette = LocalPalette.current
-    var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    var now by remember { mutableStateOf(System.currentTimeMillis()) }
     LaunchedEffect(Unit) {
         while (true) withFrameMillis { now = System.currentTimeMillis() }
     }
@@ -90,7 +90,7 @@ fun MatchmakingScreen(vm: MainViewModel) {
                 )
                 Spacer(Modifier.height(14.dp))
                 LinearProgressIndicator(
-                    progress = { (elapsedMs.toFloat() / duel.botFallbackMs).coerceIn(0f, 1f) },
+                    progress = (elapsedMs.toFloat() / duel.botFallbackMs).coerceIn(0f, 1f),
                     modifier = Modifier.fillMaxWidth(0.7f),
                     color = palette.accent,
                     trackColor = Color.White.copy(alpha = 0.1f),

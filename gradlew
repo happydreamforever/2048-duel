@@ -86,6 +86,18 @@ APP_BASE_NAME=${0##*/}
 # Discard cd standard output in case $CDPATH is set (https://github.com/gradle/gradle/issues/25036)
 APP_HOME=$( cd "${APP_HOME:-./}" > /dev/null && pwd -P ) || exit
 
+# ---- 2048 Duel: prefer a project-local portable JDK (an unpacked Temurin zip as jdk/ or
+# jdk-11...) when JAVA_HOME is not set, so the build machine needs no installed Java.
+if [ -z "$JAVA_HOME" ]; then
+    for _duel_jdk in "$APP_HOME/jdk" "$APP_HOME"/jdk-11*; do
+        if [ -x "$_duel_jdk/bin/java" ]; then
+            JAVA_HOME=$_duel_jdk
+            export JAVA_HOME
+            break
+        fi
+    done
+fi
+
 # ---- 2048 Duel: use the bundled Gradle from offline/gradle-<version> when it is present and matches
 # the wrapper version, so nothing is downloaded after `gradlew downloadDependencies`.
 # Set DUEL2048_USE_WRAPPER=1 to force the normal wrapper behaviour.

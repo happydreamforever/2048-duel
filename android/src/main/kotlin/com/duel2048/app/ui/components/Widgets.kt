@@ -113,6 +113,7 @@ fun NeonButton(
 }
 
 /** Title text with a light band sweeping across a gradient. */
+@OptIn(androidx.compose.ui.text.ExperimentalTextApi::class)
 @Composable
 fun ShimmerTitle(text: String, fontSize: TextUnit, modifier: Modifier = Modifier, letterSpacing: TextUnit = (-2).sp) {
     val palette = LocalPalette.current

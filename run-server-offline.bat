@@ -5,6 +5,14 @@ rem        set PORT=8765 && run-server-offline.bat
 rem        run-server-offline.bat -Pduel2048.serverOnly     (old JDK 8 machine, no Android SDK)
 setlocal
 cd /d "%~dp0"
+rem Prefer a project-local portable JDK (jdk\ or jdk-11...) when JAVA_HOME is not set.
+if defined JAVA_HOME goto duelJdkDone
+if exist "jdk\bin\java.exe" (
+    set "JAVA_HOME=%CD%\jdk"
+    goto duelJdkDone
+)
+for /d %%D in ("jdk-11*") do if exist "%%D\bin\java.exe" set "JAVA_HOME=%%~fD"
+:duelJdkDone
 call gradlew-offline.bat -q -Pduel2048.serverOnly :server:installDist
 if errorlevel 1 exit /b 1
 call "%~dp0server\build\install\server\bin\server.bat"

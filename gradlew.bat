@@ -33,6 +33,16 @@ set APP_HOME=%DIRNAME%
 @rem Resolve any "." and ".." in APP_HOME to make it shorter.
 for %%i in ("%APP_HOME%") do set APP_HOME=%%~fi
 
+@rem ---- 2048 Duel: prefer a project-local portable JDK (an unpacked Temurin zip as jdk\ or
+@rem jdk-11...) when JAVA_HOME is not set, so the build machine needs no installed Java.
+if defined JAVA_HOME goto duelJdkDone
+if exist "%APP_HOME%\jdk\bin\java.exe" (
+    set "JAVA_HOME=%APP_HOME%\jdk"
+    goto duelJdkDone
+)
+for /d %%D in ("%APP_HOME%\jdk-11*") do if exist "%%D\bin\java.exe" set "JAVA_HOME=%%D"
+:duelJdkDone
+
 @rem ---- 2048 Duel: use the bundled Gradle from offline\gradle-<version> when it is present and matches
 @rem the wrapper version, so nothing is downloaded after `gradlew downloadDependencies`.
 @rem Set DUEL2048_USE_WRAPPER=1 to force the normal wrapper behaviour.

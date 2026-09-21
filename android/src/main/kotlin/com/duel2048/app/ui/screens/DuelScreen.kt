@@ -37,7 +37,6 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -94,7 +93,7 @@ fun DuelScreen(vm: MainViewModel) {
         session.effects.collect { handleEffect(it, myFx, oppFx, gfx, palette, fxStrings) }
     }
 
-    var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    var now by remember { mutableStateOf(System.currentTimeMillis()) }
     LaunchedEffect(duel.phase) {
         if (duel.phase == DuelPhase.PLAYING) {
             while (true) withFrameMillis { now = System.currentTimeMillis() }

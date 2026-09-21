@@ -5,7 +5,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
@@ -46,7 +46,7 @@ class ParticleSystem(seed: Int = 1) {
     var density: Float = 2f
 
     /** Bumped every animated frame; Canvas reads it to redraw. */
-    var frame by mutableLongStateOf(0L)
+    var frame by mutableStateOf(0L)
         private set
 
     val isActive: Boolean get() = particles.isNotEmpty() || rings.isNotEmpty()

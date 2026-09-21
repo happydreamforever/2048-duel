@@ -50,6 +50,7 @@ fun Modifier.swipeInput(enabled: Boolean = true, thresholdPx: Float = 56f, onSwi
 }
 
 /** Arrow keys / WASD for keyboards and emulators. */
+@OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class) // Key constants are experimental in compose-ui 1.4
 fun Modifier.keyboardInput(onMove: (Direction) -> Unit): Modifier = onPreviewKeyEvent { e ->
     if (e.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
     val dir = when (e.key) {

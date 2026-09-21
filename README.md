@@ -51,14 +51,27 @@ Captured on an API 35 emulator (software renderer, so **Reduce effects** was on:
 
 ## Requirements
 
-- JDK 11 to 18 for the app (AGP 7.3.1 needs JDK 11+, and Gradle 7.4.2 supports up to Java 18 — not 21)
+- JDK 11 for everything — one JDK builds both the app and the server (AGP 7.3.1 needs 11+;
+  Gradle 7.4.2 accepts 11–18, not 21). Server-only builds still work on plain JDK 8.
 - Android SDK with platform 33 and build-tools 33 (`local.properties` → `sdk.dir=...`)
 - Gradle wrapper is included (Gradle 7.4.2, AGP 7.3.1, Kotlin 1.9.24, Compose BOM 2023.06.00)
 
-JDK 11+ and the Android SDK are only needed for the **app**. The **server** builds with plain
-JDK 8 (`./gradlew -Pduel2048.serverOnly :server:installDist`) and the built distribution runs on
+The **server** alone still builds with plain JDK 8
+(`./gradlew -Pduel2048.serverOnly :server:installDist`) and the built distribution runs on
 a JRE 8: `:server` and `:shared` target Java 8 bytecode, and the server dependencies stay on
 Java 8 lines (logback 1.3, HikariCP 4).
+
+### Portable JDK (no installer, no admin rights)
+
+`gradlew`, `gradlew-offline` and the `run-server` scripts pick up a project-local JDK
+automatically when `JAVA_HOME` is not set: unpack a Temurin JDK zip into the project folder and
+leave its `jdk-11.x.x` folder there (or rename it to `jdk`). On Windows:
+
+```
+tar -xf OpenJDK11U-jdk_x64_windows_hotspot_11.0.32.1_1.zip     (built-in Windows tar, or use Explorer)
+```
+
+An explicit `JAVA_HOME` always wins over the project-local folder.
 
 ## Run the server
 
@@ -84,9 +97,6 @@ Environment variables: `PORT` (8080), `DB_URL`, `DB_USER`, `DB_PASSWORD` (see th
 `BOT_INTERVAL_MS` (550), `BOT_JITTER_MS` (250).
 
 Endpoints: `GET /` (status page), `GET /health`, `GET /stats`, `WS /ws`.
-
-Docker: `docker compose up --build` (MySQL + server), or just the server image with
-`docker build -t duel2048-server -f server/Dockerfile .`
 
 ### The app says "Can't reach server"
 
@@ -158,7 +168,7 @@ its parent, or the path in `DB_CONFIG`):
 
 `type` is `mariadb` (default) or `mysql`; add `"ssl": true` for a TLS-only server. The same
 values can be given as `DB_TYPE`, `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`,
-`DB_CHARSET`, `DB_SSL` in `server.env` or the environment (handy for Docker). For a cloud MySQL
+`DB_CHARSET`, `DB_SSL` in `server.env` or the environment. For a cloud MySQL
 such as Aiven, `DB_URL=mysql://user:password@host:port/db?ssl-mode=REQUIRED` in `server.env`
 also works. Other server options (port, bot timing) live in `server.env`, see `server.env.example`.
 Never commit `database.json` or `server.env`; if a password has been shared in chat or email, rotate it.
@@ -171,10 +181,8 @@ CREATE USER 'duel2048'@'%' IDENTIFIED BY 'duel2048';
 GRANT ALL PRIVILEGES ON duel2048.* TO 'duel2048'@'%';
 ```
 
-Or skip the setup entirely with Docker: `docker compose up --build` starts MySQL and the server
-(data persists in the `mysql-data` volume). If MySQL is unreachable the server explains what
-to do and exits. For quick local development without MySQL set `DB=json`, which keeps users in
-`data/duel2048-db.json` instead.
+If MySQL is unreachable the server explains what to do and exits. For quick local development
+without MySQL set `DB=json`, which keeps users in `data/duel2048-db.json` instead.
 
 Tables: `users` (credentials + stats) and `match_history` (one row per finished match).
 
@@ -204,7 +212,7 @@ git-ignored; **back them up**, every future update must be signed with the same 
 
 Without the key the release build stops with an explanation. The values can also be provided as
 environment variables `KEYSTORE_FILE`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD` (CI).
-The server needs no signing; ship it with `./gradlew :server:distZip` or the Dockerfile.
+The server needs no signing; ship it with `./gradlew :server:distZip`.
 
 ## Languages
 
@@ -243,8 +251,8 @@ gradlew-offline.bat :android:assembleRelease     # Windows
 ```
 
 `gradlew-offline` uses the bundled Gradle and passes `--offline`; dependencies come from
-`offline-repo/`, so the only things the machine needs are a JDK 11–18 and the Android SDK
-(platform 33, build-tools 33.0.0). Those two cannot be bundled; install them with Android Studio
+`offline-repo/`, so the only things the machine needs are a JDK (11; see "Portable JDK" above)
+and the Android SDK (platform 33, build-tools 33.0.0). Those two cannot be bundled; install them with Android Studio
 beforehand. Gradle's own working cache goes to the usual `~/.gradle` (`%USERPROFILE%\.gradle`) and
 is created automatically if missing; set `GRADLE_USER_HOME` to put it elsewhere.
 

@@ -1,10 +1,11 @@
 package com.duel2048.app
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.ContentTransform
+import androidx.compose.animation.ExperimentalAnimationApi
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
@@ -33,6 +34,7 @@ import com.duel2048.app.ui.theme.DuelTheme
 import com.duel2048.app.ui.theme.LocalLowEffects
 import com.duel2048.app.ui.theme.Palettes
 
+@OptIn(ExperimentalAnimationApi::class)
 @Composable
 fun Duel2048App(vm: MainViewModel) {
     val settings by vm.settings.collectAsStateWithLifecycle()
@@ -60,7 +62,7 @@ fun Duel2048App(vm: MainViewModel) {
                     AmbientBackground(palette, animated = !settings.lowEffects)
                     AnimatedContent(
                         targetState = screen,
-                        transitionSpec = { (fadeIn() + scaleIn(initialScale = 0.96f)).togetherWith(fadeOut()) },
+                        transitionSpec = { ContentTransform(fadeIn() + scaleIn(initialScale = 0.96f), fadeOut()) },
                         label = "screen",
                     ) { target ->
                         when (target) {
