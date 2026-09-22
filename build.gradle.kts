@@ -54,9 +54,19 @@ fun runChildGradle(vararg args: String) {
         .also { it.environment()["GRADLE_USER_HOME"] = offlineHome.absolutePath }
         .start()
     // Stream the child's output through this build's logger; inheritIO would go to the daemon, not the console.
-    process.inputStream.bufferedReader().useLines { lines -> lines.forEach { logger.lifecycle("  | $it") } }
+    // Also scan for "BUILD FAILED": on Windows the Gradle launcher can return exit code 0 after a failed
+    // build, and exporting a broken cache as if it were complete is worse than failing loudly.
+    var failed = false
+    process.inputStream.bufferedReader().useLines { lines ->
+        lines.forEach { line ->
+            logger.lifecycle("  | $line")
+            if (line.startsWith("BUILD FAILED")) failed = true
+        }
+    }
     val code = process.waitFor()
-    if (code != 0) throw GradleException("child build failed with exit code $code: ${args.joinToString(" ")}")
+    if (code != 0 || failed) {
+        throw GradleException("child build failed (exit code $code): ${args.joinToString(" ")}")
+    }
 }
 
 /**
