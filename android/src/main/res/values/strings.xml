@@ -6,6 +6,12 @@
     <string name="quick_match_sub">online 1v1 · a bot fills in if nobody is around</string>
     <string name="practice_bot">PRACTICE VS BOT</string>
     <string name="practice_bot_sub">instant online match against the server bot</string>
+    <string name="home_offline_section">OFFLINE TRAINING</string>
+    <string name="home_offline_section_sub">No login or server — play on this device</string>
+    <string name="home_online_section">ONLINE DUEL</string>
+    <string name="home_online_section_sub">Account stats and matchmaking on the server</string>
+    <string name="home_online_login_required">Log in to play online modes below</string>
+    <string name="offline_play_hint">Training and Solo work without an account</string>
     <string name="training">TRAINING</string>
     <string name="training_sub">offline duel against a bot on this device</string>
     <string name="solo_zen">SOLO ZEN</string>
@@ -61,7 +67,7 @@
     <string name="username">Username</string>
     <string name="password">Password</string>
     <string name="login_title">ACCOUNT</string>
-    <string name="login_subtitle">Log in or create an account to play online. Training and Solo work without one.</string>
+    <string name="login_subtitle">Log in or create an account for online duels. Training, Solo, and Cube Training work offline without one.</string>
     <string name="play_offline">PLAY OFFLINE</string>
     <string name="connecting_short">Connecting…</string>
 

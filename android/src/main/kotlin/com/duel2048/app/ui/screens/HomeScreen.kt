@@ -97,22 +97,12 @@ fun HomeScreen(vm: MainViewModel) {
                 fontWeight = FontWeight.Black,
             )
             Spacer(Modifier.height(18.dp))
-            AccountRow(settings, onLogin = { vm.openLogin() }, onLogout = { vm.logout() })
-            Spacer(Modifier.height(14.dp))
+            SectionLabel(
+                stringResource(R.string.home_offline_section),
+                stringResource(R.string.home_offline_section_sub),
+            )
+            Spacer(Modifier.height(8.dp))
             GlassCard(Modifier.fillMaxWidth()) {
-                NeonButton(
-                    stringResource(R.string.quick_match),
-                    subtitle = stringResource(R.string.quick_match_sub),
-                    modifier = Modifier.fillMaxWidth(),
-                ) { vm.startDuel(MatchMode.PVP) }
-                Spacer(Modifier.height(10.dp))
-                NeonButton(
-                    stringResource(R.string.practice_bot),
-                    subtitle = stringResource(R.string.practice_bot_sub),
-                    colors = listOf(palette.accent, palette.orbColors[2]),
-                    modifier = Modifier.fillMaxWidth(),
-                ) { vm.startDuel(MatchMode.BOT) }
-                Spacer(Modifier.height(10.dp))
                 NeonButton(
                     stringResource(R.string.training),
                     subtitle = stringResource(R.string.training_sub),
@@ -128,6 +118,35 @@ fun HomeScreen(vm: MainViewModel) {
                 ) { vm.openSolo() }
                 Spacer(Modifier.height(10.dp))
                 NeonButton(
+                    stringResource(R.string.cube_training),
+                    subtitle = stringResource(R.string.cube_training_sub),
+                    colors = listOf(Color(0xFF1F9D6B), Color(0xFF0E4D3A)),
+                    modifier = Modifier.fillMaxWidth(),
+                ) { showCubeTraining = true }
+            }
+            Spacer(Modifier.height(16.dp))
+            AccountRow(settings, onLogin = { vm.openLogin() }, onLogout = { vm.logout() })
+            Spacer(Modifier.height(14.dp))
+            SectionLabel(
+                stringResource(R.string.home_online_section),
+                if (settings.loggedIn) stringResource(R.string.home_online_section_sub) else stringResource(R.string.home_online_login_required),
+            )
+            Spacer(Modifier.height(8.dp))
+            GlassCard(Modifier.fillMaxWidth()) {
+                NeonButton(
+                    stringResource(R.string.quick_match),
+                    subtitle = stringResource(R.string.quick_match_sub),
+                    modifier = Modifier.fillMaxWidth(),
+                ) { vm.startDuel(MatchMode.PVP) }
+                Spacer(Modifier.height(10.dp))
+                NeonButton(
+                    stringResource(R.string.practice_bot),
+                    subtitle = stringResource(R.string.practice_bot_sub),
+                    colors = listOf(palette.accent, palette.orbColors[2]),
+                    modifier = Modifier.fillMaxWidth(),
+                ) { vm.startDuel(MatchMode.BOT) }
+                Spacer(Modifier.height(10.dp))
+                NeonButton(
                     stringResource(R.string.cube_quick_match),
                     subtitle = stringResource(R.string.cube_quick_match_sub),
                     colors = listOf(Color(0xFF6B4EFF), Color(0xFF2D1B69)),
@@ -140,13 +159,6 @@ fun HomeScreen(vm: MainViewModel) {
                     colors = listOf(Color(0xFF4A6FA5), Color(0xFF1B3A5C)),
                     modifier = Modifier.fillMaxWidth(),
                 ) { vm.startCubeDuel(MatchMode.BOT) }
-                Spacer(Modifier.height(10.dp))
-                NeonButton(
-                    stringResource(R.string.cube_training),
-                    subtitle = stringResource(R.string.cube_training_sub),
-                    colors = listOf(Color(0xFF1F9D6B), Color(0xFF0E4D3A)),
-                    modifier = Modifier.fillMaxWidth(),
-                ) { showCubeTraining = true }
             }
             Spacer(Modifier.height(16.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -239,7 +251,7 @@ private fun AccountRow(settings: UserSettings, onLogin: () -> Unit, onLogout: ()
                 )
             } else {
                 Text(stringResource(R.string.not_logged_in), color = palette.textPrimary, fontWeight = FontWeight.Bold)
-                Text(stringResource(R.string.login_subtitle), style = MaterialTheme.typography.labelSmall, color = palette.textSecondary, maxLines = 2)
+                Text(stringResource(R.string.offline_play_hint), style = MaterialTheme.typography.labelSmall, color = palette.textSecondary, maxLines = 2)
             }
         }
         TextButton(onClick = if (settings.loggedIn) onLogout else onLogin) {
@@ -298,6 +310,15 @@ private fun TrainingSheet(
             NeonButton(stringResource(R.string.start), modifier = Modifier.fillMaxWidth()) { onStart(selected) }
             Spacer(Modifier.navigationBarsPadding())
         }
+    }
+}
+
+@Composable
+private fun SectionLabel(title: String, subtitle: String) {
+    val palette = LocalPalette.current
+    Column(Modifier.fillMaxWidth()) {
+        Text(title, style = MaterialTheme.typography.labelLarge, color = palette.accent, fontWeight = FontWeight.Black)
+        Text(subtitle, style = MaterialTheme.typography.labelSmall, color = palette.textSecondary)
     }
 }
 
