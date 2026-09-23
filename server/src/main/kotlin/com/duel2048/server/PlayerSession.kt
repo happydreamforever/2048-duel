@@ -13,6 +13,7 @@ class PlayerSession(val id: String, private val ws: DefaultWebSocketServerSessio
 
     @Volatile var name: String = "Player"
     @Volatile var match: Match? = null
+    @Volatile var cubeMatch: CubeMatch? = null
     /** Account id once logged in; online play requires it. */
     @Volatile var userId: String? = null
 

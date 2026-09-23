@@ -23,6 +23,9 @@ import com.duel2048.app.fx.LocalGameFx
 import com.duel2048.app.fx.SoundFx
 import com.duel2048.app.ui.components.AmbientBackground
 import com.duel2048.app.ui.rememberLocalizedContext
+import com.duel2048.app.ui.screens.CubeDuelScreen
+import com.duel2048.app.ui.screens.CubeMatchmakingScreen
+import com.duel2048.app.ui.screens.CubeResultScreen
 import com.duel2048.app.ui.screens.DuelScreen
 import com.duel2048.app.ui.screens.HomeScreen
 import com.duel2048.app.ui.screens.LeaderboardScreen
@@ -72,6 +75,9 @@ fun Duel2048App(vm: MainViewModel) {
                             Screen.Duel -> DuelScreen(vm)
                             Screen.Result -> ResultScreen(vm)
                             Screen.Solo -> SoloScreen(vm)
+                            Screen.CubeMatchmaking -> CubeMatchmakingScreen(vm)
+                            Screen.CubeDuel -> CubeDuelScreen(vm)
+                            Screen.CubeResult -> CubeResultScreen(vm)
                             Screen.Leaderboard -> LeaderboardScreen(vm)
                         }
                     }

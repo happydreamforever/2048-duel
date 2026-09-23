@@ -125,6 +125,20 @@ fun HomeScreen(vm: MainViewModel) {
                     colors = listOf(Color(0xFF3B4A66), Color(0xFF1F2A44)),
                     modifier = Modifier.fillMaxWidth(),
                 ) { vm.openSolo() }
+                Spacer(Modifier.height(10.dp))
+                NeonButton(
+                    stringResource(R.string.cube_quick_match),
+                    subtitle = stringResource(R.string.cube_quick_match_sub),
+                    colors = listOf(Color(0xFF6B4EFF), Color(0xFF2D1B69)),
+                    modifier = Modifier.fillMaxWidth(),
+                ) { vm.startCubeDuel(MatchMode.PVP) }
+                Spacer(Modifier.height(10.dp))
+                NeonButton(
+                    stringResource(R.string.cube_practice_bot),
+                    subtitle = stringResource(R.string.cube_practice_bot_sub),
+                    colors = listOf(Color(0xFF4A6FA5), Color(0xFF1B3A5C)),
+                    modifier = Modifier.fillMaxWidth(),
+                ) { vm.startCubeDuel(MatchMode.BOT) }
             }
             Spacer(Modifier.height(16.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {

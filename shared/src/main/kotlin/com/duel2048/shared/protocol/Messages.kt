@@ -10,8 +10,12 @@ import kotlinx.serialization.Serializable
 @Serializable
 enum class MatchMode { PVP, BOT }
 
+/** Which competitive game the player is queueing for. */
 @Serializable
-enum class EndReason { BOARD_FULL, TIME_UP, FORFEIT }
+enum class GameType { DUEL_2048, CUBE_SOLVE }
+
+@Serializable
+enum class EndReason { BOARD_FULL, TIME_UP, FORFEIT, SOLVED, FORFEIT_CUBE }
 
 @Serializable
 data class PlayerInfo(val id: String, val name: String, val isBot: Boolean = false)
@@ -68,6 +72,14 @@ data class PlayerResult(
     val garbageReceived: Int,
 )
 
+@Serializable
+data class CubePlayerResult(
+    val playerId: String,
+    val moves: Int,
+    val elapsedMs: Long,
+    val solved: Boolean,
+)
+
 // ---------------------------------------------------------------- client -> server
 
 @Serializable
@@ -96,7 +108,7 @@ data object Logout : ClientMessage
 
 @Serializable
 @SerialName("find_match")
-data class FindMatch(val mode: MatchMode = MatchMode.PVP) : ClientMessage
+data class FindMatch(val mode: MatchMode = MatchMode.PVP, val game: GameType = GameType.DUEL_2048) : ClientMessage
 
 @Serializable
 @SerialName("cancel_find")
@@ -113,6 +125,14 @@ data class LeaveMatch(val matchId: String) : ClientMessage
 @Serializable
 @SerialName("ping")
 data class Ping(val clientTime: Long) : ClientMessage
+
+@Serializable
+@SerialName("cube_move")
+data class CubeMoveMsg(val matchId: String, val seq: Int, val move: String) : ClientMessage
+
+@Serializable
+@SerialName("cube_solved")
+data class CubeSolvedMsg(val matchId: String, val moves: Int, val elapsedMs: Long, val fingerprint: String) : ClientMessage
 
 // ---------------------------------------------------------------- server -> client
 
@@ -140,6 +160,45 @@ data class StatsUpdated(val stats: AccountStats) : ServerMessage
 @Serializable
 @SerialName("queued")
 data class Queued(val position: Int, val botFallbackMs: Long) : ServerMessage
+
+@Serializable
+@SerialName("cube_match_found")
+data class CubeMatchFound(
+    val matchId: String,
+    val you: PlayerInfo,
+    val opponent: PlayerInfo,
+    val seed: Long,
+    val scramble: List<String>,
+    val timeLimitMs: Long,
+    val countdownSeconds: Int,
+) : ServerMessage
+
+@Serializable
+@SerialName("cube_move_ack")
+data class CubeMoveAck(val matchId: String, val seq: Int, val fingerprint: String, val moves: Int) : ServerMessage
+
+@Serializable
+@SerialName("cube_move_rejected")
+data class CubeMoveRejected(
+    val matchId: String,
+    val seq: Int,
+    val expectedSeq: Int,
+    val reason: String,
+    val fingerprint: String,
+) : ServerMessage
+
+@Serializable
+@SerialName("cube_opponent_progress")
+data class CubeOpponentProgress(val matchId: String, val moves: Int, val solved: Boolean) : ServerMessage
+
+@Serializable
+@SerialName("cube_match_over")
+data class CubeMatchOver(
+    val matchId: String,
+    val winnerId: String?,
+    val reason: EndReason,
+    val results: List<CubePlayerResult>,
+) : ServerMessage
 
 @Serializable
 @SerialName("match_found")

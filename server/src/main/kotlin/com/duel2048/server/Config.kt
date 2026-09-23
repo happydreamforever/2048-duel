@@ -12,6 +12,8 @@ data class ServerConfig(
     /** How long a PVP searcher waits before a bot fills in. */
     val botFallbackMs: Long,
     val matchDurationMs: Long,
+    /** Time limit for cube-solve races (default 5 minutes). */
+    val cubeTimeLimitMs: Long,
     val countdownSeconds: Int,
     val botIntervalMs: Long,
     val botJitterMs: Long,
@@ -57,6 +59,7 @@ data class ServerConfig(
                 host = get("HOST") ?: "0.0.0.0",
                 botFallbackMs = get("BOT_FALLBACK_MS")?.toLongOrNull() ?: 8_000L,
                 matchDurationMs = get("MATCH_DURATION_MS")?.toLongOrNull() ?: Rules.MATCH_DURATION_MS,
+                cubeTimeLimitMs = get("CUBE_TIME_LIMIT_MS")?.toLongOrNull() ?: 300_000L,
                 countdownSeconds = get("COUNTDOWN_SECONDS")?.toIntOrNull() ?: Rules.COUNTDOWN_SECONDS,
                 botIntervalMs = get("BOT_INTERVAL_MS")?.toLongOrNull() ?: 550L,
                 botJitterMs = get("BOT_JITTER_MS")?.toLongOrNull() ?: 250L,

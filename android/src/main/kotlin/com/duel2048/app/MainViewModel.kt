@@ -7,6 +7,7 @@ import com.duel2048.app.data.SettingsStore
 import com.duel2048.app.data.UserSettings
 import com.duel2048.app.game.DuelError
 import com.duel2048.app.game.DuelPhase
+import com.duel2048.app.cube.CubeMatchController
 import com.duel2048.app.game.DuelSession
 import com.duel2048.app.game.LocalDuelSession
 import com.duel2048.app.game.MatchController
@@ -15,6 +16,7 @@ import com.duel2048.app.game.TrainingProfile
 import com.duel2048.app.net.AccountClient
 import com.duel2048.app.net.DuelClient
 import com.duel2048.app.net.LeaderboardClient
+import com.duel2048.shared.cube.CubeMove
 import com.duel2048.shared.protocol.AccountStats
 import com.duel2048.shared.protocol.Accounts
 import com.duel2048.shared.protocol.ClientMessage
@@ -39,6 +41,9 @@ sealed interface Screen {
     data object Duel : Screen
     data object Result : Screen
     data object Solo : Screen
+    data object CubeMatchmaking : Screen
+    data object CubeDuel : Screen
+    data object CubeResult : Screen
     data object Leaderboard : Screen
 }
 
@@ -53,9 +58,11 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     val settings: StateFlow<UserSettings> = settingsStore.settings
 
     val client = DuelClient()
+    private val cubeClient = DuelClient()
     private val account = AccountClient()
     private val leaderboardClient = LeaderboardClient()
     val match = MatchController(client, viewModelScope, onStats = ::saveAccountStats, onSessionExpired = ::onSessionExpired)
+    val cubeMatch = CubeMatchController(cubeClient, viewModelScope, onStats = ::saveAccountStats, onSessionExpired = ::onSessionExpired)
     val solo = SoloController(initialBest = settings.value.bestSolo) { best ->
         settingsStore.update { it.copy(bestSolo = best) }
     }
@@ -74,6 +81,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     val leaderboard: StateFlow<LeaderboardUiState> = _leaderboard.asStateFlow()
 
     private var pendingMode: MatchMode? = null
+    private var pendingCubeMode: MatchMode? = null
 
     init {
         viewModelScope.launch {
@@ -93,6 +101,19 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 }
             }
         }
+        viewModelScope.launch {
+            cubeMatch.state.map { it.phase }.distinctUntilChanged().collect { phase ->
+                when (phase) {
+                    DuelPhase.CONNECTING, DuelPhase.SEARCHING -> _screen.value = Screen.CubeMatchmaking
+                    DuelPhase.FOUND, DuelPhase.PLAYING -> _screen.value = Screen.CubeDuel
+                    DuelPhase.OVER -> {
+                        delay(1600)
+                        if (cubeMatch.state.value.phase == DuelPhase.OVER) _screen.value = Screen.CubeResult
+                    }
+                    DuelPhase.IDLE -> if (_screen.value == Screen.CubeMatchmaking || _screen.value == Screen.CubeDuel) _screen.value = Screen.Home
+                }
+            }
+        }
     }
 
     // ------------------------------------------------------------------ online
@@ -101,12 +122,45 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         val s = settings.value
         if (!s.loggedIn) {
             pendingMode = mode
+            pendingCubeMode = null
             _login.value = LoginUiState()
             _screen.value = Screen.Login
             return
         }
         _session.value = match
         match.start(s.serverUrl, s.authToken, mode)
+    }
+
+    fun startCubeDuel(mode: MatchMode) {
+        val s = settings.value
+        if (!s.loggedIn) {
+            pendingCubeMode = mode
+            pendingMode = null
+            _login.value = LoginUiState()
+            _screen.value = Screen.Login
+            return
+        }
+        cubeMatch.start(s.serverUrl, s.authToken, mode)
+    }
+
+    fun applyCubeMove(move: CubeMove) {
+        cubeMatch.applyMove(move)
+    }
+
+    fun cancelCubeSearch() {
+        cubeMatch.cancel()
+        _screen.value = Screen.Home
+    }
+
+    fun leaveCubeDuel() {
+        cubeMatch.leave()
+        _screen.value = Screen.Home
+    }
+
+    fun playCubeAgain() {
+        val mode = cubeMatch.state.value.mode
+        cubeMatch.dismiss()
+        startCubeDuel(mode)
     }
 
     fun openLogin() {
@@ -147,6 +201,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                     pendingMode?.let { mode ->
                         pendingMode = null
                         startDuel(mode)
+                    }
+                    pendingCubeMode?.let { mode ->
+                        pendingCubeMode = null
+                        startCubeDuel(mode)
                     }
                 }
                 is AccountClient.Outcome.Failed -> _login.value = LoginUiState(error = DuelError(r.code, r.detail))
@@ -232,6 +290,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun goHome() {
         val s = _session.value
         if (s.state.value.phase == DuelPhase.OVER) s.dismiss()
+        if (cubeMatch.state.value.phase == DuelPhase.OVER) cubeMatch.dismiss()
         _screen.value = Screen.Home
     }
 
@@ -241,5 +300,6 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     override fun onCleared() {
         client.disconnect()
+        cubeClient.disconnect()
     }
 }
