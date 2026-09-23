@@ -8,6 +8,8 @@ rem Outputs:
 rem   android\build\outputs\apk\debug\android-debug.apk
 rem   server\build\install\server\bin\server.bat   (run-server.bat starts it)
 setlocal
+rem Stop leftover Kotlin/Gradle daemons (avoids Windows file-lock on server\build\kotlin\...).
+call "%~dp0gradlew-jdk11.bat" --stop >nul 2>&1
 call "%~dp0gradlew-jdk11.bat" :android:assembleDebug :server:installDist
 if errorlevel 1 (
     echo.
