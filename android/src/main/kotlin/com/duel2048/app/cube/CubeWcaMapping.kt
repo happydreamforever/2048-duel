@@ -3,7 +3,7 @@ package com.duel2048.app.cube
 import com.duel2048.app.cube.magic.grafic.ActiveSlice
 import com.duel2048.shared.cube.CubeMove
 
-/** Maps WCA moves to MagicCube [ActiveSlice] turns (yellow up, blue front). */
+/** Maps WCA moves to MagicCube [ActiveSlice] turns (yellow up, blue front). See [CubeOrientation]. */
 object CubeWcaMapping {
 
     data class SliceTurn(val slice: ActiveSlice, val direction: Int)
@@ -24,8 +24,9 @@ object CubeWcaMapping {
     }
 
     fun applyToEngine(engine: com.duel2048.app.cube.magic.grafic.ICubeGameEngine, move: CubeMove) {
-        val turn = toSliceTurn(move)
-        repeat(move.quarterTurns()) {
+        val visual = CubeOrientation.toVisualMove(move)
+        val turn = toSliceTurn(visual)
+        repeat(visual.quarterTurns()) {
             engine.applyQuarterTurn(turn.slice, turn.direction)
         }
     }

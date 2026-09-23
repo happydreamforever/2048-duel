@@ -3,8 +3,11 @@ package com.duel2048.app.cube.magic.grafic
 import android.content.Context
 import android.content.res.Resources
 import android.opengl.GLSurfaceView
+import android.util.Log
 import android.view.MotionEvent
+import com.duel2048.app.cube.CubeWcaMapping
 import com.duel2048.app.cube.magic.presentation.cube.CubeViewModel
+import com.duel2048.shared.cube.CubeMove
 
 /**
  * Custom [GLSurfaceView] that owns touch-event dispatch and forwards events to
@@ -19,6 +22,45 @@ class CubeSurfaceView(
 
     private var previousX = 0f
     private var previousY = 0f
+
+    init {
+        setEGLContextClientVersion(3)
+        renderMode = RENDERMODE_CONTINUOUSLY
+    }
+
+    /** Engine mutations must run on the GL thread (same thread as [CubeRenderer]). */
+    fun runOnGlThread(block: () -> Unit) {
+        queueEvent(block)
+        requestRender()
+    }
+
+    fun applyScramble(viewModel: CubeViewModel, moves: List<CubeMove>) {
+        if (moves.isEmpty()) return
+        runOnGlThread {
+            try {
+                for (move in moves) {
+                    CubeWcaMapping.applyToEngine(viewModel.engine, move)
+                }
+                Log.i(TAG, "Applied scramble on GL thread (${moves.size} moves)")
+            } catch (e: Exception) {
+                Log.e(TAG, "Scramble failed: ${e.message}", e)
+            }
+        }
+    }
+
+    fun applyMove(viewModel: CubeViewModel, move: CubeMove) {
+        runOnGlThread {
+            try {
+                CubeWcaMapping.applyToEngine(viewModel.engine, move)
+            } catch (e: Exception) {
+                Log.e(TAG, "Move failed: ${e.message}", e)
+            }
+        }
+    }
+
+    companion object {
+        private const val TAG = "CubeGL"
+    }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
         val x = event.x

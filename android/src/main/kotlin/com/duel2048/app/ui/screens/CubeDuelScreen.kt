@@ -37,7 +37,6 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.duel2048.app.MainViewModel
 import com.duel2048.app.R
 import com.duel2048.app.cube.CubeDependencies
-import com.duel2048.app.cube.CubeWcaMapping
 import com.duel2048.app.cube.magic.grafic.CubeRenderer
 import com.duel2048.app.cube.magic.grafic.CubeSurfaceView
 import com.duel2048.app.cube.magic.presentation.cube.CubeViewModel
@@ -45,7 +44,8 @@ import com.duel2048.app.game.DuelPhase
 import com.duel2048.app.ui.components.GlassCard
 import com.duel2048.app.ui.theme.LocalPalette
 import com.duel2048.shared.cube.CubeMove
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.first
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -66,7 +66,6 @@ fun CubeDuelScreen(vm: MainViewModel) {
 
     val surfaceView = remember(cubeVm) {
         CubeSurfaceView(context, cubeVm).apply {
-            setEGLContextClientVersion(3)
             setRenderer(CubeRenderer(cubeVm))
         }
     }
@@ -86,14 +85,11 @@ fun CubeDuelScreen(vm: MainViewModel) {
         }
     }
 
-    LaunchedEffect(cube.scrambleNonce, cube.scramble) {
+    LaunchedEffect(cube.scrambleNonce, cube.scramble, surfaceView) {
         if (cube.scramble.isEmpty()) return@LaunchedEffect
-        delay(300)
+        cubeVm.settingsState.filter { it != null }.first()
         val moves = cube.scramble.mapNotNull { CubeMove.parse(it) }
-        for (move in moves) {
-            CubeWcaMapping.applyToEngine(cubeVm.engine, move)
-            delay(40)
-        }
+        surfaceView.applyScramble(cubeVm, moves)
     }
 
     Box(Modifier.fillMaxSize().systemBarsPadding()) {
@@ -107,7 +103,7 @@ fun CubeDuelScreen(vm: MainViewModel) {
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Text(
-                stringResource(R.string.cube_duel_title),
+                stringResource(if (cube.training) R.string.cube_training_title else R.string.cube_duel_title),
                 style = MaterialTheme.typography.titleMedium,
                 color = palette.accent,
                 fontWeight = FontWeight.Black,
@@ -138,7 +134,7 @@ fun CubeDuelScreen(vm: MainViewModel) {
                 if (cube.phase == DuelPhase.PLAYING && !cube.solved) {
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         moveButtons { move ->
-                            CubeWcaMapping.applyToEngine(cubeVm.engine, move)
+                            surfaceView.applyMove(cubeVm, move)
                             vm.applyCubeMove(move)
                         }
                     }
