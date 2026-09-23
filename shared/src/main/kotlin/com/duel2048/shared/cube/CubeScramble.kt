@@ -17,14 +17,7 @@ object CubeScramble {
             val variant = when (rng.nextInt(3)) {
                 0 -> base
                 1 -> base.inverse()
-                else -> when (base) {
-                    CubeMove.U -> CubeMove.U2
-                    CubeMove.R -> CubeMove.R2
-                    CubeMove.F -> CubeMove.F2
-                    CubeMove.D -> CubeMove.D2
-                    CubeMove.L -> CubeMove.L2
-                    CubeMove.B -> CubeMove.B2
-                }
+                else -> base.doubleTurn()
             }
             moves += variant
             lastFace = variant.face()

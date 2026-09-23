@@ -70,6 +70,16 @@ enum class CubeMove {
         B, Bi, B2 -> CubeFace.B
     }
 
+    /** 180° turn on the same face as this move. */
+    fun doubleTurn(): CubeMove = when (face()) {
+        CubeFace.U -> U2
+        CubeFace.R -> R2
+        CubeFace.F -> F2
+        CubeFace.D -> D2
+        CubeFace.L -> L2
+        CubeFace.B -> B2
+    }
+
     companion object {
         private val byNotation = entries.associateBy { it.notation() }
 
