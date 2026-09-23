@@ -47,7 +47,7 @@ fun CubeDuelScreen(vm: MainViewModel) {
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun CubeDuelOverlay(
+internal fun CubeDuelOverlay(
     cube: CubeDuelUiState,
     onMove: (CubeMove) -> Unit,
     onLeave: () -> Unit,
