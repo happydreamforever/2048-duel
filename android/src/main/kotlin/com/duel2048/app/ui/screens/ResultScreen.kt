@@ -111,6 +111,7 @@ fun ResultScreen(vm: MainViewModel) {
                     EndReason.BOARD_FULL -> stringResource(if (won) R.string.reason_board_full_won else if (draw) R.string.reason_board_full_draw else R.string.reason_board_full_lost)
                     EndReason.TIME_UP -> stringResource(R.string.reason_time_up)
                     EndReason.FORFEIT -> stringResource(if (won) R.string.reason_forfeit_won else R.string.reason_forfeit_lost)
+                    EndReason.SOLVED, EndReason.FORFEIT_CUBE -> ""
                     null -> ""
                 },
                 color = palette.textSecondary,

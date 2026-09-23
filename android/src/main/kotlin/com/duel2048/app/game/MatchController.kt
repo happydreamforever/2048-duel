@@ -298,6 +298,7 @@ class MatchController(
                 else -> _state.update { it.copy(error = DuelError("server", msg.message)) }
             }
             is Pong -> _state.update { it.copy(pingMs = now() - msg.clientTime) }
+            else -> Unit // cube PvP messages are handled by CubeMatchController
         }
     }
 

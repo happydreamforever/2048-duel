@@ -22,6 +22,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -29,7 +30,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.duel2048.app.MainViewModel
@@ -49,7 +51,14 @@ import kotlinx.coroutines.delay
 @Composable
 fun CubeDuelScreen(vm: MainViewModel) {
     val cube by vm.cubeMatch.state.collectAsStateWithLifecycle()
-    val cubeVm: CubeViewModel = viewModel(key = cube.scrambleNonce) { CubeDependencies.createCubeViewModel() }
+    val cubeVm: CubeViewModel = viewModel(
+        key = cube.scrambleNonce.toString(),
+        factory = object : ViewModelProvider.Factory {
+            @Suppress("UNCHECKED_CAST")
+            override fun <T : ViewModel> create(modelClass: Class<T>): T =
+                CubeDependencies.createCubeViewModel() as T
+        },
+    )
     val palette = LocalPalette.current
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -127,10 +136,7 @@ fun CubeDuelScreen(vm: MainViewModel) {
         ) {
             GlassCard(Modifier.fillMaxWidth()) {
                 if (cube.phase == DuelPhase.PLAYING && !cube.solved) {
-                    FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp),
-                    ) {
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         moveButtons { move ->
                             CubeWcaMapping.applyToEngine(cubeVm.engine, move)
                             vm.applyCubeMove(move)

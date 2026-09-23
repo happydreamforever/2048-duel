@@ -50,7 +50,7 @@ object CubeDependencies {
                     GestureClassifier(),
                     CubeRotationMath(),
                     CubeFaceGeometryResolver(),
-                    CubeSliceInteractionResolver(CubeRotationMath(), CubeFaceGeometryResolver()),
+                    CubeSliceInteractionResolver(CubeFaceGeometryResolver(), CubeRotationMath()),
                     CubeVisibleFacesCalculator(),
                     matrixMath,
                 ),
