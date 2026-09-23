@@ -7,7 +7,9 @@ import com.duel2048.app.data.SettingsStore
 import com.duel2048.app.data.UserSettings
 import com.duel2048.app.game.DuelError
 import com.duel2048.app.game.DuelPhase
+import com.duel2048.app.cube.CubeDuelUiState
 import com.duel2048.app.cube.CubeMatchController
+import com.duel2048.app.cube.LocalCubeSession
 import com.duel2048.app.game.DuelSession
 import com.duel2048.app.game.LocalDuelSession
 import com.duel2048.app.game.MatchController
@@ -29,9 +31,12 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 sealed interface Screen {
@@ -63,6 +68,13 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val leaderboardClient = LeaderboardClient()
     val match = MatchController(client, viewModelScope, onStats = ::saveAccountStats, onSessionExpired = ::onSessionExpired)
     val cubeMatch = CubeMatchController(cubeClient, viewModelScope, onStats = ::saveAccountStats, onSessionExpired = ::onSessionExpired)
+    private val localCubeHolder = MutableStateFlow<LocalCubeSession?>(null)
+    private val cubeIsLocal = MutableStateFlow(false)
+    /** Online cube match or offline cube training, depending on [cubeIsLocal]. */
+    val cubeUiState = cubeIsLocal.flatMapLatest { local ->
+        if (local) localCubeHolder.value?.state ?: flowOf(CubeDuelUiState(training = true))
+        else cubeMatch.state
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, CubeDuelUiState())
     val solo = SoloController(initialBest = settings.value.bestSolo) { best ->
         settingsStore.update { it.copy(bestSolo = best) }
     }
@@ -102,13 +114,21 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             }
         }
         viewModelScope.launch {
-            cubeMatch.state.map { it.phase }.distinctUntilChanged().collect { phase ->
+            cubeUiState.map { it.phase }.distinctUntilChanged().collect { phase ->
                 when (phase) {
                     DuelPhase.CONNECTING, DuelPhase.SEARCHING -> _screen.value = Screen.CubeMatchmaking
                     DuelPhase.FOUND, DuelPhase.PLAYING -> _screen.value = Screen.CubeDuel
                     DuelPhase.OVER -> {
+                        val s = cubeUiState.value
+                        if (s.training && s.result != null) {
+                            settingsStore.update {
+                                if (s.won) it.copy(wins = it.wins + 1)
+                                else if (s.draw) it
+                                else it.copy(losses = it.losses + 1)
+                            }
+                        }
                         delay(1600)
-                        if (cubeMatch.state.value.phase == DuelPhase.OVER) _screen.value = Screen.CubeResult
+                        if (cubeUiState.value.phase == DuelPhase.OVER) _screen.value = Screen.CubeResult
                     }
                     DuelPhase.IDLE -> if (_screen.value == Screen.CubeMatchmaking || _screen.value == Screen.CubeDuel) _screen.value = Screen.Home
                 }
@@ -140,11 +160,23 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             _screen.value = Screen.Login
             return
         }
+        cubeIsLocal.value = false
+        localCubeHolder.value = null
         cubeMatch.start(s.serverUrl, s.authToken, mode)
     }
 
+    fun startCubeTraining(profile: TrainingProfile, botName: String) {
+        val s = settings.value
+        val name = s.accountName.ifBlank { s.playerName }
+        val session = LocalCubeSession(viewModelScope, profile, name, botName)
+        localCubeHolder.value = session
+        cubeIsLocal.value = true
+        session.start()
+    }
+
     fun applyCubeMove(move: CubeMove) {
-        cubeMatch.applyMove(move)
+        if (cubeIsLocal.value) localCubeHolder.value?.applyMove(move)
+        else cubeMatch.applyMove(move)
     }
 
     fun cancelCubeSearch() {
@@ -153,14 +185,28 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun leaveCubeDuel() {
-        cubeMatch.leave()
+        if (cubeIsLocal.value) {
+            localCubeHolder.value?.leave()
+            cubeIsLocal.value = false
+            localCubeHolder.value = null
+        } else {
+            cubeMatch.leave()
+        }
         _screen.value = Screen.Home
     }
 
     fun playCubeAgain() {
-        val mode = cubeMatch.state.value.mode
-        cubeMatch.dismiss()
-        startCubeDuel(mode)
+        if (cubeIsLocal.value) {
+            val session = localCubeHolder.value
+            val profile = session?.profile ?: TrainingProfile.NORMAL
+            val botName = session?.botName ?: "Trainer"
+            session?.dismiss()
+            startCubeTraining(profile, botName)
+        } else {
+            val mode = cubeMatch.state.value.mode
+            cubeMatch.dismiss()
+            startCubeDuel(mode)
+        }
     }
 
     fun openLogin() {
@@ -290,7 +336,13 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun goHome() {
         val s = _session.value
         if (s.state.value.phase == DuelPhase.OVER) s.dismiss()
-        if (cubeMatch.state.value.phase == DuelPhase.OVER) cubeMatch.dismiss()
+        if (cubeIsLocal.value && cubeUiState.value.phase == DuelPhase.OVER) {
+            localCubeHolder.value?.dismiss()
+            cubeIsLocal.value = false
+            localCubeHolder.value = null
+        } else if (cubeMatch.state.value.phase == DuelPhase.OVER) {
+            cubeMatch.dismiss()
+        }
         _screen.value = Screen.Home
     }
 

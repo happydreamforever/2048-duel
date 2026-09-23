@@ -4,6 +4,8 @@ rem Usage: run-server.bat            (port 8080)
 rem        set PORT=8765 && run-server.bat
 setlocal
 cd /d "%~dp0"
+rem Use JSON file storage when MySQL is not configured (no database.json / server.env needed).
+if not defined DB set "DB=json"
 rem Prefer a project-local portable JDK (jdk\ or jdk-11...) when JAVA_HOME is not set.
 if defined JAVA_HOME goto duelJdkDone
 if exist "jdk\bin\java.exe" (

@@ -14,6 +14,10 @@
     <string name="cube_quick_match_sub">online 1v1 · same scramble, race to solve</string>
     <string name="cube_practice_bot">CUBE VS BOT</string>
     <string name="cube_practice_bot_sub">practice solving against the server bot</string>
+    <string name="cube_training">CUBE TRAINING</string>
+    <string name="cube_training_sub">offline cube race against a bot on this device</string>
+    <string name="cube_training_title">CUBE TRAINING</string>
+    <string name="cube_training_text">Offline cube-solve duel against a bot on this device. Same scramble, race to solve. No server or login needed.</string>
     <string name="cube_duel_title">CUBE SOLVE PVP</string>
     <string name="cube_timer">%1$ds left</string>
     <string name="cube_moves_line">You %1$d · Opp %2$d moves</string>

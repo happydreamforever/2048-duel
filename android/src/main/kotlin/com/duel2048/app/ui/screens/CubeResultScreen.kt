@@ -28,7 +28,7 @@ import com.duel2048.app.ui.theme.LocalPalette
 
 @Composable
 fun CubeResultScreen(vm: MainViewModel) {
-    val cube by vm.cubeMatch.state.collectAsStateWithLifecycle()
+    val cube by vm.cubeUiState.collectAsStateWithLifecycle()
     val palette = LocalPalette.current
     val result = cube.result
     BackHandler { vm.goHome() }

@@ -48,6 +48,8 @@ import kotlinx.coroutines.launch
 data class CubeDuelUiState(
     val phase: DuelPhase = DuelPhase.IDLE,
     val mode: MatchMode = MatchMode.PVP,
+    /** Offline training on this device (no server). */
+    val training: Boolean = false,
     val matchId: String? = null,
     val me: PlayerInfo? = null,
     val opponent: PlayerInfo? = null,

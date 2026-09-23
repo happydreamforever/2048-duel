@@ -50,7 +50,7 @@ import kotlinx.coroutines.delay
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun CubeDuelScreen(vm: MainViewModel) {
-    val cube by vm.cubeMatch.state.collectAsStateWithLifecycle()
+    val cube by vm.cubeUiState.collectAsStateWithLifecycle()
     val cubeVm: CubeViewModel = viewModel(
         key = cube.scrambleNonce.toString(),
         factory = object : ViewModelProvider.Factory {

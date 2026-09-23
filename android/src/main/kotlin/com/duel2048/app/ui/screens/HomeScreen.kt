@@ -74,6 +74,7 @@ fun HomeScreen(vm: MainViewModel) {
     val palette = LocalPalette.current
     var showSettings by remember { mutableStateOf(false) }
     var showTraining by remember { mutableStateOf(false) }
+    var showCubeTraining by remember { mutableStateOf(false) }
     val botName = stringResource(R.string.bot_name)
 
     Box(Modifier.fillMaxSize().systemBarsPadding()) {
@@ -139,6 +140,13 @@ fun HomeScreen(vm: MainViewModel) {
                     colors = listOf(Color(0xFF4A6FA5), Color(0xFF1B3A5C)),
                     modifier = Modifier.fillMaxWidth(),
                 ) { vm.startCubeDuel(MatchMode.BOT) }
+                Spacer(Modifier.height(10.dp))
+                NeonButton(
+                    stringResource(R.string.cube_training),
+                    subtitle = stringResource(R.string.cube_training_sub),
+                    colors = listOf(Color(0xFF1F9D6B), Color(0xFF0E4D3A)),
+                    modifier = Modifier.fillMaxWidth(),
+                ) { showCubeTraining = true }
             }
             Spacer(Modifier.height(16.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -186,9 +194,23 @@ fun HomeScreen(vm: MainViewModel) {
         SettingsSheet(settings, onDismiss = { showSettings = false }) { vm.updateSettings(it) }
     }
     if (showTraining) {
-        TrainingSheet(onDismiss = { showTraining = false }) { profile ->
+        TrainingSheet(
+            title = stringResource(R.string.training_title),
+            description = stringResource(R.string.training_text),
+            onDismiss = { showTraining = false },
+        ) { profile ->
             showTraining = false
             vm.startTraining(profile, botName)
+        }
+    }
+    if (showCubeTraining) {
+        TrainingSheet(
+            title = stringResource(R.string.cube_training_title),
+            description = stringResource(R.string.cube_training_text),
+            onDismiss = { showCubeTraining = false },
+        ) { profile ->
+            showCubeTraining = false
+            vm.startCubeTraining(profile, botName)
         }
     }
 }
@@ -228,14 +250,19 @@ private fun AccountRow(settings: UserSettings, onLogin: () -> Unit, onLogout: ()
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun TrainingSheet(onDismiss: () -> Unit, onStart: (TrainingProfile) -> Unit) {
+private fun TrainingSheet(
+    title: String,
+    description: String,
+    onDismiss: () -> Unit,
+    onStart: (TrainingProfile) -> Unit,
+) {
     val palette = LocalPalette.current
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var selected by remember { mutableStateOf(TrainingProfile.NORMAL) }
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = palette.bgTop) {
         Column(Modifier.padding(horizontal = 24.dp).padding(bottom = 32.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text(stringResource(R.string.training_title), style = MaterialTheme.typography.titleMedium, color = palette.accent)
-            Text(stringResource(R.string.training_text), style = MaterialTheme.typography.bodyMedium, color = palette.textSecondary)
+            Text(title, style = MaterialTheme.typography.titleMedium, color = palette.accent)
+            Text(description, style = MaterialTheme.typography.bodyMedium, color = palette.textSecondary)
             Text(stringResource(R.string.difficulty), style = MaterialTheme.typography.labelLarge, color = palette.textPrimary)
             TrainingProfile.all.forEach { profile ->
                 val (title, sub) = when (profile.id) {
