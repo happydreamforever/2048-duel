@@ -26,6 +26,8 @@ data class UserSettings(
     val accBestScore: Int = 0,
     /** BCP-47 tag such as "ko"; blank follows the system language. */
     val language: String = "",
+    /** 3D cube renderer: [com.duel2048.app.data.CubeRenderer.MAGIC] or [com.duel2048.app.data.CubeRenderer.CUBE2]. */
+    val cubeRenderer: String = CubeRenderer.CUBE2.id,
 ) {
     val loggedIn: Boolean get() = authToken.isNotBlank()
 
@@ -79,6 +81,7 @@ class SettingsStore(context: Context) {
         accDraws = prefs.getInt("accDraws", 0),
         accBestScore = prefs.getInt("accBest", 0),
         language = prefs.getString("lang", "") ?: "",
+        cubeRenderer = prefs.getString("cubeRenderer", CubeRenderer.CUBE2.id) ?: CubeRenderer.CUBE2.id,
     )
 
     fun update(transform: (UserSettings) -> UserSettings) {
@@ -101,6 +104,7 @@ class SettingsStore(context: Context) {
             .putInt("accDraws", s.accDraws)
             .putInt("accBest", s.accBestScore)
             .putString("lang", s.language)
+            .putString("cubeRenderer", s.cubeRenderer)
             .apply()
     }
 }

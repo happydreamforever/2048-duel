@@ -18,6 +18,9 @@
     <string name="cube_training_sub">offline cube race against a bot on this device</string>
     <string name="cube_training_title">CUBE TRAINING</string>
     <string name="cube_training_text">Offline cube-solve duel against a bot on this device. Same scramble, race to solve. No server or login needed.</string>
+    <string name="cube_renderer">Cube 3D renderer</string>
+    <string name="cube_renderer_cube2">AnimCube (cube2)</string>
+    <string name="cube_renderer_magic">MagicCube (OpenGL)</string>
     <string name="cube_duel_title">CUBE SOLVE PVP</string>
     <string name="cube_timer">%1$ds left</string>
     <string name="cube_moves_line">You %1$d · Opp %2$d moves</string>

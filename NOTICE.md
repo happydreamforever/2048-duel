@@ -18,5 +18,7 @@ studied and some of their ideas or small code patterns were adapted:
   burst + shock ring effect, board micro-shake, combo pill and procedural Web Audio sound.
   Reimplemented for Compose/Android in `Particles.kt`, `BoardFx.kt` and `fx/SoundFx.kt`.
 - **gabrielecirulli/2048** (MIT) — the original game rules.
+- **cjurjiu/AnimCubeAndroid** (Apache-2.0) — vendored as the `:cube2` module (AnimCube 3D
+  renderer). See `cube2/ATTRIBUTION.md`.
 
 The Gradle wrapper files (`gradlew`, `gradle/wrapper/*`) are part of Gradle (Apache-2.0).

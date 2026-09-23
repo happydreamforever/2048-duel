@@ -14,86 +14,48 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.viewinterop.AndroidView
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.duel2048.app.MainViewModel
 import com.duel2048.app.R
-import com.duel2048.app.cube.CubeDependencies
-import com.duel2048.app.cube.magic.grafic.CubeRenderer
-import com.duel2048.app.cube.magic.grafic.CubeSurfaceView
-import com.duel2048.app.cube.magic.presentation.cube.CubeViewModel
+import com.duel2048.app.cube.CubeDuelUiState
+import com.duel2048.app.data.CubeRenderer as CubeRendererChoice
 import com.duel2048.app.game.DuelPhase
 import com.duel2048.app.ui.components.GlassCard
 import com.duel2048.app.ui.theme.LocalPalette
 import com.duel2048.shared.cube.CubeMove
-import kotlinx.coroutines.flow.filter
-import kotlinx.coroutines.flow.first
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun CubeDuelScreen(vm: MainViewModel) {
     val cube by vm.cubeUiState.collectAsStateWithLifecycle()
-    val cubeVm: CubeViewModel = viewModel(
-        key = cube.scrambleNonce.toString(),
-        factory = object : ViewModelProvider.Factory {
-            @Suppress("UNCHECKED_CAST")
-            override fun <T : ViewModel> create(modelClass: Class<T>): T =
-                CubeDependencies.createCubeViewModel() as T
-        },
-    )
-    val palette = LocalPalette.current
-    val context = LocalContext.current
-    val lifecycleOwner = LocalLifecycleOwner.current
+    val settings by vm.settings.collectAsStateWithLifecycle()
+    val renderer = CubeRendererChoice.fromId(settings.cubeRenderer)
     BackHandler { vm.leaveCubeDuel() }
 
-    val surfaceView = remember(cubeVm) {
-        CubeSurfaceView(context, cubeVm).apply {
-            setRenderer(CubeRenderer(cubeVm))
-        }
+    when (renderer) {
+        CubeRendererChoice.CUBE2 -> CubeDuelCube2Route(vm, cube)
+        CubeRendererChoice.MAGIC -> CubeDuelMagicRoute(vm, cube)
     }
+}
 
-    DisposableEffect(lifecycleOwner, surfaceView) {
-        val observer = LifecycleEventObserver { _, event ->
-            when (event) {
-                Lifecycle.Event.ON_RESUME -> surfaceView.onResume()
-                Lifecycle.Event.ON_PAUSE -> surfaceView.onPause()
-                else -> Unit
-            }
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose {
-            surfaceView.onPause()
-            lifecycleOwner.lifecycle.removeObserver(observer)
-        }
-    }
-
-    LaunchedEffect(cube.scrambleNonce, cube.scramble, surfaceView) {
-        if (cube.scramble.isEmpty()) return@LaunchedEffect
-        cubeVm.settingsState.filter { it != null }.first()
-        val moves = cube.scramble.mapNotNull { CubeMove.parse(it) }
-        surfaceView.applyScramble(cubeVm, moves)
-    }
-
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun CubeDuelOverlay(
+    cube: CubeDuelUiState,
+    onMove: (CubeMove) -> Unit,
+    onLeave: () -> Unit,
+    cubeView: @Composable () -> Unit,
+) {
+    val palette = LocalPalette.current
     Box(Modifier.fillMaxSize().systemBarsPadding()) {
-        AndroidView(factory = { surfaceView }, modifier = Modifier.fillMaxSize())
+        cubeView()
 
         Column(
             Modifier
@@ -133,16 +95,13 @@ fun CubeDuelScreen(vm: MainViewModel) {
             GlassCard(Modifier.fillMaxWidth()) {
                 if (cube.phase == DuelPhase.PLAYING && !cube.solved) {
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        moveButtons { move ->
-                            surfaceView.applyMove(cubeVm, move)
-                            vm.applyCubeMove(move)
-                        }
+                        moveButtons(onMove)
                     }
                 } else if (cube.solved) {
                     Text(stringResource(R.string.cube_solved_wait), color = palette.success, modifier = Modifier.padding(8.dp))
                 }
             }
-            TextButton(onClick = { vm.leaveCubeDuel() }, modifier = Modifier.align(Alignment.End)) {
+            TextButton(onClick = onLeave, modifier = Modifier.align(Alignment.End)) {
                 Text(stringResource(R.string.leave), color = palette.danger)
             }
         }

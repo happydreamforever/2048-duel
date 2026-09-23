@@ -24,8 +24,8 @@ android {
         applicationId = "com.duel2048.app"
         minSdk = libs.versions.minSdk.get().toInt()
         targetSdk = libs.versions.targetSdk.get().toInt()
-        versionCode = 2
-        versionName = "1.1.0"
+        versionCode = 3
+        versionName = "1.2.0"
         vectorDrawables { useSupportLibrary = true }
     }
 
@@ -91,6 +91,7 @@ gradle.taskGraph.whenReady {
 
 dependencies {
     implementation(project(":shared"))
+    implementation(project(":cube2"))
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)

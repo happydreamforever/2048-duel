@@ -29,6 +29,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.duel2048.app.R
+import com.duel2048.app.data.CubeRenderer
 import com.duel2048.app.data.UserSettings
 import com.duel2048.app.ui.Languages
 import com.duel2048.app.ui.theme.LocalPalette
@@ -88,6 +89,30 @@ internal fun SettingsSheet(settings: UserSettings, onDismiss: () -> Unit, onChan
                         ),
                     )
                 }
+            }
+
+            Text(stringResource(R.string.cube_renderer), color = palette.textPrimary, style = MaterialTheme.typography.bodyLarge)
+            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(
+                    selected = settings.cubeRenderer == CubeRenderer.CUBE2.id,
+                    onClick = { onChange { it.copy(cubeRenderer = CubeRenderer.CUBE2.id) } },
+                    label = { Text(stringResource(R.string.cube_renderer_cube2)) },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = palette.accent.copy(alpha = 0.25f),
+                        selectedLabelColor = palette.textPrimary,
+                        labelColor = palette.textSecondary,
+                    ),
+                )
+                FilterChip(
+                    selected = settings.cubeRenderer == CubeRenderer.MAGIC.id,
+                    onClick = { onChange { it.copy(cubeRenderer = CubeRenderer.MAGIC.id) } },
+                    label = { Text(stringResource(R.string.cube_renderer_magic)) },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = palette.accent.copy(alpha = 0.25f),
+                        selectedLabelColor = palette.textPrimary,
+                        labelColor = palette.textSecondary,
+                    ),
+                )
             }
 
             ToggleRow(stringResource(R.string.haptics), settings.haptics) { v -> onChange { it.copy(haptics = v) } }
