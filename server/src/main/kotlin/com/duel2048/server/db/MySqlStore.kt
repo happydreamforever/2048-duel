@@ -127,6 +127,16 @@ class MySqlStore(jdbcUrl: String, user: String, password: String) : UserStore {
         }
     }
 
+    override suspend fun names(): List<String> = db { c ->
+        c.prepareStatement("SELECT name FROM users ORDER BY name ASC").use { ps ->
+            ps.executeQuery().use { rs ->
+                val out = ArrayList<String>()
+                while (rs.next()) out += rs.getString(1)
+                out
+            }
+        }
+    }
+
     override suspend fun leaderboard(limit: Int): List<LeaderboardEntry> = db { c ->
         c.prepareStatement(
             "SELECT name, wins, losses, draws, matches, best_score, best_tile FROM users ORDER BY wins DESC, best_score DESC, name ASC LIMIT ?",

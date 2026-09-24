@@ -7,8 +7,15 @@ import kotlinx.coroutines.runBlocking
 import kotlin.system.exitProcess
 import com.duel2048.shared.protocol.Protocol
 import com.duel2048.shared.protocol.ServerStats
+import com.duel2048.shared.social.ChatBody
+import com.duel2048.shared.social.MiniAnswerBody
+import com.duel2048.shared.social.MiniJoinBody
+import com.duel2048.shared.social.NotifyBody
+import com.duel2048.shared.social.ReportBody
+import com.duel2048.shared.social.WalletBody
 import io.ktor.http.ContentType
 import io.ktor.http.HttpMethod
+import io.ktor.http.HttpStatusCode
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.Application
 import io.ktor.server.application.call
@@ -19,15 +26,18 @@ import io.ktor.server.netty.Netty
 import io.ktor.server.plugins.callloging.CallLogging
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.server.plugins.cors.routing.CORS
+import io.ktor.server.request.receiveText
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.get
+import io.ktor.server.routing.post
 import io.ktor.server.routing.routing
 import io.ktor.server.websocket.WebSockets
 import io.ktor.server.websocket.webSocket
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import org.slf4j.LoggerFactory
 import java.io.File
 import java.net.Inet4Address
@@ -78,9 +88,16 @@ fun Application.module(config: ServerConfig = ServerConfig.fromEnv(), db: UserSt
     install(CORS) {
         anyHost()
         allowMethod(HttpMethod.Get)
+        allowMethod(HttpMethod.Post)
+        allowHeader("Content-Type")
+        allowHeader("X-Admin-Key")
     }
 
-    val lobby = Lobby(config, CoroutineScope(SupervisorJob() + Dispatchers.Default), db)
+    val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    val lobby = Lobby(config, appScope, db)
+    val social = SocialService(config.dataDir, db, lobby)
+    val adminKey = System.getenv("ADMIN_KEY")?.takeIf { it.isNotBlank() } ?: "duel-admin"
+    appScope.launch { social.pollLoop() }
 
     routing {
         get("/") { call.respondText(statusPage(config, lobby.stats()), ContentType.Text.Html) }
@@ -89,6 +106,66 @@ fun Application.module(config: ServerConfig = ServerConfig.fromEnv(), db: UserSt
         get("/leaderboard") {
             val limit = call.request.queryParameters["limit"]?.toIntOrNull()?.coerceIn(1, 100) ?: 50
             call.respond(db.leaderboard(limit))
+        }
+        get("/social/players") { call.respond(social.players()) }
+        get("/social/notifications") {
+            val since = call.request.queryParameters["since"]?.toLongOrNull() ?: 0L
+            call.respond(social.notifications(since))
+        }
+        get("/social/live") { call.respond(social.live()) }
+        get("/social/chat") {
+            val room = call.request.queryParameters["room"] ?: "lobby"
+            val since = call.request.queryParameters["since"]?.toLongOrNull() ?: 0L
+            call.respond(social.chatSince(room, since))
+        }
+        get("/social/wallet") {
+            val token = call.request.queryParameters["token"].orEmpty()
+            val wallet = social.wallet(token)
+            if (wallet == null) call.respond(HttpStatusCode.Unauthorized, "bad token")
+            else call.respond(wallet)
+        }
+        get("/social/mini/{id}") {
+            val id = call.parameters["id"].orEmpty()
+            val name = call.request.queryParameters["name"].orEmpty()
+            val room = social.mini(id, name)
+            if (room == null) call.respond(HttpStatusCode.NotFound, "no room")
+            else call.respond(room)
+        }
+        post("/social/report") {
+            val body = Protocol.json.decodeFromString(ReportBody.serializer(), call.receiveText())
+            social.report(body.name.ifBlank { "player" }, body.text, body.game)
+            call.respondText("{\"ok\":true}", ContentType.Application.Json)
+        }
+        post("/social/chat") {
+            val body = Protocol.json.decodeFromString(ChatBody.serializer(), call.receiveText())
+            val line = social.chat(body.name, body.text, body.room)
+            if (line == null) call.respond(HttpStatusCode.BadRequest, "phrase not allowed")
+            else call.respond(line)
+        }
+        post("/social/wallet") {
+            val body = Protocol.json.decodeFromString(WalletBody.serializer(), call.receiveText())
+            val wallet = social.applyWallet(body.token, body.scoreDelta, body.coinDelta)
+            if (wallet == null) call.respond(HttpStatusCode.Unauthorized, "bad token")
+            else call.respond(wallet)
+        }
+        post("/social/mini/join") {
+            val body = Protocol.json.decodeFromString(MiniJoinBody.serializer(), call.receiveText())
+            call.respond(social.joinMini(body.name, body.game, body.mode, body.difficulty))
+        }
+        post("/social/mini/answer") {
+            val body = Protocol.json.decodeFromString(MiniAnswerBody.serializer(), call.receiveText())
+            val room = social.answer(body.roomId, body.name, body.answer)
+            if (room == null) call.respond(HttpStatusCode.NotFound, "no room")
+            else call.respond(room)
+        }
+        post("/admin/notify") {
+            val key = call.request.headers["X-Admin-Key"] ?: call.request.queryParameters["key"]
+            if (key != adminKey) {
+                call.respond(HttpStatusCode.Forbidden, "forbidden")
+                return@post
+            }
+            val body = Protocol.json.decodeFromString(NotifyBody.serializer(), call.receiveText())
+            call.respond(social.addNote(body.text))
         }
         webSocket(Protocol.WS_PATH) { lobby.handleSession(this) }
     }

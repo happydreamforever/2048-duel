@@ -51,59 +51,54 @@ internal fun CubeDuelOverlay(
     cube: CubeDuelUiState,
     onMove: (CubeMove) -> Unit,
     onLeave: () -> Unit,
-    cubeView: @Composable () -> Unit,
+    onGiveUp: () -> Unit,
+    onHint: () -> Unit = {},
+    opponentView: @Composable () -> Unit,
+    playerView: @Composable () -> Unit,
 ) {
     val palette = LocalPalette.current
-    Box(Modifier.fillMaxSize().systemBarsPadding()) {
-        cubeView()
-
-        Column(
-            Modifier
-                .fillMaxWidth()
-                .align(Alignment.TopCenter)
-                .padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Text(
-                stringResource(if (cube.training) R.string.cube_training_title else R.string.cube_duel_title),
-                style = MaterialTheme.typography.titleMedium,
-                color = palette.accent,
-                fontWeight = FontWeight.Black,
-            )
-            if (cube.countdown != null) {
-                Text("${cube.countdown}", fontSize = 48.sp, fontWeight = FontWeight.Black, color = palette.gold)
-            } else if (cube.phase == DuelPhase.PLAYING) {
-                val rem = cube.remainingNow(System.currentTimeMillis()) / 1000
-                Text(stringResource(R.string.cube_timer, rem), color = palette.textSecondary)
-            }
-            Text(
-                stringResource(R.string.cube_moves_line, cube.myMoves, cube.oppMoves),
-                color = palette.textSecondary,
-                style = MaterialTheme.typography.labelLarge,
-            )
-            cube.opponent?.let {
-                Text(stringResource(R.string.cube_vs, it.name), color = palette.textSecondary)
+    Column(Modifier.fillMaxSize().systemBarsPadding().padding(8.dp)) {
+        Text(
+            stringResource(if (cube.training) R.string.cube_training_title else R.string.cube_duel_title),
+            style = MaterialTheme.typography.titleMedium,
+            color = palette.accent,
+            fontWeight = FontWeight.Black,
+            modifier = Modifier.align(Alignment.CenterHorizontally),
+        )
+        if (cube.countdown != null) {
+            Text("${cube.countdown}", fontSize = 36.sp, fontWeight = FontWeight.Black, color = palette.gold, modifier = Modifier.align(Alignment.CenterHorizontally))
+        } else if (cube.phase == DuelPhase.PLAYING) {
+            val rem = cube.remainingNow(System.currentTimeMillis()) / 1000
+            Text(stringResource(R.string.cube_timer, rem), color = palette.textSecondary, modifier = Modifier.align(Alignment.CenterHorizontally))
+        }
+        Text(
+            stringResource(R.string.cube_moves_line, cube.myMoves, cube.oppMoves),
+            color = palette.textSecondary,
+            style = MaterialTheme.typography.labelLarge,
+            modifier = Modifier.align(Alignment.CenterHorizontally),
+        )
+        Text(stringResource(R.string.opponent_cube), color = palette.textSecondary, style = MaterialTheme.typography.labelSmall)
+        Box(Modifier.fillMaxWidth().weight(1f)) { opponentView() }
+        Text(stringResource(R.string.your_cube), color = palette.accent, style = MaterialTheme.typography.labelSmall)
+        Box(Modifier.fillMaxWidth().weight(1f)) { playerView() }
+        if (cube.solutionHint.isNotBlank()) {
+            Text(stringResource(R.string.solver_line, cube.solutionHint), color = palette.gold, style = MaterialTheme.typography.bodySmall)
+        }
+        GlassCard(Modifier.fillMaxWidth()) {
+            if (cube.phase == DuelPhase.PLAYING && !cube.solved) {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    moveButtons(onMove)
+                }
+                TextButton(onClick = onGiveUp) { Text(stringResource(R.string.give_up_solver), color = palette.gold) }
+                if (cube.guided) {
+                    TextButton(onClick = onHint) { Text(stringResource(R.string.hint), color = palette.accent) }
+                }
+            } else if (cube.solved) {
+                Text(stringResource(R.string.cube_solved_wait), color = palette.success, modifier = Modifier.padding(8.dp))
             }
         }
-
-        Column(
-            Modifier
-                .fillMaxWidth()
-                .align(Alignment.BottomCenter)
-                .padding(12.dp),
-        ) {
-            GlassCard(Modifier.fillMaxWidth()) {
-                if (cube.phase == DuelPhase.PLAYING && !cube.solved) {
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        moveButtons(onMove)
-                    }
-                } else if (cube.solved) {
-                    Text(stringResource(R.string.cube_solved_wait), color = palette.success, modifier = Modifier.padding(8.dp))
-                }
-            }
-            TextButton(onClick = onLeave, modifier = Modifier.align(Alignment.End)) {
-                Text(stringResource(R.string.leave), color = palette.danger)
-            }
+        TextButton(onClick = onLeave, modifier = Modifier.align(Alignment.End)) {
+            Text(stringResource(R.string.leave), color = palette.danger)
         }
     }
 }

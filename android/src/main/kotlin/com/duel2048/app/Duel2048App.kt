@@ -27,8 +27,12 @@ import com.duel2048.app.ui.screens.CubeDuelScreen
 import com.duel2048.app.ui.screens.CubeMatchmakingScreen
 import com.duel2048.app.ui.screens.CubeResultScreen
 import com.duel2048.app.ui.screens.DuelScreen
+import com.duel2048.app.ui.screens.GameModesScreen
 import com.duel2048.app.ui.screens.HomeScreen
 import com.duel2048.app.ui.screens.LeaderboardScreen
+import com.duel2048.app.ui.screens.MiniPlayScreen
+import com.duel2048.app.ui.screens.MoreGamesScreen
+import com.duel2048.app.ui.screens.WatchScreen
 import com.duel2048.app.ui.screens.LoginScreen
 import com.duel2048.app.ui.screens.MatchmakingScreen
 import com.duel2048.app.ui.screens.ResultScreen
@@ -79,6 +83,10 @@ fun Duel2048App(vm: MainViewModel) {
                             Screen.CubeDuel -> CubeDuelScreen(vm)
                             Screen.CubeResult -> CubeResultScreen(vm)
                             Screen.Leaderboard -> LeaderboardScreen(vm)
+                            Screen.MoreGames -> MoreGamesScreen(vm)
+                            is Screen.GameModes -> GameModesScreen(vm, target.game)
+                            Screen.MiniPlay -> MiniPlayScreen(vm)
+                            Screen.Watch -> WatchScreen(vm)
                         }
                     }
                 }

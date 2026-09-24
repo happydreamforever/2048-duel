@@ -29,6 +29,7 @@ class LocalCubeSession(
     val profile: TrainingProfile,
     playerName: String,
     val botName: String,
+    private val guided: Boolean = false,
     private val durationMs: Long = 300_000L,
     private val now: () -> Long = System::currentTimeMillis,
 ) {
@@ -59,6 +60,7 @@ class LocalCubeSession(
             phase = DuelPhase.FOUND,
             mode = MatchMode.BOT,
             training = true,
+            guided = guided,
             matchId = "cube-training",
             me = meInfo,
             opponent = botInfo,
@@ -67,6 +69,10 @@ class LocalCubeSession(
             scrambleNonce = _state.value.scrambleNonce + 1,
             myMoves = 0,
             oppMoves = 0,
+            oppLastMove = "",
+            oppSerial = 0,
+            played = emptyList(),
+            solutionHint = "",
             oppSolved = false,
             solved = false,
             countdown = Rules.COUNTDOWN_SECONDS,
@@ -83,7 +89,7 @@ class LocalCubeSession(
             _state.update {
                 it.copy(phase = DuelPhase.PLAYING, countdown = null, remainingMs = durationMs, remainingAnchor = startedAt)
             }
-            launch { botLoop() }
+            launch { if (!guided) botLoop() }
             while (isActive && !finished) {
                 delay(1000)
                 val remaining = durationMs - (now() - startedAt)
@@ -102,7 +108,7 @@ class LocalCubeSession(
         if (s.phase != DuelPhase.PLAYING || s.solved || finished) return
         local = cur.apply(move)
         val moves = s.myMoves + 1
-        _state.update { it.copy(myMoves = moves) }
+        _state.update { it.copy(myMoves = moves, played = it.played + move.notation()) }
         if (local!!.isSolved()) {
             _state.update { it.copy(solved = true) }
             finish(EndReason.SOLVED)
@@ -110,6 +116,16 @@ class LocalCubeSession(
     }
 
     fun leave() = dismiss()
+
+    fun revealSolver(onlyNext: Boolean = false): String {
+        val s = _state.value
+        val scramble = s.scramble.mapNotNull { CubeMove.parse(it) }
+        val played = s.played.mapNotNull { CubeMove.parse(it) }
+        val text = (scramble + played).asReversed().joinToString(" ") { it.inverse().notation() }
+        val shown = if (onlyNext) text.substringBefore(' ') else text
+        _state.update { it.copy(solutionHint = shown) }
+        return shown
+    }
 
     fun dismiss() {
         job?.cancel()
@@ -124,9 +140,17 @@ class LocalCubeSession(
             delay(profile.intervalMs + Random.nextLong(profile.jitterMs + 1))
             if (finished || botSolved) return
             if (botMoves >= botSolution.size) return
+            val move = botSolution[botMoves]
             botMoves++
             botSolved = botMoves >= botSolution.size
-            _state.update { it.copy(oppMoves = botMoves, oppSolved = botSolved) }
+            _state.update {
+                it.copy(
+                    oppMoves = botMoves,
+                    oppSolved = botSolved,
+                    oppLastMove = move.notation(),
+                    oppSerial = it.oppSerial + 1,
+                )
+            }
             if (botSolved && !_state.value.solved) finish(EndReason.SOLVED)
         }
     }

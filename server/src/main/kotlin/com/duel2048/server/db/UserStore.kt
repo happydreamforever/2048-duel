@@ -47,6 +47,7 @@ interface UserStore {
     suspend fun logout(userId: String)
     suspend fun updateStats(userId: String, transform: (AccountStats) -> AccountStats): UserRecord?
     suspend fun leaderboard(limit: Int = 50): List<LeaderboardEntry>
+    suspend fun names(): List<String> = emptyList()
     suspend fun recordMatch(match: MatchRecord) {}
     fun close() {}
 }

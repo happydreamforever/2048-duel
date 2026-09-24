@@ -17,31 +17,53 @@ import com.duel2048.shared.cube.CubeMove
 
 @Composable
 internal fun CubeDuelCube2Route(vm: MainViewModel, cube: CubeDuelUiState) {
-    var animCube by remember(cube.scrambleNonce) { mutableStateOf<AnimCube?>(null) }
+    var mine by remember(cube.scrambleNonce) { mutableStateOf<AnimCube?>(null) }
+    var opp by remember(cube.scrambleNonce) { mutableStateOf<AnimCube?>(null) }
 
-    LaunchedEffect(cube.scrambleNonce, cube.scramble, animCube) {
-        val view = animCube ?: return@LaunchedEffect
-        if (cube.scramble.isEmpty()) return@LaunchedEffect
-        Cube2Bridge.applyScrambleAnimated(view, cube.scramble)
+    LaunchedEffect(cube.scrambleNonce, cube.scramble, mine, opp) {
+        val scramble = cube.scramble
+        if (scramble.isEmpty()) return@LaunchedEffect
+        mine?.let { Cube2Bridge.applyScrambleAnimated(it, scramble) }
+        opp?.let { Cube2Bridge.applyScrambleAnimated(it, scramble) }
+    }
+    LaunchedEffect(cube.oppSerial, opp) {
+        val view = opp ?: return@LaunchedEffect
+        val move = CubeMove.parse(cube.oppLastMove) ?: return@LaunchedEffect
+        Cube2Bridge.applyMoveAnimated(view, move)
     }
 
     CubeDuelOverlay(
         cube = cube,
         onMove = { move ->
-            animCube?.let { Cube2Bridge.applyMoveAnimated(it, move) }
+            mine?.let { Cube2Bridge.applyMoveAnimated(it, move) }
             vm.applyCubeMove(move)
         },
         onLeave = { vm.leaveCubeDuel() },
-    ) {
-        AndroidView(
-            factory = { ctx ->
-                AnimCube(ctx).also { view ->
-                    Cube2Bridge.configure(view)
-                    animCube = view
-                }
-            },
-            modifier = Modifier.fillMaxSize(),
-            update = { view -> if (animCube == null) animCube = view },
-        )
-    }
+        onGiveUp = { vm.revealCubeSolver() },
+        onHint = { vm.cubeHint() },
+        opponentView = {
+            AndroidView(
+                factory = { ctx ->
+                    AnimCube(ctx).also { view ->
+                        Cube2Bridge.configure(view)
+                        opp = view
+                    }
+                },
+                modifier = Modifier.fillMaxSize(),
+                update = { view -> if (opp == null) opp = view },
+            )
+        },
+        playerView = {
+            AndroidView(
+                factory = { ctx ->
+                    AnimCube(ctx).also { view ->
+                        Cube2Bridge.configure(view)
+                        mine = view
+                    }
+                },
+                modifier = Modifier.fillMaxSize(),
+                update = { view -> if (mine == null) mine = view },
+            )
+        },
+    )
 }

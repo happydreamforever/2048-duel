@@ -50,6 +50,7 @@ data class CubeDuelUiState(
     val mode: MatchMode = MatchMode.PVP,
     /** Offline training on this device (no server). */
     val training: Boolean = false,
+    val guided: Boolean = false,
     val matchId: String? = null,
     val me: PlayerInfo? = null,
     val opponent: PlayerInfo? = null,
@@ -58,7 +59,11 @@ data class CubeDuelUiState(
     val scrambleNonce: Int = 0,
     val myMoves: Int = 0,
     val oppMoves: Int = 0,
+    val oppLastMove: String = "",
+    val oppSerial: Int = 0,
     val oppSolved: Boolean = false,
+    val played: List<String> = emptyList(),
+    val solutionHint: String = "",
     val solved: Boolean = false,
     val countdown: Int? = null,
     val durationMs: Long = 300_000L,
@@ -146,7 +151,7 @@ class CubeMatchController(
         val next = cur.apply(move)
         local = next
         val moves = s.myMoves + 1
-        _state.update { it.copy(myMoves = moves) }
+        _state.update { it.copy(myMoves = moves, played = it.played + move.notation()) }
         client.send(CubeMoveMsg(matchId, seq, move.notation()))
         seq++
         if (next.isSolved()) {
@@ -157,6 +162,16 @@ class CubeMatchController(
     }
 
     fun localState(): CubeState? = local
+
+    fun revealSolver(onlyNext: Boolean = false): String {
+        val s = _state.value
+        val scramble = s.scramble.mapNotNull { CubeMove.parse(it) }
+        val played = s.played.mapNotNull { CubeMove.parse(it) }
+        val text = (scramble + played).asReversed().joinToString(" ") { it.inverse().notation() }
+        val shown = if (onlyNext) text.substringBefore(' ') else text
+        _state.update { it.copy(solutionHint = shown) }
+        return shown
+    }
 
     private fun onMessage(msg: ServerMessage) {
         val s = _state.value
@@ -193,6 +208,10 @@ class CubeMatchController(
                         scrambleNonce = it.scrambleNonce + 1,
                         myMoves = 0,
                         oppMoves = 0,
+                        oppLastMove = "",
+                        oppSerial = 0,
+                        played = emptyList(),
+                        solutionHint = "",
                         oppSolved = false,
                         solved = false,
                         countdown = msg.countdownSeconds,
@@ -233,7 +252,14 @@ class CubeMatchController(
             }
             is CubeOpponentProgress -> {
                 if (msg.matchId != s.matchId) return
-                _state.update { it.copy(oppMoves = msg.moves, oppSolved = msg.solved) }
+                _state.update {
+                    it.copy(
+                        oppMoves = msg.moves,
+                        oppSolved = msg.solved,
+                        oppLastMove = msg.move,
+                        oppSerial = if (msg.move.isNotBlank()) it.oppSerial + 1 else it.oppSerial,
+                    )
+                }
             }
             is CubeMatchOver -> {
                 if (msg.matchId != s.matchId) return

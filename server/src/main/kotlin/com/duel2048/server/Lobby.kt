@@ -377,6 +377,11 @@ class Lobby(private val config: ServerConfig, private val scope: CoroutineScope,
 
     fun stats(): ServerStats = ServerStats(players.size, queue2048.size + queueCube.size, matches.size + cubeMatches.size, totalMatches.get())
 
+    fun onlineNames(): Set<String> = players.values.map { it.name }.filter { it.isNotBlank() }.toSet()
+
+    fun liveGames(): List<com.duel2048.shared.social.LiveGame> =
+        matches.values.map { it.liveRow() } + cubeMatches.values.map { it.liveRow() }
+
     companion object {
         private val BOT_NAMES = listOf("Nova", "Byte", "Pixel", "Vega", "Orion", "Quark", "Echo", "Zed")
     }

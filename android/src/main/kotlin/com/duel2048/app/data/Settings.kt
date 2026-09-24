@@ -24,6 +24,9 @@ data class UserSettings(
     val accLosses: Int = 0,
     val accDraws: Int = 0,
     val accBestScore: Int = 0,
+    /** Lifetime score. Level is 1 + score / 100. */
+    val score: Int = 0,
+    val coins: Int = com.duel2048.shared.social.Economy.START_COINS,
     /** BCP-47 tag such as "ko"; blank follows the system language. */
     val language: String = "",
     /** 3D cube renderer: [com.duel2048.app.data.CubeRenderer.MAGIC] or [com.duel2048.app.data.CubeRenderer.CUBE2]. */
@@ -80,6 +83,8 @@ class SettingsStore(context: Context) {
         accLosses = prefs.getInt("accLosses", 0),
         accDraws = prefs.getInt("accDraws", 0),
         accBestScore = prefs.getInt("accBest", 0),
+        score = prefs.getInt("score", 0),
+        coins = if (prefs.contains("coins")) prefs.getInt("coins", com.duel2048.shared.social.Economy.START_COINS) else com.duel2048.shared.social.Economy.START_COINS,
         language = prefs.getString("lang", "") ?: "",
         cubeRenderer = prefs.getString("cubeRenderer", CubeRenderer.CUBE2.id) ?: CubeRenderer.CUBE2.id,
     )
@@ -103,6 +108,8 @@ class SettingsStore(context: Context) {
             .putInt("accLosses", s.accLosses)
             .putInt("accDraws", s.accDraws)
             .putInt("accBest", s.accBestScore)
+            .putInt("score", s.score)
+            .putInt("coins", s.coins)
             .putString("lang", s.language)
             .putString("cubeRenderer", s.cubeRenderer)
             .apply()

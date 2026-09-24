@@ -74,7 +74,13 @@ fun HomeScreen(vm: MainViewModel) {
     val palette = LocalPalette.current
     var showSettings by remember { mutableStateOf(false) }
     var showTraining by remember { mutableStateOf(false) }
-    var showCubeTraining by remember { mutableStateOf(false) }
+    var showSearch by remember { mutableStateOf(false) }
+    var showChat by remember { mutableStateOf(false) }
+    var showShop by remember { mutableStateOf(false) }
+    var showNotes by remember { mutableStateOf(false) }
+    var showReport by remember { mutableStateOf(false) }
+    val banner by vm.banner.collectAsStateWithLifecycle()
+    val notes by vm.notes.collectAsStateWithLifecycle()
     val botName = stringResource(R.string.bot_name)
 
     Box(Modifier.fillMaxSize().systemBarsPadding()) {
@@ -96,42 +102,11 @@ fun HomeScreen(vm: MainViewModel) {
                 letterSpacing = 12.sp,
                 fontWeight = FontWeight.Black,
             )
-            Spacer(Modifier.height(18.dp))
-            SectionLabel(
-                stringResource(R.string.home_offline_section),
-                stringResource(R.string.home_offline_section_sub),
-            )
-            Spacer(Modifier.height(8.dp))
-            GlassCard(Modifier.fillMaxWidth()) {
-                NeonButton(
-                    stringResource(R.string.training),
-                    subtitle = stringResource(R.string.training_sub),
-                    colors = listOf(Color(0xFF1F9D6B), Color(0xFF0E6B8A)),
-                    modifier = Modifier.fillMaxWidth(),
-                ) { showTraining = true }
-                Spacer(Modifier.height(10.dp))
-                NeonButton(
-                    stringResource(R.string.solo_zen),
-                    subtitle = stringResource(R.string.solo_sub),
-                    colors = listOf(Color(0xFF3B4A66), Color(0xFF1F2A44)),
-                    modifier = Modifier.fillMaxWidth(),
-                ) { vm.openSolo() }
-                Spacer(Modifier.height(10.dp))
-                NeonButton(
-                    stringResource(R.string.cube_training),
-                    subtitle = stringResource(R.string.cube_training_sub),
-                    colors = listOf(Color(0xFF1F9D6B), Color(0xFF0E4D3A)),
-                    modifier = Modifier.fillMaxWidth(),
-                ) { showCubeTraining = true }
-            }
+            Spacer(Modifier.height(12.dp))
+            WalletRow(settings, notes.isNotEmpty(), { showShop = true }, { showNotes = true }, { showSearch = true }, { showChat = true }, { showReport = true })
             Spacer(Modifier.height(16.dp))
             AccountRow(settings, onLogin = { vm.openLogin() }, onLogout = { vm.logout() })
             Spacer(Modifier.height(14.dp))
-            SectionLabel(
-                stringResource(R.string.home_online_section),
-                if (settings.loggedIn) stringResource(R.string.home_online_section_sub) else stringResource(R.string.home_online_login_required),
-            )
-            Spacer(Modifier.height(8.dp))
             GlassCard(Modifier.fillMaxWidth()) {
                 NeonButton(
                     stringResource(R.string.quick_match),
@@ -147,18 +122,23 @@ fun HomeScreen(vm: MainViewModel) {
                 ) { vm.startDuel(MatchMode.BOT) }
                 Spacer(Modifier.height(10.dp))
                 NeonButton(
-                    stringResource(R.string.cube_quick_match),
-                    subtitle = stringResource(R.string.cube_quick_match_sub),
-                    colors = listOf(Color(0xFF6B4EFF), Color(0xFF2D1B69)),
+                    stringResource(R.string.training),
+                    subtitle = stringResource(R.string.training_sub),
+                    colors = listOf(Color(0xFF1F9D6B), Color(0xFF0E6B8A)),
                     modifier = Modifier.fillMaxWidth(),
-                ) { vm.startCubeDuel(MatchMode.PVP) }
+                ) { showTraining = true }
                 Spacer(Modifier.height(10.dp))
                 NeonButton(
-                    stringResource(R.string.cube_practice_bot),
-                    subtitle = stringResource(R.string.cube_practice_bot_sub),
-                    colors = listOf(Color(0xFF4A6FA5), Color(0xFF1B3A5C)),
+                    stringResource(R.string.more_games),
+                    subtitle = stringResource(R.string.more_games_sub),
+                    colors = listOf(Color(0xFF6B4EFF), Color(0xFF2D1B69)),
                     modifier = Modifier.fillMaxWidth(),
-                ) { vm.startCubeDuel(MatchMode.BOT) }
+                ) { vm.openMoreGames() }
+            }
+            if (banner == "need_coins") {
+                Spacer(Modifier.height(10.dp))
+                Text(stringResource(R.string.need_coins), color = palette.danger, fontWeight = FontWeight.Bold)
+                TextButton(onClick = { vm.clearBanner() }) { Text(stringResource(R.string.ok), color = palette.accent) }
             }
             Spacer(Modifier.height(16.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -215,16 +195,11 @@ fun HomeScreen(vm: MainViewModel) {
             vm.startTraining(profile, botName)
         }
     }
-    if (showCubeTraining) {
-        TrainingSheet(
-            title = stringResource(R.string.cube_training_title),
-            description = stringResource(R.string.cube_training_text),
-            onDismiss = { showCubeTraining = false },
-        ) { profile ->
-            showCubeTraining = false
-            vm.startCubeTraining(profile, botName)
-        }
-    }
+    if (showSearch) SearchSheet(vm) { showSearch = false }
+    if (showChat) ChatSheet(vm) { showChat = false }
+    if (showShop) ShopSheet(vm) { showShop = false }
+    if (showNotes) NotesSheet(vm) { showNotes = false }
+    if (showReport) ReportSheet(vm) { showReport = false }
 }
 
 @Composable
@@ -309,6 +284,36 @@ private fun TrainingSheet(
             Spacer(Modifier.height(4.dp))
             NeonButton(stringResource(R.string.start), modifier = Modifier.fillMaxWidth()) { onStart(selected) }
             Spacer(Modifier.navigationBarsPadding())
+        }
+    }
+}
+
+@Composable
+private fun WalletRow(
+    settings: UserSettings,
+    hasNotes: Boolean,
+    onShop: () -> Unit,
+    onNotes: () -> Unit,
+    onSearch: () -> Unit,
+    onChat: () -> Unit,
+    onReport: () -> Unit,
+) {
+    val palette = LocalPalette.current
+    val level = com.duel2048.shared.social.Economy.level(settings.score)
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            StatPill(stringResource(R.string.level_label), level.toString(), valueColor = palette.gold)
+            StatPill(stringResource(R.string.score_label), settings.score.toString(), valueColor = palette.accent)
+            StatPill(stringResource(R.string.coins_label), settings.coins.toString(), valueColor = palette.gold)
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            TextButton(onClick = onShop) { Text(stringResource(R.string.coin_shop), color = palette.gold) }
+            TextButton(onClick = onSearch) { Text(stringResource(R.string.user_search), color = palette.accent) }
+            TextButton(onClick = onChat) { Text(stringResource(R.string.chat), color = palette.accent) }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            TextButton(onClick = onNotes) { Text(if (hasNotes) stringResource(R.string.admin_notes_new) else stringResource(R.string.admin_notes), color = palette.accent) }
+            TextButton(onClick = onReport) { Text(stringResource(R.string.report_admin), color = palette.danger) }
         }
     }
 }

@@ -135,7 +135,7 @@ class CubeMatch(
             p.moveCount++
             p.send(CubeMoveAck(id, seq, p.state.fingerprint(), p.moveCount))
             val o = other(p)
-            o.send(CubeOpponentProgress(id, p.moveCount, p.state.isSolved()))
+            o.send(CubeOpponentProgress(id, p.moveCount, p.state.isSolved(), move.notation()))
 
             if (p.state.isSolved()) {
                 markSolved(p)
@@ -163,7 +163,7 @@ class CubeMatch(
         p.solved = true
         p.finishedAtMs = elapsedMs
         val o = other(p)
-        o.send(CubeOpponentProgress(id, p.moveCount, true))
+        o.send(CubeOpponentProgress(id, p.moveCount, true, ""))
         if (!o.solved) {
             finishLocked(EndReason.SOLVED, p)
         } else {
@@ -219,4 +219,8 @@ class CubeMatch(
     }
 
     private fun other(p: CubeParticipant): CubeParticipant = if (p === p1) p2 else p1
+
+    fun liveRow() = com.duel2048.shared.social.LiveGame(
+        id, "cube", p1.info.name, p1.moveCount, p2.info.name, p2.moveCount,
+    )
 }

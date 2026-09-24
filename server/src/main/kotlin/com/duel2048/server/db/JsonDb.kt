@@ -98,6 +98,8 @@ class JsonDb(val file: File) : UserStore {
         updated
     }
 
+    override suspend fun names(): List<String> = mutex.withLock { users.values.map { it.name } }
+
     override suspend fun leaderboard(limit: Int): List<LeaderboardEntry> = mutex.withLock {
         users.values
             .sortedWith(compareByDescending<UserRecord> { it.stats.wins }.thenByDescending { it.stats.bestScore })

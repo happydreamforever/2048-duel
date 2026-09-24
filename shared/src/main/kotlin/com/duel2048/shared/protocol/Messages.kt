@@ -189,7 +189,12 @@ data class CubeMoveRejected(
 
 @Serializable
 @SerialName("cube_opponent_progress")
-data class CubeOpponentProgress(val matchId: String, val moves: Int, val solved: Boolean) : ServerMessage
+data class CubeOpponentProgress(
+    val matchId: String,
+    val moves: Int,
+    val solved: Boolean,
+    val move: String = "",
+) : ServerMessage
 
 @Serializable
 @SerialName("cube_match_over")
