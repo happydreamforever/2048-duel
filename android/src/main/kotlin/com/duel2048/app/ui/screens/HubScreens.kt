@@ -50,7 +50,7 @@ import com.duel2048.app.R
 import com.duel2048.app.ui.components.GlassCard
 import com.duel2048.app.ui.components.NeonButton
 import com.duel2048.app.ui.theme.LocalPalette
-import com.duel2048.shared.social.CHAT_PHRASES
+import com.duel2048.shared.social.ChatPhrases
 import com.duel2048.shared.social.Economy
 import kotlinx.coroutines.delay
 
@@ -246,7 +246,7 @@ fun ChatSheet(vm: MainViewModel, onDismiss: () -> Unit) {
             lines.takeLast(8).forEach { line ->
                 Text("${line.from}: ${line.text}", color = palette.textPrimary)
             }
-            CHAT_PHRASES.chunked(4).forEach { row ->
+            ChatPhrases.all.chunked(4).forEach { row ->
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     row.forEach { phrase ->
                         Text(

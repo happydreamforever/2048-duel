@@ -81,7 +81,7 @@ class SocialService(
     }
 
     fun chat(name: String, text: String, room: String): ChatLine? {
-        val allowed = com.duel2048.shared.social.CHAT_PHRASES
+        val allowed = com.duel2048.shared.social.ChatPhrases.all
         if (text !in allowed) return null
         val line = ChatLine(System.currentTimeMillis(), name.ifBlank { "Player" }, text, room.ifBlank { "lobby" })
         synchronized(lock) {

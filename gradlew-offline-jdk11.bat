@@ -20,4 +20,7 @@ if not exist "%DUEL2048_JDK11%\bin\java.exe" (
     exit /b 1
 )
 set "JAVA_HOME=%DUEL2048_JDK11%"
+rem A leftover Kotlin daemon locks server\build\kotlin\... on Windows and then the compile fails.
+call "%~dp0gradlew-jdk11.bat" --stop >nul 2>&1
+call "%~dp0gradlew-offline.bat" --stop >nul 2>&1
 call "%~dp0gradlew-offline.bat" %*

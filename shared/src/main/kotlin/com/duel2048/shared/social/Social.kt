@@ -28,10 +28,12 @@ object Economy {
     }
 }
 
-val CHAT_PHRASES = listOf(
-    "Good luck", "Nice", "Wow", "Hurry up", "GG", "Thanks", "Oops", "Close one",
-    "🔥", "😂", "👍", "👏", "😎", "🤝", "💀", "✨",
-)
+object ChatPhrases {
+    val all = listOf(
+        "Good luck", "Nice", "Wow", "Hurry up", "GG", "Thanks", "Oops", "Close one",
+        "🔥", "😂", "👍", "👏", "😎", "🤝", "💀", "✨",
+    )
+}
 
 @Serializable
 data class PlayerPresence(val name: String, val online: Boolean)
