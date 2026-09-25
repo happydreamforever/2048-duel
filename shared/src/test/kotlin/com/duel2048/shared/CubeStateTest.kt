@@ -28,14 +28,7 @@ class CubeStateTest {
     @Test
     fun `double turn is self-inverse`() {
         for (face in CubeMove.QUARTER_TURNS) {
-            val double = when (face) {
-                CubeMove.U -> CubeMove.U2
-                CubeMove.R -> CubeMove.R2
-                CubeMove.F -> CubeMove.F2
-                CubeMove.D -> CubeMove.D2
-                CubeMove.L -> CubeMove.L2
-                CubeMove.B -> CubeMove.B2
-            }
+            val double = face.doubleTurn()
             val once = CubeState.SOLVED.apply(double)
             val twice = once.apply(double)
             assertTrue(twice.isSolved(), double.notation())

@@ -85,9 +85,9 @@ data class CubeState(val stickers: CharArray) {
             CubeFace.B to arrayOf(
                 intArrayOf(45, 47, 53, 51),
                 intArrayOf(46, 50, 52, 48),
-                intArrayOf(2, 33, 47, 11),
-                intArrayOf(1, 34, 50, 10),
-                intArrayOf(0, 35, 53, 9),
+                intArrayOf(2, 11, 35, 42),
+                intArrayOf(1, 14, 34, 39),
+                intArrayOf(0, 17, 33, 36),
             ),
         )
     }
