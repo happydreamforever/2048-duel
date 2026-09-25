@@ -9,7 +9,7 @@
 // ---------------------------------------------------------------------------------------------
 // Offline builds.
 //
-//   gradlew downloadDependencies   (once, with internet)  -> offline-repo/ + offline/gradle-x.y.z/
+//   gradlew downloadDependencies   (once, with internet)  -> m2/ + offline/gradle-x.y.z/
 //   gradlew-offline(.bat) <tasks>  (anywhere, no internet)
 //
 // downloadDependencies runs the complete build in a fresh, project-local Gradle home so that
@@ -19,7 +19,7 @@
 // ---------------------------------------------------------------------------------------------
 
 val offlineHome: File = rootDir.resolve(".gradle-offline-home")
-val offlineRepo: File = rootDir.resolve("offline-repo")
+val offlineRepo: File = rootDir.resolve("m2")
 val offlineDistDir: File = rootDir.resolve("offline")
 
 // No String.lowercase() here: build scripts compile against Gradle 7.4.2's embedded Kotlin 1.5.
@@ -44,7 +44,7 @@ fun seedGradleDistribution() {
 fun runChildGradle(vararg args: String) {
     val serverOnly = providers.gradleProperty("duel2048.serverOnly").isPresent
     val launcher = if (isWindows()) listOf("cmd", "/c", rootDir.resolve("gradlew.bat").absolutePath) else listOf(rootDir.resolve("gradlew").absolutePath)
-    val command = launcher + listOf("--no-daemon", "--console=plain", "-Dduel2048.offlineRepo=false") +
+    val command = launcher + listOf("--no-daemon", "--console=plain", "-Dduel2048.m2=false") +
         (if (serverOnly) listOf("-Pduel2048.serverOnly") else emptyList()) + args
     logger.lifecycle("> child build: ${args.joinToString(" ")}")
     logger.lifecycle("  GRADLE_USER_HOME=$offlineHome")
@@ -118,7 +118,7 @@ fun syncFile(source: File, target: File, stats: LongArray) {
     }
 }
 
-/** files-2.1/<group>/<module>/<version>/<sha1>/<file>  ->  offline-repo/<group/as/path>/<module>/<version>/<url-name> */
+/** files-2.1/<group>/<module>/<version>/<sha1>/<file>  ->  m2/<group/as/path>/<module>/<version>/<url-name> */
 fun exportDependencyCache() {
     val files21 = offlineHome.resolve("caches/modules-2/files-2.1")
     require(files21.isDirectory) { "no dependency cache at $files21; run the child build first" }
@@ -150,7 +150,7 @@ fun exportDependencyCache() {
     offlineRepo.walkBottomUp().forEach { f ->
         if (f.isFile && f.absoluteFile !in wanted) { if (f.delete()) stale++ else locked++ } else if (f.isDirectory && f != offlineRepo && f.listFiles().isNullOrEmpty()) f.delete()
     }
-    logger.lifecycle("offline-repo: ${wanted.size} files (${stats[0]} copied, ${stats[1] / 1_048_576} MB; ${stats[2]} unchanged; $renamed renamed per module metadata; $stale stale removed" + (if (locked > 0) "; $locked stale files locked, delete them later" else "") + ")")
+    logger.lifecycle("m2: ${wanted.size} files (${stats[0]} copied, ${stats[1] / 1_048_576} MB; ${stats[2]} unchanged; $renamed renamed per module metadata; $stale stale removed" + (if (locked > 0) "; $locked stale files locked, delete them later" else "") + ")")
 }
 
 fun exportGradleDistribution() {
@@ -183,7 +183,7 @@ tasks.register("fetchPlatformArtifacts") {
 
 tasks.register("exportOfflineRepo") {
     group = "offline"
-    description = "Exports .gradle-offline-home into offline-repo/ and offline/ without running the build again."
+    description = "Exports .gradle-offline-home into m2/ and offline/ without running the build again."
     doLast {
         exportDependencyCache()
         exportGradleDistribution()
@@ -192,7 +192,7 @@ tasks.register("exportOfflineRepo") {
 
 tasks.register("downloadDependencies") {
     group = "offline"
-    description = "Downloads every dependency, Gradle plugin, tool and the Gradle distribution into offline-repo/ and offline/ (needs internet once)."
+    description = "Downloads every dependency, Gradle plugin, tool and the Gradle distribution into m2/ and offline/ (needs internet once)."
     doLast {
         logger.lifecycle("")
         logger.lifecycle("downloadDependencies: runs the complete build once in $offlineHome and downloads about 450 MB of")
@@ -212,6 +212,6 @@ tasks.register("downloadDependencies") {
         for (v in aapt2Versions) runChildGradle("fetchPlatformArtifacts", "-Paapt2Version=$v")
         exportDependencyCache()
         exportGradleDistribution()
-        logger.lifecycle("Done. Commit offline-repo/ and offline/, then build anywhere with gradlew-offline(.bat).")
+        logger.lifecycle("Done. Keep m2/ and offline/ next to the project, then build anywhere with gradlew-offline(.bat).")
     }
 }

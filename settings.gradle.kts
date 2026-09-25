@@ -1,15 +1,16 @@
 pluginManagement {
     repositories {
-        // Project-local Maven repository written by `gradlew downloadDependencies` (offline builds).
+        // Project-local Maven repository (m2/) written by `gradlew downloadDependencies`.
         // Listed first so nothing is fetched from the internet when it is present.
-        // Skipped while (re)generating it: on Windows a build that loaded jars from offline-repo
+        // Skipped while (re)generating it: on Windows a build that loaded jars from m2
         // would keep them locked and the export could not overwrite them.
-        val offlineRepo = File(rootDir, "offline-repo")
+        val m2 = File(rootDir, "m2")
         val exporting = gradle.startParameter.taskNames.any { it.endsWith("downloadDependencies") || it.endsWith("exportOfflineRepo") }
-        if (offlineRepo.isDirectory && !exporting && System.getProperty("duel2048.offlineRepo") != "false") {
+        val disabled = System.getProperty("duel2048.m2") == "false" || System.getProperty("duel2048.offlineRepo") == "false"
+        if (m2.isDirectory && !exporting && !disabled) {
             maven {
-                name = "offlineRepo"
-                url = offlineRepo.toURI()
+                name = "m2"
+                url = m2.toURI()
             }
         }
         google {
@@ -27,12 +28,13 @@ pluginManagement {
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
-        val offlineRepo = File(rootDir, "offline-repo")
+        val m2 = File(rootDir, "m2")
         val exporting = gradle.startParameter.taskNames.any { it.endsWith("downloadDependencies") || it.endsWith("exportOfflineRepo") }
-        if (offlineRepo.isDirectory && !exporting && System.getProperty("duel2048.offlineRepo") != "false") {
+        val disabled = System.getProperty("duel2048.m2") == "false" || System.getProperty("duel2048.offlineRepo") == "false"
+        if (m2.isDirectory && !exporting && !disabled) {
             maven {
-                name = "offlineRepo"
-                url = offlineRepo.toURI()
+                name = "m2"
+                url = m2.toURI()
             }
         }
         google()

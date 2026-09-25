@@ -1,5 +1,5 @@
 @echo off
-rem Offline build with JDK 11: bundled Gradle (offline\gradle-*) + dependencies from offline-repo\.
+rem Offline build with JDK 11: bundled Gradle (offline\gradle-*) + dependencies from m2\.
 rem The machine-wide JAVA_HOME stays on Java 21; JDK 11 is used only for this process.
 rem
 rem Usage:  gradlew-offline-jdk11.bat -Pduel2048.serverOnly :server:installDist

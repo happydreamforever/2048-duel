@@ -1,5 +1,5 @@
 @echo off
-rem Builds without internet: bundled Gradle from offline\gradle-* and dependencies from offline-repo\.
+rem Builds without internet: bundled Gradle from offline\gradle-* and dependencies from m2\.
 rem Usage: gradlew-offline.bat :android:assembleRelease
 rem Uses your normal Gradle home (%USERPROFILE%\.gradle) unless GRADLE_USER_HOME is set.
 setlocal
@@ -18,8 +18,8 @@ if not defined GRADLE_BIN (
   echo Bundled Gradle not found in offline\. Run gradlew.bat downloadDependencies on a machine with internet first.
   exit /b 1
 )
-if not exist "%ROOT%offline-repo\" (
-  echo offline-repo\ not found. Run gradlew.bat downloadDependencies on a machine with internet first.
+if not exist "%ROOT%m2\" (
+  echo m2\ not found. Run gradlew.bat downloadDependencies on a machine with internet first.
   exit /b 1
 )
 call "%GRADLE_BIN%" --offline %*

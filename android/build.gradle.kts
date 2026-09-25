@@ -68,7 +68,7 @@ android {
 
     lint {
         // lintVital pulls extra tooling jars (trove4j, etc.) that may be missing from a partial
-        // offline-repo; compile, minify and signing still run for release APKs.
+        // m2; compile, minify and signing still run for release APKs.
         checkReleaseBuilds = false
     }
 }

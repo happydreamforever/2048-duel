@@ -235,12 +235,12 @@ exports everything it fetched:
 
 | Folder | Contents | Size |
 |---|---|---|
-| `offline-repo/` | every dependency, Gradle plugin, Kotlin compiler, Android build tool and `aapt2` for Windows, macOS and Linux, in Maven layout | ~375 MB |
+| `m2/` | every dependency, Gradle plugin, Kotlin compiler, Android build tool and `aapt2` for Windows, macOS and Linux, in Maven layout | ~375 MB |
 | `offline/gradle-7.4.2/` | the Gradle distribution itself | ~146 MB |
 
 Both folders are **git-ignored**: they are generated, not committed. From then on the normal
 `gradlew` / `gradlew.bat` also runs on the bundled Gradle (whenever `offline/gradle-<version>` matches
-`gradle-wrapper.properties`) and resolves from `offline-repo/`, so nothing is downloaded any more;
+`gradle-wrapper.properties`) and resolves from `m2/`, so nothing is downloaded any more;
 `gradlew-offline` is the same plus `--offline`, which forbids network access outright. Set
 `DUEL2048_USE_WRAPPER=1` to force the stock wrapper behaviour. To build on a machine without
 internet, copy the whole project folder (or a zip of it) including those two folders. There:
@@ -251,7 +251,7 @@ gradlew-offline.bat :android:assembleRelease     # Windows
 ```
 
 `gradlew-offline` uses the bundled Gradle and passes `--offline`; dependencies come from
-`offline-repo/`, so the only things the machine needs are a JDK (11; see "Portable JDK" above)
+`m2/`, so the only things the machine needs are a JDK (11; see "Portable JDK" above)
 and the Android SDK (platform 33, build-tools 33.0.0). Those two cannot be bundled; install them with Android Studio
 beforehand. Gradle's own working cache goes to the usual `~/.gradle` (`%USERPROFILE%\.gradle`) and
 is created automatically if missing; set `GRADLE_USER_HOME` to put it elsewhere.
@@ -279,7 +279,7 @@ server-only offline bundle:
 gradlew downloadDependencies -Pduel2048.serverOnly     # online, once
 ```
 
-Copy the project folder including `offline-repo/` and `offline/` to the old machine, and there:
+Copy the project folder including `m2/` and `offline/` to the old machine, and there:
 
 ```
 gradlew-offline.bat -Pduel2048.serverOnly :server:installDist    # Windows
@@ -294,7 +294,7 @@ not optional. (Alternatively, skip Gradle on the old machine entirely: copy a re
 Windows note: if a build stops with "Could not move temporary workspace ... to immutable location",
 an antivirus scanner is holding freshly written files in Gradle's transform cache. Delete the
 `caches\7.4.2\transforms` folder of the Gradle home it names, add the project and Gradle home
-folders to the scanner's exclusions, and re-run. `settings.gradle.kts` also puts `offline-repo/` first in the
+folders to the scanner's exclusions, and re-run. `settings.gradle.kts` also puts `m2/` first in the
 repository list whenever it exists, so the normal `gradlew` stops downloading as well. After
 changing any version in `gradle/libs.versions.toml`, run `downloadDependencies` again while online.
 

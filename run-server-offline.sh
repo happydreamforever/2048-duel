@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Builds the server without internet (bundled Gradle + offline-repo) and runs it.
+# Builds the server without internet (bundled Gradle + m2) and runs it.
 # Usage: ./run-server-offline.sh            (port 8080, database from database.json / server.env)
 #        PORT=8765 ./run-server-offline.sh
 # serverOnly: the server never needs the :android module, so skip it - this also makes the
