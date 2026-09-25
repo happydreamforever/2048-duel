@@ -282,6 +282,19 @@ server\build\install\server\bin\server.bat
 
 `set PORT=8765` before the command changes the port. Accounts need MariaDB or MySQL via `database.json`, or `DB=json` in `server.env` to store them in `data/duel2048-db.json`. The built `server\build\install\server\` folder can be copied to another machine that only has a JRE 8.
 
+### Automatic app update
+
+The installed app checks `GET /app/update` when the home screen opens. If the server's `versionCode` is higher, it downloads the APK and starts the system installer. The new APK must be signed with the **same keystore**. Android shows one confirm screen; a normal app cannot replace itself with no prompt.
+
+On the server machine, next to the process working directory:
+
+```
+data/app-release.json       copy of app-release.json.example, with the new versionCode
+data/android-release.apk    the release APK from assembleRelease
+```
+
+`versionCode` in that JSON must be greater than the one already on the device (`android/build.gradle.kts`). Restart the server after replacing the files.
+
 ### Old machine with only JDK 8, no Android SDK
 
 Add `-Pduel2048.serverOnly`: the `:android` module is skipped, so AGP (which requires JDK 11+)

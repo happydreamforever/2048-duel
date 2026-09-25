@@ -36,6 +36,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -46,6 +47,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -61,6 +63,7 @@ import com.duel2048.app.ui.components.NeonButton
 import com.duel2048.app.ui.components.ShimmerTitle
 import com.duel2048.app.ui.components.StatPill
 import com.duel2048.app.ui.errorText
+import com.duel2048.app.update.AppUpdater
 import com.duel2048.app.ui.theme.LocalPalette
 import com.duel2048.app.ui.theme.Palettes
 import com.duel2048.shared.protocol.MatchMode
@@ -81,7 +84,10 @@ fun HomeScreen(vm: MainViewModel) {
     var showReport by remember { mutableStateOf(false) }
     val banner by vm.banner.collectAsStateWithLifecycle()
     val notes by vm.notes.collectAsStateWithLifecycle()
+    val updateStatus by AppUpdater.status.collectAsStateWithLifecycle()
     val botName = stringResource(R.string.bot_name)
+    val context = LocalContext.current
+    LaunchedEffect(settings.serverUrl) { AppUpdater.checkAndInstall(context, settings.serverUrl) }
 
     Box(Modifier.fillMaxSize().systemBarsPadding()) {
         Column(
@@ -169,6 +175,12 @@ fun HomeScreen(vm: MainViewModel) {
         }
 
         // Declared after the scrolling column so it stays on top and receives taps.
+        updateStatus?.let { message ->
+            GlassCard(Modifier.align(Alignment.TopCenter).padding(top = 48.dp, start = 16.dp, end = 16.dp)) {
+                Text(message, color = palette.gold, fontWeight = FontWeight.Bold)
+            }
+        }
+
         IconButton(onClick = { showSettings = true }, modifier = Modifier.align(Alignment.TopEnd).padding(8.dp)) {
             Icon(Icons.Default.Settings, contentDescription = stringResource(R.string.settings), tint = palette.textSecondary)
         }

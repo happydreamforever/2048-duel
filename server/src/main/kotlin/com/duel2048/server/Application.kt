@@ -5,6 +5,7 @@ import com.duel2048.server.db.MySqlStore
 import com.duel2048.server.db.UserStore
 import kotlinx.coroutines.runBlocking
 import kotlin.system.exitProcess
+import com.duel2048.shared.protocol.AppRelease
 import com.duel2048.shared.protocol.Protocol
 import com.duel2048.shared.protocol.ServerStats
 import com.duel2048.shared.social.ChatBody
@@ -27,6 +28,7 @@ import io.ktor.server.plugins.callloging.CallLogging
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.server.plugins.cors.routing.CORS
 import io.ktor.server.request.receiveText
+import io.ktor.server.http.content.LocalFileContent
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.get
@@ -102,6 +104,12 @@ fun Application.module(config: ServerConfig = ServerConfig.fromEnv(), db: UserSt
     routing {
         get("/") { call.respondText(statusPage(config, lobby.stats()), ContentType.Text.Html) }
         get("/health") { call.respondText("ok") }
+        get("/app/update") { call.respond(readAppRelease(config.dataDir)) }
+        get("/app/android-release.apk") {
+            val apk = File(config.dataDir, "android-release.apk")
+            if (!apk.isFile) call.respond(HttpStatusCode.NotFound, "no apk")
+            else call.respond(LocalFileContent(apk, ContentType.Application.OctetStream))
+        }
         get("/stats") { call.respond(lobby.stats()) }
         get("/leaderboard") {
             val limit = call.request.queryParameters["limit"]?.toIntOrNull()?.coerceIn(1, 100) ?: 50
@@ -209,6 +217,18 @@ private fun printBanner(config: ServerConfig, db: UserStore) {
     lines += "======================================================================"
     lines.forEach { println(it) }
     System.out.flush()
+}
+
+private fun readAppRelease(dataDir: String): AppRelease {
+    val meta = File(dataDir, "app-release.json")
+    val apk = File(dataDir, "android-release.apk")
+    if (!meta.isFile || !apk.isFile) return AppRelease()
+    return try {
+        Protocol.json.decodeFromString(AppRelease.serializer(), meta.readText()).copy(url = "/app/android-release.apk")
+    } catch (e: Exception) {
+        log.warn("app-release.json unreadable: ${e.message}")
+        AppRelease()
+    }
 }
 
 private fun statusPage(config: ServerConfig, stats: ServerStats): String {
