@@ -222,52 +222,65 @@ values, and add the tag to `Languages.all` in `android/.../ui/Localization.kt`.
 
 ## Building without internet
 
-Once, on a machine with internet:
+Gradle 7.4.2 does not run on Java 21. On Windows use the `*-jdk11.bat` scripts (they set `JAVA_HOME` to JDK 11 for that process only). Linux and macOS: `./gradlew-offline.sh` with `JAVA_HOME` pointing at JDK 11.
+
+### 1. Fill the offline cache (once, online)
 
 ```
-gradlew.bat downloadDependencies        # Windows      (Linux/macOS: ./gradlew downloadDependencies)
+gradlew-jdk11.bat downloadDependencies          # Windows
+./gradlew downloadDependencies                  # Linux/macOS
 ```
 
-This runs the whole build in a fresh project-local Gradle home (`.gradle-offline-home/`), streams its
-progress to the console, and downloads about 450 MB (the Gradle distribution is reused from your normal
-Gradle cache). Expect 5 to 10 minutes on a normal connection; if interrupted, re-running continues. It then
-exports everything it fetched:
+This builds the client and the server once, then writes two git-ignored folders next to the project:
 
-| Folder | Contents | Size |
-|---|---|---|
-| `m2/` | every dependency, Gradle plugin, Kotlin compiler, Android build tool and `aapt2` for Windows, macOS and Linux, in Maven layout | ~375 MB |
-| `offline/gradle-7.4.2/` | the Gradle distribution itself | ~146 MB |
+| Folder | Contents |
+|---|---|
+| `m2/` | Maven packages: dependencies, Gradle plugins, Kotlin, Android tools, and `aapt2` for Windows, macOS, and Linux |
+| `offline/gradle-7.4.2/` | the Gradle distribution |
 
-Both folders are **git-ignored**: they are generated, not committed. From then on the normal
-`gradlew` / `gradlew.bat` also runs on the bundled Gradle (whenever `offline/gradle-<version>` matches
-`gradle-wrapper.properties`) and resolves from `m2/`, so nothing is downloaded any more;
-`gradlew-offline` is the same plus `--offline`, which forbids network access outright. Set
-`DUEL2048_USE_WRAPPER=1` to force the stock wrapper behaviour. To build on a machine without
-internet, copy the whole project folder (or a zip of it) including those two folders. There:
+`git pull` does not create these. Copy the whole project folder, including `m2/` and `offline/`, to a machine that has no network. That machine still needs JDK 11. The Android client also needs the Android SDK (platform 33 and build-tools 33). The server build below does not.
+
+### 2. Build the client offline
 
 ```
-gradlew-offline.bat :android:assembleRelease     # Windows
-./gradlew-offline.sh :android:assembleRelease    # Linux/macOS
+gradlew-offline-jdk11.bat :android:assembleDebug      # Windows, debug APK
+gradlew-offline-jdk11.bat :android:assembleRelease    # Windows, signed release APK
+./gradlew-offline.sh :android:assembleDebug           # Linux/macOS
 ```
 
-`gradlew-offline` uses the bundled Gradle and passes `--offline`; dependencies come from
-`m2/`, so the only things the machine needs are a JDK (11; see "Portable JDK" above)
-and the Android SDK (platform 33, build-tools 33.0.0). Those two cannot be bundled; install them with Android Studio
-beforehand. Gradle's own working cache goes to the usual `~/.gradle` (`%USERPROFILE%\.gradle`) and
-is created automatically if missing; set `GRADLE_USER_HOME` to put it elsewhere.
+Outputs:
 
-### Server without internet
+- `android\build\outputs\apk\debug\android-debug.apk`
+- `android\build\outputs\apk\release\android-release.apk` (needs `tools\create-keystore.bat` once)
+
+### 3. Build the server offline
+
+`-Pduel2048.serverOnly` skips the Android modules, so no Android SDK is required. In PowerShell the property must be quoted, or the dot is split off and Gradle looks for a task named `.serverOnly`.
 
 ```
-run-server-offline.bat        # Windows   (Linux/macOS: ./run-server-offline.sh)
+.\gradlew-offline-jdk11.bat "-Pduel2048.serverOnly" :server:installDist    # Windows PowerShell
+gradlew-offline-jdk11.bat -Pduel2048.serverOnly :server:installDist        # Windows cmd
+./gradlew-offline.sh -Pduel2048.serverOnly :server:installDist             # Linux/macOS
 ```
 
-This builds `server/build/install/server/` with the bundled Gradle and starts it. The server
-itself never needs the internet, only a database on the local machine or LAN: install MariaDB or
-MySQL there and point `database.json` at it, or put `DB=json` in `server.env` to keep accounts in
-`data/duel2048-db.json` with no database server at all. Once built, the distribution is a plain
-folder; `server\build\install\server\bin\server.bat` (or `bin/server`) starts it directly, and it
-can be copied to another machine that only has a JRE 8.
+Output: `server\build\install\server\` (`bin\server.bat` on Windows, `bin/server` on Linux).
+
+### 4. Run the server offline
+
+Build and start in one step:
+
+```
+run-server-offline.bat        # Windows, port 8080
+./run-server-offline.sh       # Linux/macOS
+```
+
+Or, after step 3, start the distribution directly. It does not use Gradle or the network:
+
+```
+server\build\install\server\bin\server.bat
+```
+
+`set PORT=8765` before the command changes the port. Accounts need MariaDB or MySQL via `database.json`, or `DB=json` in `server.env` to store them in `data/duel2048-db.json`. The built `server\build\install\server\` folder can be copied to another machine that only has a JRE 8.
 
 ### Old machine with only JDK 8, no Android SDK
 
@@ -276,13 +289,13 @@ is never resolved and no Android SDK is needed. On the machine with internet, ex
 server-only offline bundle:
 
 ```
-gradlew downloadDependencies -Pduel2048.serverOnly     # online, once
+.\gradlew-jdk11.bat "-Pduel2048.serverOnly" downloadDependencies    # Windows PowerShell, online, once
 ```
 
 Copy the project folder including `m2/` and `offline/` to the old machine, and there:
 
 ```
-gradlew-offline.bat -Pduel2048.serverOnly :server:installDist    # Windows
+.\gradlew-offline-jdk11.bat "-Pduel2048.serverOnly" :server:installDist    # Windows PowerShell
 ./gradlew-offline.sh -Pduel2048.serverOnly :server:installDist   # Linux/macOS
 run-server-offline.bat                                           # or build + run in one step (serverOnly is built in)
 ```
