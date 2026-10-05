@@ -26,7 +26,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.duel2048.app.MainViewModel
 import com.duel2048.app.R
 import com.duel2048.app.cube.CubeDuelUiState
-import com.duel2048.app.data.CubeRenderer as CubeRendererChoice
 import com.duel2048.app.game.DuelPhase
 import com.duel2048.app.ui.components.GlassCard
 import com.duel2048.app.ui.theme.LocalPalette
@@ -35,14 +34,8 @@ import com.duel2048.shared.cube.CubeMove
 @Composable
 fun CubeDuelScreen(vm: MainViewModel) {
     val cube by vm.cubeUiState.collectAsStateWithLifecycle()
-    val settings by vm.settings.collectAsStateWithLifecycle()
-    val renderer = CubeRendererChoice.fromId(settings.cubeRenderer)
     BackHandler { vm.leaveCubeDuel() }
-
-    when (renderer) {
-        CubeRendererChoice.CUBE2 -> CubeDuelCube2Route(vm, cube)
-        CubeRendererChoice.MAGIC -> CubeDuelMagicRoute(vm, cube)
-    }
+    CubeDuelModel3dRoute(vm, cube)
 }
 
 @OptIn(ExperimentalLayoutApi::class)

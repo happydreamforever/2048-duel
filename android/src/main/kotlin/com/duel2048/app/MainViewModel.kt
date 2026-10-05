@@ -67,8 +67,8 @@ sealed interface Screen {
 enum class HubMode { PVP, BOT, TRAIN, WATCH }
 
 enum class HubGame(val title: String, val blurb: String) {
-    CUBE("Cube", "OpenGL cube, same scramble"),
-    CUBE2("Cube 2", "AnimCube race"),
+    CUBE("Cube", "3D cube, same scramble"),
+    CUBE2("Cube 2", "cube race"),
     MATH("Math", "Beat the clock"),
     WORD("Word puzzle", "Find the hidden word"),
     ;
@@ -433,8 +433,6 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     fun startHub(game: HubGame, mode: HubMode, difficulty: String) {
         if (game == HubGame.CUBE || game == HubGame.CUBE2) {
-            val renderer = if (game == HubGame.CUBE2) com.duel2048.app.data.CubeRenderer.CUBE2.id else com.duel2048.app.data.CubeRenderer.MAGIC.id
-            updateSettings { it.copy(cubeRenderer = renderer) }
             when (mode) {
                 HubMode.PVP -> startCubeDuel(MatchMode.PVP)
                 HubMode.BOT -> startCubeTraining(profileFor(difficulty), "Bot")

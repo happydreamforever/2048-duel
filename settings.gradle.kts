@@ -51,7 +51,4 @@ rootProject.name = "duel2048"
 val serverOnly = providers.gradleProperty("duel2048.serverOnly").isPresent
 if (serverOnly) logger.lifecycle("duel2048.serverOnly: :android is excluded from this build")
 include(":shared", ":server")
-if (!serverOnly) {
-    include(":android")
-    include(":cube2")
-}
+if (!serverOnly) include(":android")

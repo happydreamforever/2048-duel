@@ -29,8 +29,6 @@ data class UserSettings(
     val coins: Int = com.duel2048.shared.social.Economy.START_COINS,
     /** BCP-47 tag such as "ko"; blank follows the system language. */
     val language: String = "",
-    /** 3D cube renderer: [com.duel2048.app.data.CubeRenderer.MAGIC] or [com.duel2048.app.data.CubeRenderer.CUBE2]. */
-    val cubeRenderer: String = CubeRenderer.CUBE2.id,
 ) {
     val loggedIn: Boolean get() = authToken.isNotBlank()
 
@@ -86,7 +84,6 @@ class SettingsStore(context: Context) {
         score = prefs.getInt("score", 0),
         coins = if (prefs.contains("coins")) prefs.getInt("coins", com.duel2048.shared.social.Economy.START_COINS) else com.duel2048.shared.social.Economy.START_COINS,
         language = prefs.getString("lang", "") ?: "",
-        cubeRenderer = prefs.getString("cubeRenderer", CubeRenderer.CUBE2.id) ?: CubeRenderer.CUBE2.id,
     )
 
     fun update(transform: (UserSettings) -> UserSettings) {
@@ -111,7 +108,6 @@ class SettingsStore(context: Context) {
             .putInt("score", s.score)
             .putInt("coins", s.coins)
             .putString("lang", s.language)
-            .putString("cubeRenderer", s.cubeRenderer)
             .apply()
     }
 }

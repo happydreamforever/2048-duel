@@ -12,13 +12,13 @@ rem   android\build\outputs\apk\release\android-release.apk
 rem   server\build\install\server\bin\server.bat
 setlocal
 call "%~dp0gradlew-jdk11.bat" --stop >nul 2>&1
-rem Clean android/cube2 first: AGP 7.3 can leave stale merged-not-compiled-resources on
+rem Clean the android module first: AGP 7.3 can leave stale merged-not-compiled-resources on
 rem Windows (mergeReleaseResources / notification_action.xml). Release builds are infrequent.
-call "%~dp0gradlew-jdk11.bat" :android:clean :cube2:clean :android:assembleRelease :server:installDist
+call "%~dp0gradlew-jdk11.bat" :android:clean :android:assembleRelease :server:installDist
 if errorlevel 1 (
     echo.
     echo BUILD FAILED
-    echo If mergeReleaseResources mentions notification_action.xml, delete android\build and cube2\build, then re-run.
+    echo If mergeReleaseResources mentions notification_action.xml, delete android\build, then re-run.
     exit /b 1
 )
 echo.
