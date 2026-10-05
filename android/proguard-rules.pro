@@ -12,3 +12,5 @@
 -dontwarn org.conscrypt.**
 -dontwarn org.bouncycastle.**
 -dontwarn org.openjsse.**
+# Filament (JNI calls back into these classes by name)
+-keep class com.google.android.filament.** { *; }

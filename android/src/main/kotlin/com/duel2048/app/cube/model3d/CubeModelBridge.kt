@@ -15,11 +15,11 @@ object CubeModelBridge {
     /** Reset to solved and play the whole scramble (white-up WCA). */
     fun applyScrambleAnimated(cube: RubiksCubeView, notations: List<String>) {
         if (notations.isEmpty()) return
-        cube.renderer.applyScrambleAnimated(notations)
+        cube.animator.applyScramble(notations)
     }
 
-    /** Animate a single competitive move (buttons and face drags both come through here). */
+    /** Animate a single competitive move (face drags and opponent moves both come through here). */
     fun applyMoveAnimated(cube: RubiksCubeView, move: CubeMove) {
-        cube.renderer.applyMoveAnimated(move)
+        cube.animator.applyMove(move)
     }
 }

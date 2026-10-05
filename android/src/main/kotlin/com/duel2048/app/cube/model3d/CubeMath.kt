@@ -36,15 +36,15 @@ object CubeMath {
         val y = axisY / len
         val z = axisZ / len
         val rad = Math.toRadians(degrees.toDouble())
-        val c = cos(rad).toFloat()
-        val s = sin(rad).toFloat()
+        // Quarter and half turns must stay exact: cos(90°) and sin(180°) round to ~1e-16,
+        // snap both to 0 so committed turns never leave residue in the poses.
+        val c = cos(rad).toFloat().let { if (abs(it) < 1e-6f) 0f else it }
+        val s = sin(rad).toFloat().let { if (abs(it) < 1e-6f) 0f else it }
         val t = 1f - c
-        // Exact quarter turns must stay exact: cos(90°) rounds to ~6e-17, snap it to 0.
-        val cc = if (abs(c) < 1e-6f) 0f else c
         return floatArrayOf(
-            t * x * x + cc, t * x * y + s * z, t * x * z - s * y, 0f,
-            t * x * y - s * z, t * y * y + cc, t * y * z + s * x, 0f,
-            t * x * z + s * y, t * y * z - s * x, t * z * z + cc, 0f,
+            t * x * x + c, t * x * y + s * z, t * x * z - s * y, 0f,
+            t * x * y - s * z, t * y * y + c, t * y * z + s * x, 0f,
+            t * x * z + s * y, t * y * z - s * x, t * z * z + c, 0f,
             0f, 0f, 0f, 1f,
         )
     }

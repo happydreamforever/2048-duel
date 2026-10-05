@@ -5,12 +5,18 @@ import com.duel2048.shared.cube.CubeMove
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.float
+import kotlinx.serialization.json.int
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Test
 import kotlin.math.abs
 
 class CubeModelMathTest {
 
-    private fun geometry(): CubeGeometry = CubeGeometry.procedural()
+    private fun geometry(): CubeGeometry = CubeGeometry()
 
     // ---- matrix math -------------------------------------------------------------------------
 
@@ -49,7 +55,7 @@ class CubeModelMathTest {
     // ---- the hand-built cube -----------------------------------------------------------------
 
     @Test
-    fun `grid faces and stickers are WCA-native`() {
+    fun `grid and faces are WCA-native`() {
         val g = geometry()
         assertEquals(1f, g.spacing, 1e-5f)
         assertEquals(27, g.cubies.size)
@@ -60,18 +66,84 @@ class CubeModelMathTest {
         assertEquals(Pair(0, 1), g.faceLayer[CubeFace.R])
         assertEquals(Pair(0, -1), g.faceLayer[CubeFace.L])
         assertEquals(9, g.faceCubies(CubeFace.U).size)
+        assertEquals("cubie_1_-1_0", g.cubies[cubieIndex(g, 1, -1, 0)].nodeName)
+    }
 
-        // Corner cubie: black body + white U + red R + green F stickers.
-        val corner = g.cubies[cubieIndex(g, 1, 1, 1)]
-        assertEquals(4, corner.parts.size)
-        val stickers = corner.parts.drop(1)
-        assertTrue(stickers.any { sameColor(it.color, CubeGeometry.FACE_COLORS[CubeFace.U]!!) })
-        assertTrue(stickers.any { sameColor(it.color, CubeGeometry.FACE_COLORS[CubeFace.R]!!) })
-        assertTrue(stickers.any { sameColor(it.color, CubeGeometry.FACE_COLORS[CubeFace.F]!!) })
-        // Center cubie: bare plastic, no stickers at all.
-        assertEquals(1, g.cubies[cubieIndex(g, 0, 0, 0)].parts.size)
-        // 54 stickers across the cube.
-        assertEquals(54, g.cubies.sumOf { it.parts.size - 1 })
+    // ---- animation ---------------------------------------------------------------------------
+
+    @Test
+    fun `scramble then inverse returns every cubie exactly home`() {
+        var now = 0L
+        val animator = CubeAnimator(geometry()) { now }
+        val scramble = listOf("R", "U2", "F'", "L", "D", "B2", "R'", "U")
+        animator.applyScramble(scramble)
+        for (notation in scramble.reversed()) {
+            val move = CubeMove.parse(notation)!!
+            animator.applyMove(CubeMove.parse(inverse(move.notation()))!!)
+        }
+        val out = Array(27) { FloatArray(16) }
+        var guard = 0
+        while (animator.frame(out)) {
+            now += 37
+            check(++guard < 10_000)
+        }
+        for (i in 0 until 27) {
+            val pose = animator.poseOf(i)
+            for (k in 0 until 16) assertEquals(if (k % 5 == 0) 1f else 0f, pose[k], 0f) // exact, not approximate
+        }
+    }
+
+    @Test
+    fun `frame places cubies at pose times grid center`() {
+        val animator = CubeAnimator(geometry()) { 0L }
+        val out = Array(27) { FloatArray(16) }
+        animator.frame(out)
+        val i = cubieIndex(animator.geometry, 1, -1, 0)
+        assertEquals(1f, out[i][12], 0f)
+        assertEquals(-1f, out[i][13], 0f)
+        assertEquals(0f, out[i][14], 0f)
+    }
+
+    // ---- the shipped model -------------------------------------------------------------------
+
+    @Test
+    fun `model asset matches the layout and WCA colors`() {
+        val bytes = java.io.File("src/main/assets/models/rubiks_cube.glb").readBytes()
+        val buf = java.nio.ByteBuffer.wrap(bytes).order(java.nio.ByteOrder.LITTLE_ENDIAN)
+        assertEquals(0x46546C67, buf.getInt(0))
+        val jsonLen = buf.getInt(12)
+        val gltf = Json.parseToJsonElement(String(bytes, 20, jsonLen, Charsets.UTF_8)).jsonObject
+        val nodes = gltf["nodes"]!!.jsonArray.map { it.jsonObject }
+        val meshes = gltf["meshes"]!!.jsonArray.map { it.jsonObject }
+        val materials = gltf["materials"]!!.jsonArray.map { it.jsonObject["name"]!!.jsonPrimitive.content }
+        val accessors = gltf["accessors"]!!.jsonArray.map { it.jsonObject }
+        val g = geometry()
+        for (cubie in g.cubies) {
+            val node = nodes.single { it["name"]?.jsonPrimitive?.content == cubie.nodeName }
+            val t = node["translation"]!!.jsonArray.map { it.jsonPrimitive.float }
+            for (a in 0 until 3) assertEquals(cubie.grid[a].toFloat(), t[a], 0f)
+            val prims = meshes[node["mesh"]!!.jsonPrimitive.int]["primitives"]!!.jsonArray.map { it.jsonObject }
+            val tiles = prims.map { materials[it["material"]!!.jsonPrimitive.int] }.filter { it.startsWith("tile_") }
+            val expected = g.faceLayer.filter { (_, layer) -> cubie.grid[layer.first] == layer.second }.keys.map { "tile_" + it.name }
+            assertEquals(expected.sorted(), tiles.sorted())
+            for (prim in prims) {
+                val material = materials[prim["material"]!!.jsonPrimitive.int]
+                if (!material.startsWith("tile_")) continue
+                val (axis, sign) = g.faceLayer[CubeFace.valueOf(material.removePrefix("tile_"))]!!
+                val pos = accessors[prim["attributes"]!!.jsonObject["POSITION"]!!.jsonPrimitive.int]
+                val lo = pos["min"]!!.jsonArray[axis].jsonPrimitive.float
+                val hi = pos["max"]!!.jsonArray[axis].jsonPrimitive.float
+                // Flat tile on the outer face of its cubie (local space), just above the body.
+                assertEquals(lo, hi, 1e-6f)
+                assertTrue(lo * sign > 0.5f && lo * sign < 0.52f)
+            }
+        }
+    }
+
+    private fun inverse(notation: String): String = when {
+        notation.endsWith("2") -> notation
+        notation.endsWith("'") -> notation.dropLast(1)
+        else -> "$notation'"
     }
 
     @Test
@@ -139,12 +211,6 @@ class CubeModelMathTest {
         val hit = CubeGeometry.PickHit(cubieIndex(g, 0, 0, 1), floatArrayOf(0f, 0f, 1f), 2, 1)
         val project = { p: FloatArray -> floatArrayOf(p[0], -p[1]) }
         assertNull(g.resolveDragMove(hit, 10f, 0f, project))
-    }
-
-    private fun sameColor(a: FloatArray, b: FloatArray): Boolean {
-        if (a.size != b.size) return false
-        for (i in a.indices) if (abs(a[i] - b[i]) > 1e-6f) return false
-        return true
     }
 
     private fun cubieIndex(g: CubeGeometry, x: Int, y: Int, z: Int): Int =

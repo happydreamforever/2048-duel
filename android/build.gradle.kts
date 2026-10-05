@@ -105,6 +105,9 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.okhttp)
+    // Cube renderer: Filament PBR engine + its glTF loader (assets/models/rubiks_cube.glb).
+    implementation(libs.filament.android)
+    implementation(libs.filament.gltfio)
     debugImplementation(libs.compose.ui.tooling)
     testImplementation(libs.junit)
 }

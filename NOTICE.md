@@ -20,3 +20,13 @@ studied and some of their ideas or small code patterns were adapted:
 - **gabrielecirulli/2048** (MIT) — the original game rules.
 
 The Gradle wrapper files (`gradlew`, `gradle/wrapper/*`) are part of Gradle (Apache-2.0).
+## Bundled assets and libraries
+
+- **"Rubik's Cube" by DatSketch** — 3D model, licensed
+  [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/),
+  <https://sketchfab.com/3d-models/rubiks-cube-eaba6bf1c7da497f926852006c7bd855>.
+  Modified: regrouped into 27 cubie nodes, rescaled, tiles recolored to the WCA scheme,
+  tile winding fixed and materials replaced (`tools/cube-model/build_cube_glb.py`).
+  Shipped as `android/src/main/assets/models/rubiks_cube.glb`.
+- **Google Filament** (Apache-2.0) — the PBR renderer and glTF loader that draw the cube
+  (`com.google.android.filament:filament-android` / `gltfio-android`).
