@@ -1,11 +1,9 @@
 package com.duel2048.app.ui.screens
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -17,7 +15,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -29,7 +26,6 @@ import com.duel2048.app.cube.CubeDuelUiState
 import com.duel2048.app.game.DuelPhase
 import com.duel2048.app.ui.components.GlassCard
 import com.duel2048.app.ui.theme.LocalPalette
-import com.duel2048.shared.cube.CubeMove
 
 @Composable
 fun CubeDuelScreen(vm: MainViewModel) {
@@ -42,7 +38,6 @@ fun CubeDuelScreen(vm: MainViewModel) {
 @Composable
 internal fun CubeDuelOverlay(
     cube: CubeDuelUiState,
-    onMove: (CubeMove) -> Unit,
     onLeave: () -> Unit,
     onGiveUp: () -> Unit,
     onHint: () -> Unit = {},
@@ -79,9 +74,6 @@ internal fun CubeDuelOverlay(
         }
         GlassCard(Modifier.fillMaxWidth()) {
             if (cube.phase == DuelPhase.PLAYING && !cube.solved) {
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    moveButtons(onMove)
-                }
                 TextButton(onClick = onGiveUp) { Text(stringResource(R.string.give_up_solver), color = palette.gold) }
                 if (cube.guided) {
                     TextButton(onClick = onHint) { Text(stringResource(R.string.hint), color = palette.accent) }
@@ -92,23 +84,6 @@ internal fun CubeDuelOverlay(
         }
         TextButton(onClick = onLeave, modifier = Modifier.align(Alignment.End)) {
             Text(stringResource(R.string.leave), color = palette.danger)
-        }
-    }
-}
-
-@Composable
-private fun moveButtons(onMove: (CubeMove) -> Unit) {
-    val faces = listOf(
-        CubeMove.U, CubeMove.Ui,
-        CubeMove.R, CubeMove.Ri,
-        CubeMove.F, CubeMove.Fi,
-        CubeMove.D, CubeMove.Di,
-        CubeMove.L, CubeMove.Li,
-        CubeMove.B, CubeMove.Bi,
-    )
-    for (move in faces) {
-        TextButton(onClick = { onMove(move) }) {
-            Text(move.notation(), color = Color.White, fontWeight = FontWeight.Bold)
         }
     }
 }

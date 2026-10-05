@@ -174,10 +174,6 @@ class CubeModelRenderer(val geometry: CubeGeometry) : GLSurfaceView.Renderer {
         }
         GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, 0)
         GLES20.glBindBuffer(GLES20.GL_ELEMENT_ARRAY_BUFFER, 0)
-
-        // Frame the whole cube: distance from its outer radius and the vertical fov.
-        val radius = 1.74f * geometry.spacing
-        cameraDistance = radius / kotlin.math.tan(Math.toRadians((fovY / 2f).toDouble())).toFloat() * 1.12f
     }
 
     override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
@@ -187,7 +183,12 @@ class CubeModelRenderer(val geometry: CubeGeometry) : GLSurfaceView.Renderer {
             surfaceH = height
             val aspect = if (height > 0) width.toFloat() / height else 1f
             System.arraycopy(CubeMath.perspective(fovY, aspect, 0.05f, 40f), 0, mProjection, 0, 16)
-            System.arraycopy(CubeMath.translation(0f, 0f, -cameraDistance), 0, mView, 0, 16)
+            // Fill the limiting axis: in portrait that is width, in landscape height.
+            val halfTan = kotlin.math.tan(Math.toRadians(fovY / 2.0))
+            val extent = 2.05f * geometry.spacing // worst-case silhouette half-extent
+            val distance = maxOf(extent / halfTan, extent / (halfTan * aspect)).toFloat() * 0.99f
+            cameraDistance = distance
+            System.arraycopy(CubeMath.translation(0f, 0f, -distance), 0, mView, 0, 16)
             CubeMath.multiply(mProjection, mView, mPv)
         }
     }
@@ -211,7 +212,9 @@ class CubeModelRenderer(val geometry: CubeGeometry) : GLSurfaceView.Renderer {
                 }
                 CubeMath.multiply(mOrbit, mNode, mTmpA)
                 CubeMath.multiply(mPv, mTmpA, mMvp)
-                System.arraycopy(mTmpA, 0, mNode, 0, 16)
+                // mNode deliberately stays in cube space: uModel feeds the shader's normals,
+                // so the lights below are cube-space and every face keeps a constant shade
+                // while the cube orbits.
 
                 GLES20.glUniformMatrix4fv(uMvp, 1, false, mMvp, 0)
                 GLES20.glUniformMatrix4fv(uModel, 1, false, mNode, 0)
@@ -287,8 +290,9 @@ class CubeModelRenderer(val geometry: CubeGeometry) : GLSurfaceView.Renderer {
                 vNormal = mat3(uModel[0].xyz, uModel[1].xyz, uModel[2].xyz) * aNormal;
             }
         """.trimIndent()
-        // Normals land in view space (the orbit is part of uModel and the camera looks down -Z),
-        // so the lighting stays fixed while the cube orbits.
+        // Normals stay in cube space (the orbit is NOT part of uModel), so the lights below
+        // are cube-space: every face keeps its own constant shade while the cube orbits and
+        // the sticker colors never shift.
         val fragment = """
             precision mediump float;
             varying vec3 vNormal;
@@ -296,13 +300,13 @@ class CubeModelRenderer(val geometry: CubeGeometry) : GLSurfaceView.Renderer {
             uniform float uGloss;
             void main() {
                 vec3 n = normalize(vNormal);
-                vec3 keyDir = normalize(vec3(0.40, 0.85, 0.50));
-                vec3 fillDir = normalize(vec3(-0.60, -0.20, 0.55));
+                vec3 keyDir = normalize(vec3(0.35, 0.80, 0.50));
+                vec3 fillDir = normalize(vec3(-0.60, -0.35, -0.62));
                 float key = max(dot(n, keyDir), 0.0);
                 float fill = max(dot(n, fillDir), 0.0);
-                float b = 0.30 + 0.70 * key + 0.16 * fill;
-                float spec = pow(max(dot(reflect(-keyDir, n), vec3(0.0, 0.0, 1.0)), 0.0), 30.0);
-                vec3 c = uColor.rgb * b + uGloss * spec * vec3(1.0);
+                float b = 0.36 + 0.74 * key + 0.26 * fill;
+                float sheen = pow(max(dot(n, normalize(vec3(0.20, 0.72, 0.66))), 0.0), 26.0);
+                vec3 c = uColor.rgb * b + uGloss * sheen * vec3(1.0);
                 gl_FragColor = vec4(c, uColor.a);
             }
         """.trimIndent()

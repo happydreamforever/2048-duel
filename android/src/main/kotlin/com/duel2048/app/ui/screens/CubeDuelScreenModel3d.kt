@@ -57,10 +57,6 @@ internal fun CubeDuelModel3dRoute(vm: MainViewModel, cube: CubeDuelUiState) {
 
     CubeDuelOverlay(
         cube = cube,
-        onMove = { move ->
-            mine?.let { CubeModelBridge.applyMoveAnimated(it, move) }
-            vm.applyCubeMove(move)
-        },
         onLeave = { vm.leaveCubeDuel() },
         onGiveUp = { vm.revealCubeSolver() },
         onHint = { vm.cubeHint() },

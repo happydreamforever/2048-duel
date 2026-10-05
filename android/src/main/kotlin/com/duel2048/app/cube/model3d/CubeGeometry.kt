@@ -335,13 +335,13 @@ class CubeGeometry private constructor(private val bodyHalf: Float) {
         private const val PLASTIC_GLOSS = 0.16f
         private const val STICKER_GLOSS = 0.45f
         private const val CHAMFER = 0.055f
-        private const val STICKER_HALF = 0.335f
+        private const val STICKER_HALF = 0.375f
         private const val STICKER_RADIUS = 0.095f
         private const val STICKER_RAISE = 0.0045f
         private const val ARC_SEGS = 4
 
-        /** The cube: spacing 1, body half 0.46 (crisp seams), 27 cubies, 54 stickers. */
-        fun procedural(): CubeGeometry = CubeGeometry(bodyHalf = 0.46f)
+        /** The cube: spacing 1, tight 3% seams, 27 cubies, 54 stickers. */
+        fun procedural(): CubeGeometry = CubeGeometry(bodyHalf = 0.485f)
 
         /** The two axes != [axis], ascending. */
         private fun tangentAxes(axis: Int): Pair<Int, Int> = when (axis) {
