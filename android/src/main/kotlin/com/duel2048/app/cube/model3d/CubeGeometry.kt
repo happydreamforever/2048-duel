@@ -3,35 +3,37 @@ package com.duel2048.app.cube.model3d
 import com.duel2048.shared.cube.CubeFace
 import com.duel2048.shared.cube.CubeMove
 import kotlin.math.abs
+import kotlin.math.cos
 import kotlin.math.roundToInt
+import kotlin.math.sin
 import kotlin.math.sqrt
 
 /**
- * Turns a parsed Rubik's-cube glb (one node per cubie, flat sticker colors) into the
- * structures the renderer needs:
- *
- *  - the 27 cubies with their grid cell, derived from world bounding-box centers
- *    (the exported nodes all carry identity transforms, geometry is baked in cube space),
- *  - which world axis/sign each WCA face lives on, derived from the sticker colors
- *    (white = U, yellow = D, green = F, blue = B, red = R, orange = L), so moves look
- *    right no matter how the model was oriented in the 3D editor,
- *  - the exact axis/angle a move animates (WCA: a face turn is -90° about the face's
- *    outward normal, seen from outside the face),
- *  - ray picking and drag->move resolution for touch turns.
+ * The hand-built cube: 27 chamfered cubies with rounded inset stickers, WCA colors baked in
+ * (white U on +Y, yellow D, green F on +Z, blue B, red R on +X, orange L) so no face or color
+ * is ever inferred from external data. Also owns the exact move<->rotation laws (a WCA face
+ * turn is -90° about the face's outward normal, seen from outside), ray picking and
+ * drag->move resolution for touch turns.
  */
-class CubeGeometry(private val model: GlbModel) {
+class CubeGeometry private constructor(private val bodyHalf: Float) {
+
+    /** One renderable chunk (plastic body or sticker) with flat normals and a flat color. */
+    class MeshPart(
+        val positions: FloatArray,
+        val normals: FloatArray,
+        val indices: ShortArray,
+        /** RGBA in 0..1. */
+        val color: FloatArray,
+        /** Specular strength; stickers glossier than the plastic. */
+        val gloss: Float,
+    )
 
     class Cubie(
-        /** Node index in the glb (cubies are the mesh-bearing nodes, in order). */
-        val node: Int,
         /** Grid cell, each component in -1..1. */
         val grid: IntArray,
-        /** World-space bbox center (idle pose). */
+        /** Cube-space center at the idle pose ([spacing] per unit). */
         val center: FloatArray,
-        /** Raw-local (pre node transform) bounding box of the whole cubie. */
-        val localMin: FloatArray,
-        val localMax: FloatArray,
-        val primitives: List<Int>,
+        val parts: List<MeshPart>,
     )
 
     /** One turn to animate: a layer's cubies rotate about the world +axis by [degrees]. */
@@ -42,65 +44,28 @@ class CubeGeometry(private val model: GlbModel) {
 
     val cubies: List<Cubie>
     /** Center-to-center distance between neighbouring cubies (world units). */
-    val spacing: Float
+    val spacing: Float = 1f
 
-    /** WCA face -> (axis 0..2, grid sign -1/+1) of its outer layer. */
-    val faceLayer: Map<CubeFace, Pair<Int, Int>>
+    /** WCA face -> (axis 0..2, grid sign -1/+1) of its outer layer; fixed by construction. */
+    val faceLayer: Map<CubeFace, Pair<Int, Int>> = FACE_PLACEMENT
 
     init {
-        val cubieNodeIndices = model.nodes.withIndex().filter { it.value.mesh >= 0 }.map { it.index }
-        var maxAbs = 0f
-        val centers = ArrayList<FloatArray>(27)
-        val locals = ArrayList<Triple<FloatArray, FloatArray, List<Int>>>(27)
-        for (node in model.nodes) {
-            if (node.mesh < 0) continue
-            val mesh = model.meshes[node.mesh]
-            var minX = Float.MAX_VALUE; var minY = Float.MAX_VALUE; var minZ = Float.MAX_VALUE
-            var maxX = -Float.MAX_VALUE; var maxY = -Float.MAX_VALUE; var maxZ = -Float.MAX_VALUE
-            val prims = ArrayList<Int>()
-            for ((pIndex, prim) in mesh.primitives.withIndex()) {
-                prims.add(pIndex)
-                var i = 0
-                while (i < prim.positions.size) {
-                    val p = CubeMath.transformPoint(node.transform, prim.positions[i], prim.positions[i + 1], prim.positions[i + 2])
-                    if (p[0] < minX) minX = p[0]; if (p[0] > maxX) maxX = p[0]
-                    if (p[1] < minY) minY = p[1]; if (p[1] > maxY) maxY = p[1]
-                    if (p[2] < minZ) minZ = p[2]; if (p[2] > maxZ) maxZ = p[2]
-                    i += 3
+        val built = ArrayList<Cubie>(27)
+        for (gz in intArrayOf(-1, 0, 1)) for (gy in intArrayOf(-1, 0, 1)) for (gx in intArrayOf(-1, 0, 1)) {
+            val grid = intArrayOf(gx, gy, gz)
+            val center = floatArrayOf(gx.toFloat(), gy.toFloat(), gz.toFloat())
+            val parts = ArrayList<MeshPart>(4)
+            parts.add(chamferedBox(bodyHalf, CHAMFER, PLASTIC, PLASTIC_GLOSS))
+            for ((face, placement) in FACE_PLACEMENT) {
+                val (axis, sign) = placement
+                if (grid[axis] == sign) {
+                    parts.add(stickerMesh(axis, sign, bodyHalf, STICKER_HALF, STICKER_RADIUS, FACE_COLORS[face]!!, STICKER_GLOSS))
                 }
             }
-            // Raw-local bbox: undo the node transform (identity for this model, but be correct).
-            val inv = CubeMath.inverse(node.transform) ?: CubeMath.identity()
-            val lmin = CubeMath.transformPoint(inv, minX, minY, minZ)
-            val lmax = CubeMath.transformPoint(inv, maxX, maxY, maxZ)
-            val c = floatArrayOf((minX + maxX) / 2f, (minY + maxY) / 2f, (minZ + maxZ) / 2f)
-            centers.add(c)
-            locals.add(Triple(floatArrayOf(min(lmin[0], lmax[0]), min(lmin[1], lmax[1]), min(lmin[2], lmax[2])),
-                floatArrayOf(max(lmin[0], lmax[0]), max(lmin[1], lmax[1]), max(lmin[2], lmax[2])), prims))
-            for (i in 0 until 3) if (abs(c[i]) > maxAbs) maxAbs = abs(c[i])
+            built.add(Cubie(grid, center, parts))
         }
-        check(centers.size == 27) { "expected 27 cubie nodes, got ${centers.size}" }
-        check(maxAbs > 0f) { "degenerate cube geometry" }
-        spacing = maxAbs
-
-        cubies = centers.mapIndexed { index, c ->
-            val (lmin, lmax, prims) = locals[index]
-            Cubie(
-                node = cubieNodeIndices[index],
-                grid = intArrayOf((c[0] / spacing).roundToInt(), (c[1] / spacing).roundToInt(), (c[2] / spacing).roundToInt()),
-                center = c,
-                localMin = lmin,
-                localMax = lmax,
-                primitives = prims,
-            )
-        }
-        check(cubies.count { it.grid[0] == 0 && it.grid[1] == 0 && it.grid[2] == 0 } == 1) { "cube center cubie missing" }
-
-        faceLayer = deriveFaceLayers()
+        cubies = built
     }
-
-    /** Cubie index -> node index (cubies are the mesh-bearing nodes, in order). */
-    fun nodeOf(cubie: Int): Int = cubies[cubie].node
 
     /** The cubies of the outer layer of [face]. */
     fun faceCubies(face: CubeFace): List<Int> {
@@ -153,47 +118,41 @@ class CubeGeometry(private val model: GlbModel) {
 
     /**
      * Nearest cubie hit by a cube-space ray (origin o, direction d). [poseOf] supplies each
-     * cubie's current accumulated layer-turn matrix (identity when idle); gestures only act
-     * when idle, so normals are axis-aligned in cube space either way.
+     * cubie's current accumulated layer-turn matrix (a pure rotation about the origin);
+     * gestures only act when idle, so the hit normal is axis-aligned in cube space either way.
      */
     fun pick(ox: Float, oy: Float, oz: Float, dx: Float, dy: Float, dz: Float, poseOf: (Int) -> FloatArray = { CubeMath.identity() }): PickHit? {
         var bestT = Float.MAX_VALUE
         var best: PickHit? = null
         for ((cubieIndex, cubie) in cubies.withIndex()) {
-            val node = model.nodes[nodeOf(cubieIndex)]
-            val pose = poseOf(cubieIndex)
-            val nodePose = CubeMath.multiply(pose, node.transform)
-            val inv = CubeMath.inverse(nodePose) ?: continue
+            val inv = CubeMath.inverse(poseOf(cubieIndex)) ?: continue
+            // Ray in the cubie's rotated frame, where its box stays axis-aligned.
             val lo = CubeMath.transformPoint(inv, ox, oy, oz)
             val ld = CubeMath.transformDir(inv, dx, dy, dz)
-            val t = CubeMath.rayAabb(lo[0], lo[1], lo[2], ld[0], ld[1], ld[2], cubie.localMin, cubie.localMax) ?: continue
+            val lc = CubeMath.transformPoint(inv, cubie.center[0], cubie.center[1], cubie.center[2])
+            val min = floatArrayOf(lc[0] - bodyHalf, lc[1] - bodyHalf, lc[2] - bodyHalf)
+            val max = floatArrayOf(lc[0] + bodyHalf, lc[1] + bodyHalf, lc[2] + bodyHalf)
+            val t = CubeMath.rayAabb(lo[0], lo[1], lo[2], ld[0], ld[1], ld[2], min, max) ?: continue
             if (t >= bestT) continue
             bestT = t
-            // Struck face of the raw-local box...
-            val localHit = floatArrayOf(lo[0] + ld[0] * t, lo[1] + ld[1] * t, lo[2] + ld[2] * t)
-            val localCenter = floatArrayOf(
-                (cubie.localMin[0] + cubie.localMax[0]) / 2f,
-                (cubie.localMin[1] + cubie.localMax[1]) / 2f,
-                (cubie.localMin[2] + cubie.localMax[2]) / 2f,
-            )
+            // Struck face: the axis where the hit point sits closest to the box surface.
+            val hit = floatArrayOf(lo[0] + ld[0] * t, lo[1] + ld[1] * t, lo[2] + ld[2] * t)
             var axis = 0
             var bestAxisDist = Float.MAX_VALUE
             for (a in 0 until 3) {
-                val half = (cubie.localMax[a] - cubie.localMin[a]) / 2f
-                val dist = half - abs(localHit[a] - localCenter[a])
+                val dist = bodyHalf - abs(hit[a] - lc[a])
                 if (dist < bestAxisDist) { bestAxisDist = dist; axis = a }
             }
-            val localSign = if (localHit[axis] >= localCenter[axis]) 1 else -1
-            // ...then back to cube space (rotations keep it axis-aligned; snap numerics).
+            val localSign = if (hit[axis] >= lc[axis]) 1 else -1
             val nLocal = FloatArray(3)
             nLocal[axis] = localSign.toFloat()
-            val nCube = CubeMath.transformDir(nodePose, nLocal[0], nLocal[1], nLocal[2])
+            // Back to cube space (rotations keep it axis-aligned; snap numerics).
+            val nCube = CubeMath.transformDir(poseOf(cubieIndex), nLocal[0], nLocal[1], nLocal[2])
             var cubeAxis = 0
             var maxComp = 0f
             var cubeSign = 1
             for (a in 0 until 3) if (abs(nCube[a]) > maxComp) { maxComp = abs(nCube[a]); cubeAxis = a; cubeSign = if (nCube[a] >= 0f) 1 else -1 }
-            val hitCube = CubeMath.transformPoint(nodePose, localHit[0], localHit[1], localHit[2])
-            best = PickHit(cubieIndex, hitCube, cubeAxis, cubeSign)
+            best = PickHit(cubieIndex, floatArrayOf(ox + dx * t, oy + dy * t, oz + dz * t), cubeAxis, cubeSign)
         }
         return best
     }
@@ -253,70 +212,142 @@ class CubeGeometry(private val model: GlbModel) {
         return moveForTurn(rotAxis, layerCoord, degreesAboutPositiveAxis)
     }
 
-    // ---- internals ---------------------------------------------------------------------------
+    // ---- mesh construction -------------------------------------------------------------------
 
-    /** WCA face -> model axis placement, by nearest-palette sticker color voting. */
-    private fun deriveFaceLayers(): Map<CubeFace, Pair<Int, Int>> {
-        val palette = mapOf(
-            CubeFace.U to floatArrayOf(0.80f, 0.80f, 0.80f), // white
-            CubeFace.D to floatArrayOf(0.80f, 0.68f, 0.00f), // yellow
-            CubeFace.F to floatArrayOf(0.00f, 0.33f, 0.00f), // green
-            CubeFace.B to floatArrayOf(0.00f, 0.12f, 0.80f), // blue
-            CubeFace.R to floatArrayOf(0.80f, 0.03f, 0.00f), // red
-            CubeFace.L to floatArrayOf(0.80f, 0.18f, 0.00f), // orange
-        )
+    /** Box with chamfered edges and corners: 6 inset faces, 12 bevel strips, 8 corner caps. */
+    private fun chamferedBox(h: Float, c: Float, color: FloatArray, gloss: Float): MeshPart {
+        val pos = ArrayList<Float>(96 * 3)
+        val nrm = ArrayList<Float>(96 * 3)
+        val idx = ArrayList<Short>(128)
+        val w = h - c
 
-        // Vote per material: sum the |normal| components along the dominant axis of each
-        // sticker primitive (black plastic body excluded).
-        data class Vote(var axis: Int, var sign: Int, var weight: Float)
-        val votes = HashMap<Int, Vote>()
-        for ((cubieIndex, cubie) in cubies.withIndex()) {
-            val mesh = model.meshes[model.nodes[nodeOf(cubieIndex)].mesh]
-            for (pIndex in cubie.primitives) {
-                val prim = mesh.primitives[pIndex]
-                val color = model.materials[prim.material].color
-                if (color[0] < 0.1f && color[1] < 0.1f && color[2] < 0.1f) continue
-                var sx = 0f; var sy = 0f; var sz = 0f
-                var ssigned = 0f
-                var i = 0
-                while (i < prim.normals.size) {
-                    sx += abs(prim.normals[i]); sy += abs(prim.normals[i + 1]); sz += abs(prim.normals[i + 2])
-                    i += 3
-                }
-                val axis = when {
-                    sx >= sy && sx >= sz -> 0
-                    sy >= sz -> 1
-                    else -> 2
-                }
-                var j = axis
-                while (j < prim.normals.size) { ssigned += prim.normals[j]; j += 3 }
-                val sign = if (ssigned >= 0f) 1 else -1
-                val weight = when (axis) { 0 -> sx; 1 -> sy; else -> sz }
-                val existing = votes[prim.material]
-                if (existing == null || weight > existing.weight) votes[prim.material] = Vote(axis, sign, weight)
-            }
+        fun vertex(v: FloatArray, n: FloatArray): Short {
+            pos.add(v[0]); pos.add(v[1]); pos.add(v[2])
+            nrm.add(n[0]); nrm.add(n[1]); nrm.add(n[2])
+            return (pos.size / 3 - 1).toShort()
         }
 
-        val result = HashMap<CubeFace, Pair<Int, Int>>()
-        val used = HashSet<Int>()
-        for ((face, target) in palette) {
-            var bestMaterial = -1
-            var bestDist = Float.MAX_VALUE
-            for ((material, _) in votes) {
-                if (material in used) continue
-                val c = model.materials[material].color
-                val d = (c[0] - target[0]) * (c[0] - target[0]) + (c[1] - target[1]) * (c[1] - target[1]) + (c[2] - target[2]) * (c[2] - target[2])
-                if (d < bestDist) { bestDist = d; bestMaterial = material }
+        // Inset face quads.
+        for (axis in 0 until 3) for (sign in intArrayOf(1, -1)) {
+            val n = FloatArray(3); n[axis] = sign.toFloat()
+            val (a1, a2) = tangentAxes(axis)
+            val v = FloatArray(3)
+            fun corner(s1: Float, s2: Float): Short {
+                v[axis] = sign * h; v[a1] = s1 * w; v[a2] = s2 * w
+                return vertex(v, n)
             }
-            check(bestMaterial >= 0) { "could not map WCA face $face to a model material" }
-            used.add(bestMaterial)
-            val vote = checkNotNull(votes[bestMaterial])
-            result[face] = Pair(vote.axis, vote.sign)
+            val q0 = corner(-1f, -1f); val q1 = corner(1f, -1f); val q2 = corner(1f, 1f); val q3 = corner(-1f, 1f)
+            idx.add(q0); idx.add(q1); idx.add(q2)
+            idx.add(q0); idx.add(q2); idx.add(q3)
         }
-        check(result.values.toSet().size == 6) { "two WCA faces mapped to the same axis placement" }
-        return result
+        // Edge bevel strips (each runs along the third axis).
+        for (a1 in 0 until 3) for (a2 in (a1 + 1) until 3) for (s1 in intArrayOf(1, -1)) for (s2 in intArrayOf(1, -1)) {
+            val a3 = 3 - a1 - a2
+            val n = FloatArray(3); n[a1] = s1.toFloat(); n[a2] = s2.toFloat()
+            val len = sqrt(n[0] * n[0] + n[1] * n[1] + n[2] * n[2])
+            for (i in 0..2) n[i] /= len
+            val v = FloatArray(3)
+            fun corner(u1: Float, u2: Float, t: Float): Short {
+                v[a1] = u1; v[a2] = u2; v[a3] = t
+                return vertex(v, n)
+            }
+            val e0 = corner(s1 * h, s2 * w, -w); val e1 = corner(s1 * w, s2 * h, -w)
+            val e2 = corner(s1 * w, s2 * h, w); val e3 = corner(s1 * h, s2 * w, w)
+            idx.add(e0); idx.add(e1); idx.add(e2)
+            idx.add(e0); idx.add(e2); idx.add(e3)
+        }
+        // Corner caps.
+        for (s1 in intArrayOf(1, -1)) for (s2 in intArrayOf(1, -1)) for (s3 in intArrayOf(1, -1)) {
+            val n = floatArrayOf(s1.toFloat(), s2.toFloat(), s3.toFloat())
+            val len = sqrt(n[0] * n[0] + n[1] * n[1] + n[2] * n[2])
+            for (i in 0..2) n[i] /= len
+            val p1 = vertex(floatArrayOf(s1 * h, s2 * w, s3 * w), n)
+            val p2 = vertex(floatArrayOf(s1 * w, s2 * h, s3 * w), n)
+            val p3 = vertex(floatArrayOf(s1 * w, s2 * w, s3 * h), n)
+            idx.add(p1); idx.add(p2); idx.add(p3)
+        }
+        return MeshPart(pos.toFloatArray(), nrm.toFloatArray(), idx.toShortArray(), color, gloss)
     }
 
-    private fun min(a: Float, b: Float) = if (a < b) a else b
-    private fun max(a: Float, b: Float) = if (a > b) a else b
+    /** Rounded-square sticker, raised [raise] above the face plane of a box with half [h]. */
+    private fun stickerMesh(axis: Int, sign: Int, h: Float, half: Float, radius: Float, color: FloatArray, gloss: Float): MeshPart {
+        val (a1, a2) = tangentAxes(axis)
+        val plane = sign * (h + STICKER_RAISE)
+        val n = FloatArray(3); n[axis] = sign.toFloat()
+        val pos = ArrayList<Float>(17 * 3)
+        val nrm = ArrayList<Float>(17 * 3)
+        val idx = ArrayList<Short>(48)
+
+        fun vertex(u1: Float, u2: Float): Short {
+            val v = FloatArray(3)
+            v[axis] = plane; v[a1] = u1; v[a2] = u2
+            pos.add(v[0]); pos.add(v[1]); pos.add(v[2])
+            nrm.add(n[0]); nrm.add(n[1]); nrm.add(n[2])
+            return (pos.size / 3 - 1).toShort()
+        }
+
+        val centerIdx = vertex(0f, 0f)
+        // Perimeter: four arcs of [ARC_SEGS] points; straight edges fall out of the fan.
+        val ringIdx = ShortArray(4 * ARC_SEGS)
+        val cornerDirs = arrayOf(floatArrayOf(1f, 1f), floatArrayOf(-1f, 1f), floatArrayOf(-1f, -1f), floatArrayOf(1f, -1f))
+        for (k in 0 until 4) {
+            val cx = cornerDirs[k][0] * (half - radius)
+            val cy = cornerDirs[k][1] * (half - radius)
+            val base = when (k) {
+                0 -> 0f
+                1 -> 90f
+                2 -> 180f
+                else -> 270f
+            }
+            for (j in 0 until ARC_SEGS) {
+                val ang = Math.toRadians((base + 90.0 * j / ARC_SEGS).toDouble())
+                ringIdx[k * ARC_SEGS + j] = vertex(cx + radius * cos(ang).toFloat(), cy + radius * sin(ang).toFloat())
+            }
+        }
+        for (i in 0 until ringIdx.size) {
+            idx.add(centerIdx); idx.add(ringIdx[i]); idx.add(ringIdx[(i + 1) % ringIdx.size])
+        }
+        return MeshPart(pos.toFloatArray(), nrm.toFloatArray(), idx.toShortArray(), color, gloss)
+    }
+
+    companion object {
+        /** Axis (0=x, 1=y, 2=z) and grid sign of each WCA face's outer layer. */
+        val FACE_PLACEMENT: Map<CubeFace, Pair<Int, Int>> = mapOf(
+            CubeFace.U to Pair(1, 1),
+            CubeFace.D to Pair(1, -1),
+            CubeFace.F to Pair(2, 1),
+            CubeFace.B to Pair(2, -1),
+            CubeFace.R to Pair(0, 1),
+            CubeFace.L to Pair(0, -1),
+        )
+
+        /** Standard WCA sticker colors, tuned for the shader's lighting. */
+        val FACE_COLORS: Map<CubeFace, FloatArray> = mapOf(
+            CubeFace.U to floatArrayOf(0.93f, 0.94f, 0.96f, 1f),
+            CubeFace.D to floatArrayOf(0.97f, 0.79f, 0.06f, 1f),
+            CubeFace.F to floatArrayOf(0.12f, 0.62f, 0.24f, 1f),
+            CubeFace.B to floatArrayOf(0.15f, 0.36f, 0.90f, 1f),
+            CubeFace.R to floatArrayOf(0.86f, 0.11f, 0.13f, 1f),
+            CubeFace.L to floatArrayOf(0.96f, 0.47f, 0.07f, 1f),
+        )
+
+        private val PLASTIC = floatArrayOf(0.055f, 0.06f, 0.075f, 1f)
+        private const val PLASTIC_GLOSS = 0.16f
+        private const val STICKER_GLOSS = 0.45f
+        private const val CHAMFER = 0.055f
+        private const val STICKER_HALF = 0.335f
+        private const val STICKER_RADIUS = 0.095f
+        private const val STICKER_RAISE = 0.0045f
+        private const val ARC_SEGS = 4
+
+        /** The cube: spacing 1, body half 0.46 (crisp seams), 27 cubies, 54 stickers. */
+        fun procedural(): CubeGeometry = CubeGeometry(bodyHalf = 0.46f)
+
+        /** The two axes != [axis], ascending. */
+        private fun tangentAxes(axis: Int): Pair<Int, Int> = when (axis) {
+            0 -> Pair(1, 2)
+            1 -> Pair(0, 2)
+            else -> Pair(0, 1)
+        }
+    }
 }

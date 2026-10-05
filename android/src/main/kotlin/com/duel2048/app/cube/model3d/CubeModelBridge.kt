@@ -5,8 +5,6 @@ import com.duel2048.shared.cube.CubeMove
 /** Drives a [RubiksCubeView] from shared WCA notation (same surface the old engines exposed). */
 object CubeModelBridge {
 
-    const val ASSET_PATH = "models/animated_rubiks_cube_modelvault3d.glb"
-
     fun configure(cube: RubiksCubeView, gesturesEnabled: Boolean) {
         cube.gesturesEnabled = gesturesEnabled
     }

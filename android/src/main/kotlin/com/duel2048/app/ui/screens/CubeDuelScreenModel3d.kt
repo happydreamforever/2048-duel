@@ -67,7 +67,7 @@ internal fun CubeDuelModel3dRoute(vm: MainViewModel, cube: CubeDuelUiState) {
         opponentView = {
             AndroidView(
                 factory = { ctx ->
-                    RubiksCubeView(ctx, CubeModelBridge.ASSET_PATH).also { view ->
+                    RubiksCubeView(ctx).also { view ->
                         CubeModelBridge.configure(view, gesturesEnabled = false)
                         opp = view
                     }
@@ -79,7 +79,7 @@ internal fun CubeDuelModel3dRoute(vm: MainViewModel, cube: CubeDuelUiState) {
         playerView = {
             AndroidView(
                 factory = { ctx ->
-                    RubiksCubeView(ctx, CubeModelBridge.ASSET_PATH).also { view ->
+                    RubiksCubeView(ctx).also { view ->
                         CubeModelBridge.configure(view, gesturesEnabled = true)
                         // Face drags behave exactly like button presses: animate + report.
                         view.onMove = { move ->

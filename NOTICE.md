@@ -20,6 +20,3 @@ studied and some of their ideas or small code patterns were adapted:
 - **gabrielecirulli/2048** (MIT) — the original game rules.
 
 The Gradle wrapper files (`gradlew`, `gradle/wrapper/*`) are part of Gradle (Apache-2.0).
-- **animated_rubiks_cube_modelvault3d** — the Rubik's cube 3D model shipped at
-  `android/src/main/assets/models/` and rendered by the in-house glTF engine in
-  `android/.../cube/model3d`.

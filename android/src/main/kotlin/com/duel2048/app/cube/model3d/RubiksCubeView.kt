@@ -5,14 +5,16 @@ import android.opengl.GLSurfaceView
 import android.view.MotionEvent
 import android.view.ViewConfiguration
 import com.duel2048.shared.cube.CubeMove
+import javax.microedition.khronos.egl.EGL10
+import javax.microedition.khronos.egl.EGLConfig
 import kotlin.math.sqrt
 
 /**
- * GLSurfaceView hosting the glb cube. Drag on empty space orbits; drag across a face
+ * GLSurfaceView hosting the hand-built cube. Drag on empty space orbits; drag across a face
  * turns that layer (reported once through [onMove], exactly like a button press);
  * programmatic turns arrive via [CubeModelBridge].
  */
-class RubiksCubeView(context: Context, assetPath: String) : GLSurfaceView(context) {
+class RubiksCubeView(context: Context) : GLSurfaceView(context) {
 
     val renderer: CubeModelRenderer
     var onMove: ((CubeMove) -> Unit)? = null
@@ -30,10 +32,9 @@ class RubiksCubeView(context: Context, assetPath: String) : GLSurfaceView(contex
     private var drag: Drag = Idle
 
     init {
-        val bytes = context.assets.open(assetPath).use { it.readBytes() }
-        val model = GlbModel.parse(bytes)
-        renderer = CubeModelRenderer(CubeGeometry(model), model)
+        renderer = CubeModelRenderer(CubeGeometry.procedural())
         setEGLContextClientVersion(2)
+        setEGLConfigChooser(MsaaConfigChooser())
         setRenderer(renderer)
         renderMode = RENDERMODE_CONTINUOUSLY
         preserveEGLContextOnPause = true
@@ -79,6 +80,38 @@ class RubiksCubeView(context: Context, assetPath: String) : GLSurfaceView(contex
             MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> drag = Idle
         }
         return true
+    }
+
+    /**
+     * Requests an RGBA8888 / depth-16 config with 4x MSAA, falling back to the same config
+     * without MSAA on devices that do not expose it.
+     */
+    private class MsaaConfigChooser : GLSurfaceView.EGLConfigChooser {
+        override fun chooseConfig(egl: EGL10, display: javax.microedition.khronos.egl.EGLDisplay): EGLConfig {
+            for (msaa in booleanArrayOf(true, false)) {
+                val attrs = if (msaa) intArrayOf(
+                    EGL10.EGL_RED_SIZE, 8,
+                    EGL10.EGL_GREEN_SIZE, 8,
+                    EGL10.EGL_BLUE_SIZE, 8,
+                    EGL10.EGL_DEPTH_SIZE, 16,
+                    EGL10.EGL_SAMPLE_BUFFERS, 1,
+                    EGL10.EGL_SAMPLES, 4,
+                    EGL10.EGL_NONE,
+                ) else intArrayOf(
+                    EGL10.EGL_RED_SIZE, 8,
+                    EGL10.EGL_GREEN_SIZE, 8,
+                    EGL10.EGL_BLUE_SIZE, 8,
+                    EGL10.EGL_DEPTH_SIZE, 16,
+                    EGL10.EGL_NONE,
+                )
+                val configs = arrayOfNulls<EGLConfig>(1)
+                val count = IntArray(1)
+                if (egl.eglChooseConfig(display, attrs, configs, 1, count) && count[0] > 0 && configs[0] != null) {
+                    return configs[0]!!
+                }
+            }
+            throw RuntimeException("no suitable EGL config for the cube view")
+        }
     }
 
     private companion object {

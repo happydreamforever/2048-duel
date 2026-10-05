@@ -12,12 +12,12 @@ import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
 
 /**
- * GLES2 renderer for the glb Rubik's cube: 27 cubie nodes with flat sticker colors.
- * Layer turns are animated by rotating the 9 member cubies about a world axis and then
- * committing the exact quarter-turn matrix (drift-free). Touch picking reuses the same
- * matrices, so gestures and rendering always agree.
+ * GLES2 renderer for the hand-built cube: per-cubie mesh parts (plastic + stickers) with a
+ * two-light + specular shader. Layer turns are animated by rotating the 9 member cubies about
+ * a world axis and then committing the exact quarter-turn matrix (drift-free). Touch picking
+ * reuses the same matrices, so gestures and rendering always agree.
  */
-class CubeModelRenderer(val geometry: CubeGeometry, private val model: GlbModel) : GLSurfaceView.Renderer {
+class CubeModelRenderer(val geometry: CubeGeometry) : GLSurfaceView.Renderer {
 
     private val lock = Any()
 
@@ -32,26 +32,27 @@ class CubeModelRenderer(val geometry: CubeGeometry, private val model: GlbModel)
     private var active: PendingMove? = null
     private var activeProgress = 0f // eased 0..1
 
-    private var azimuth = 30f
-    private var elevation = 22f
+    private var azimuth = 32f
+    private var elevation = 24f
 
     private var surfaceW = 1
     private var surfaceH = 1
     private var cameraDistance = 3f
     private var fovY = 34f
 
+    /** Uploaded GPU copy of one mesh part. */
+    private class GpuPart(val vbo: Int, val ibo: Int, val count: Int, val color: FloatArray, val gloss: Float)
+
     // GL objects (rebuilt on every surface create).
     private var program = 0
     private var uMvp = 0
     private var uModel = 0
     private var uColor = 0
+    private var uGloss = 0
     private var aPosition = 0
     private var aNormal = 0
-    private var vboIds = IntArray(0)
-    private var iboIds = IntArray(0)
-    private var indexCounts = IntArray(0)
-    /** (cubie index, primitive index within cubie) -> vbo slot. */
-    private var primSlots = ArrayList<Triple<Int, Int, Int>>()
+    /** Per cubie: its parts in upload order. */
+    private var gpuCubies: List<List<GpuPart>> = emptyList()
 
     // Scratch to avoid per-frame allocation.
     private val mProjection = FloatArray(16)
@@ -62,7 +63,6 @@ class CubeModelRenderer(val geometry: CubeGeometry, private val model: GlbModel)
     private val mNode = FloatArray(16)
     private val mMvp = FloatArray(16)
     private val mTmpA = FloatArray(16)
-    private val mTmpB = FloatArray(16)
 
     fun applyScrambleAnimated(notations: List<String>) {
         val moves = notations.mapNotNull { CubeMove.parse(it) }
@@ -141,51 +141,43 @@ class CubeModelRenderer(val geometry: CubeGeometry, private val model: GlbModel)
         uMvp = GLES20.glGetUniformLocation(program, "uMvp")
         uModel = GLES20.glGetUniformLocation(program, "uModel")
         uColor = GLES20.glGetUniformLocation(program, "uColor")
+        uGloss = GLES20.glGetUniformLocation(program, "uGloss")
         aPosition = GLES20.glGetAttribLocation(program, "aPosition")
         aNormal = GLES20.glGetAttribLocation(program, "aNormal")
 
         GLES20.glEnable(GLES20.GL_DEPTH_TEST)
         GLES20.glClearColor(0f, 0f, 0f, 0f)
 
-        // Upload one interleaved position+normal VBO per primitive.
-        val primitives = ArrayList<Pair<Int, GlbModel.Primitive>>() // (material, primitive)
-        primSlots = ArrayList()
-        for ((cubieIndex, cubie) in geometry.cubies.withIndex()) {
-            val mesh = model.meshes[model.nodes[cubie.node].mesh]
-            for (pIndex in cubie.primitives) {
-                primitives.add(Pair(mesh.primitives[pIndex].material, mesh.primitives[pIndex]))
-                primSlots.add(Triple(cubieIndex, pIndex, primitives.size - 1))
+        // Upload one interleaved position+normal VBO per mesh part.
+        gpuCubies = geometry.cubies.map { cubie ->
+            cubie.parts.map { part ->
+                val count = part.positions.size / 3
+                val interleaved = FloatArray(count * 6)
+                for (v in 0 until count) {
+                    interleaved[v * 6] = part.positions[v * 3]
+                    interleaved[v * 6 + 1] = part.positions[v * 3 + 1]
+                    interleaved[v * 6 + 2] = part.positions[v * 3 + 2]
+                    interleaved[v * 6 + 3] = part.normals[v * 3]
+                    interleaved[v * 6 + 4] = part.normals[v * 3 + 1]
+                    interleaved[v * 6 + 5] = part.normals[v * 3 + 2]
+                }
+                val vbo = IntArray(1)
+                val ibo = IntArray(1)
+                GLES20.glGenBuffers(1, vbo, 0)
+                GLES20.glGenBuffers(1, ibo, 0)
+                GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, vbo[0])
+                GLES20.glBufferData(GLES20.GL_ARRAY_BUFFER, interleaved.size * 4, floatBuffer(interleaved), GLES20.GL_STATIC_DRAW)
+                GLES20.glBindBuffer(GLES20.GL_ELEMENT_ARRAY_BUFFER, ibo[0])
+                GLES20.glBufferData(GLES20.GL_ELEMENT_ARRAY_BUFFER, part.indices.size * 2, shortBuffer(part.indices), GLES20.GL_STATIC_DRAW)
+                GpuPart(vbo[0], ibo[0], part.indices.size, part.color, part.gloss)
             }
-        }
-        vboIds = IntArray(primitives.size)
-        iboIds = IntArray(primitives.size)
-        indexCounts = IntArray(primitives.size)
-        GLES20.glGenBuffers(vboIds.size, vboIds, 0)
-        GLES20.glGenBuffers(iboIds.size, iboIds, 0)
-        for (i in primitives.indices) {
-            val prim = primitives[i].second
-            val count = prim.positions.size / 3
-            val interleaved = FloatArray(count * 6)
-            for (v in 0 until count) {
-                interleaved[v * 6] = prim.positions[v * 3]
-                interleaved[v * 6 + 1] = prim.positions[v * 3 + 1]
-                interleaved[v * 6 + 2] = prim.positions[v * 3 + 2]
-                interleaved[v * 6 + 3] = prim.normals[v * 3]
-                interleaved[v * 6 + 4] = prim.normals[v * 3 + 1]
-                interleaved[v * 6 + 5] = prim.normals[v * 3 + 2]
-            }
-            GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, vboIds[i])
-            GLES20.glBufferData(GLES20.GL_ARRAY_BUFFER, interleaved.size * 4, floatBuffer(interleaved), GLES20.GL_STATIC_DRAW)
-            GLES20.glBindBuffer(GLES20.GL_ELEMENT_ARRAY_BUFFER, iboIds[i])
-            GLES20.glBufferData(GLES20.GL_ELEMENT_ARRAY_BUFFER, prim.indices.size * 2, shortBuffer(prim.indices), GLES20.GL_STATIC_DRAW)
-            indexCounts[i] = prim.indices.size
         }
         GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, 0)
         GLES20.glBindBuffer(GLES20.GL_ELEMENT_ARRAY_BUFFER, 0)
 
         // Frame the whole cube: distance from its outer radius and the vertical fov.
         val radius = 1.74f * geometry.spacing
-        cameraDistance = radius / kotlin.math.tan(Math.toRadians((fovY / 2f).toDouble())).toFloat() * 1.22f
+        cameraDistance = radius / kotlin.math.tan(Math.toRadians((fovY / 2f).toDouble())).toFloat() * 1.12f
     }
 
     override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
@@ -208,8 +200,7 @@ class CubeModelRenderer(val geometry: CubeGeometry, private val model: GlbModel)
             advanceAnimationLocked()
             updateOrbitMatrix()
 
-            for ((cubieIndex, pIndex, slot) in primSlots) {
-                val cubie = geometry.cubies[cubieIndex]
+            for ((cubieIndex, cubieParts) in gpuCubies.withIndex()) {
                 System.arraycopy(base[cubieIndex], 0, mNode, 0, 16)
                 val anim = active
                 if (anim != null && anim.members.contains(cubieIndex)) {
@@ -218,22 +209,23 @@ class CubeModelRenderer(val geometry: CubeGeometry, private val model: GlbModel)
                     CubeMath.multiply(mRot, mNode, mTmpA)
                     System.arraycopy(mTmpA, 0, mNode, 0, 16)
                 }
-                CubeMath.multiply(mOrbit, mNode, mTmpB)
-                CubeMath.multiply(mPv, mTmpB, mMvp)
-                System.arraycopy(mTmpB, 0, mNode, 0, 16)
+                CubeMath.multiply(mOrbit, mNode, mTmpA)
+                CubeMath.multiply(mPv, mTmpA, mMvp)
+                System.arraycopy(mTmpA, 0, mNode, 0, 16)
 
-                val color = model.materials[model.meshes[model.nodes[cubie.node].mesh].primitives[pIndex].material].color
                 GLES20.glUniformMatrix4fv(uMvp, 1, false, mMvp, 0)
                 GLES20.glUniformMatrix4fv(uModel, 1, false, mNode, 0)
-                GLES20.glUniform4f(uColor, color[0], color[1], color[2], if (color.size > 3) color[3] else 1f)
-
-                GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, vboIds[slot])
-                GLES20.glEnableVertexAttribArray(aPosition)
-                GLES20.glVertexAttribPointer(aPosition, 3, GLES20.GL_FLOAT, false, 24, 0)
-                GLES20.glEnableVertexAttribArray(aNormal)
-                GLES20.glVertexAttribPointer(aNormal, 3, GLES20.GL_FLOAT, false, 24, 12)
-                GLES20.glBindBuffer(GLES20.GL_ELEMENT_ARRAY_BUFFER, iboIds[slot])
-                GLES20.glDrawElements(GLES20.GL_TRIANGLES, indexCounts[slot], GLES20.GL_UNSIGNED_SHORT, 0)
+                for (part in cubieParts) {
+                    GLES20.glUniform4f(uColor, part.color[0], part.color[1], part.color[2], part.color[3])
+                    GLES20.glUniform1f(uGloss, part.gloss)
+                    GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, part.vbo)
+                    GLES20.glEnableVertexAttribArray(aPosition)
+                    GLES20.glVertexAttribPointer(aPosition, 3, GLES20.GL_FLOAT, false, 24, 0)
+                    GLES20.glEnableVertexAttribArray(aNormal)
+                    GLES20.glVertexAttribPointer(aNormal, 3, GLES20.GL_FLOAT, false, 24, 12)
+                    GLES20.glBindBuffer(GLES20.GL_ELEMENT_ARRAY_BUFFER, part.ibo)
+                    GLES20.glDrawElements(GLES20.GL_TRIANGLES, part.count, GLES20.GL_UNSIGNED_SHORT, 0)
+                }
             }
             GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, 0)
             GLES20.glBindBuffer(GLES20.GL_ELEMENT_ARRAY_BUFFER, 0)
@@ -295,15 +287,23 @@ class CubeModelRenderer(val geometry: CubeGeometry, private val model: GlbModel)
                 vNormal = mat3(uModel[0].xyz, uModel[1].xyz, uModel[2].xyz) * aNormal;
             }
         """.trimIndent()
+        // Normals land in view space (the orbit is part of uModel and the camera looks down -Z),
+        // so the lighting stays fixed while the cube orbits.
         val fragment = """
             precision mediump float;
             varying vec3 vNormal;
             uniform vec4 uColor;
+            uniform float uGloss;
             void main() {
                 vec3 n = normalize(vNormal);
-                float d = max(dot(n, normalize(vec3(0.35, 0.9, 0.55))), 0.0);
-                float b = 0.52 + 0.48 * d;
-                gl_FragColor = vec4(uColor.rgb * b, uColor.a);
+                vec3 keyDir = normalize(vec3(0.40, 0.85, 0.50));
+                vec3 fillDir = normalize(vec3(-0.60, -0.20, 0.55));
+                float key = max(dot(n, keyDir), 0.0);
+                float fill = max(dot(n, fillDir), 0.0);
+                float b = 0.30 + 0.70 * key + 0.16 * fill;
+                float spec = pow(max(dot(reflect(-keyDir, n), vec3(0.0, 0.0, 1.0)), 0.0), 30.0);
+                vec3 c = uColor.rgb * b + uGloss * spec * vec3(1.0);
+                gl_FragColor = vec4(c, uColor.a);
             }
         """.trimIndent()
         val vs = compile(GLES20.GL_VERTEX_SHADER, vertex)
