@@ -107,8 +107,7 @@ class GlbModel(
             }
             checkNotNull(jsonText) { "glb has no JSON chunk" }
             val parsed = json.decodeFromString<GlbFile>(jsonText)
-            val binBuf = bin?.let { ByteBuffer.wrap(it).order(ByteOrder.LITTLE_ENDIAN) }
-            checkNotNull(binBuf) { "glb has no BIN chunk" }
+            val binBytes = bin ?: error("glb has no BIN chunk")
 
             fun viewBytes(accessor: GlbAccessor): ByteBuffer {
                 check(accessor.bufferView >= 0) { "accessor without bufferView" }
@@ -120,7 +119,7 @@ class GlbModel(
                     else -> error("unsupported accessor type ${accessor.type}")
                 }
                 val stride = bv.byteStride ?: elementSize
-                return ByteBuffer.wrap(bin, start, stride * (accessor.count - 1) + elementSize)
+                return ByteBuffer.wrap(binBytes, start, stride * (accessor.count - 1) + elementSize)
                     .order(ByteOrder.LITTLE_ENDIAN)
             }
 

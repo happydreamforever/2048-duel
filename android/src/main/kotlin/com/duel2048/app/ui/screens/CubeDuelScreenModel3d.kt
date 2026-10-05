@@ -9,7 +9,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
@@ -23,7 +22,6 @@ import com.duel2048.shared.cube.CubeMove
 /** Cube duel on the glb model renderer (the only cube engine). */
 @Composable
 internal fun CubeDuelModel3dRoute(vm: MainViewModel, cube: CubeDuelUiState) {
-    val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
 
     var mine by remember(cube.scrambleNonce) { mutableStateOf<RubiksCubeView?>(null) }

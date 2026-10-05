@@ -52,7 +52,7 @@ class CubeGeometry(private val model: GlbModel) {
         var maxAbs = 0f
         val centers = ArrayList<FloatArray>(27)
         val locals = ArrayList<Triple<FloatArray, FloatArray, List<Int>>>(27)
-        for ((nodeIndex, node) in model.nodes.withIndex()) {
+        for (node in model.nodes) {
             if (node.mesh < 0) continue
             val mesh = model.meshes[node.mesh]
             var minX = Float.MAX_VALUE; var minY = Float.MAX_VALUE; var minZ = Float.MAX_VALUE
