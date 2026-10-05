@@ -232,30 +232,74 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     // ------------------------------------------------------------------ online
 
     fun startDuel(mode: MatchMode) {
-        val s = settings.value
-        if (!s.loggedIn) {
-            pendingMode = mode
-            pendingCubeMode = null
-            _login.value = LoginUiState()
-            _screen.value = Screen.Login
-            return
-        }
-        _session.value = match
-        match.start(s.serverUrl, s.authToken, mode)
+        ensureAccount { token -> match.start(settings.value.serverUrl, token, mode) }
     }
 
     fun startCubeDuel(mode: MatchMode) {
+        ensureAccount { token ->
+            cubeIsLocal.value = false
+            localCubeHolder.value = null
+            cubeMatch.start(settings.value.serverUrl, token, mode)
+        }
+    }
+
+    /**
+     * Online play never demands login: logged-in users use their token, everyone else gets a
+     * persistent guest account created silently on the server ("guest####") and reused forever.
+     */
+    private var ensuringSession = false
+
+    private fun ensureAccount(onReady: (String) -> Unit) {
         val s = settings.value
-        if (!s.loggedIn) {
-            pendingCubeMode = mode
-            pendingMode = null
-            _login.value = LoginUiState()
-            _screen.value = Screen.Login
+        if (s.authToken.isNotBlank()) {
+            onReady(s.authToken)
             return
         }
-        cubeIsLocal.value = false
-        localCubeHolder.value = null
-        cubeMatch.start(s.serverUrl, s.authToken, mode)
+        if (ensuringSession) return
+        ensuringSession = true
+        viewModelScope.launch {
+            try {
+                val pass = s.guestPass.ifBlank { randomSecret() }
+                when (val outcome = guestSession(s, pass)) {
+                    is AccountClient.Outcome.Ok -> {
+                        val auth = outcome.auth
+                        settingsStore.update {
+                            it.copy(
+                                authToken = auth.token,
+                                accountName = auth.name,
+                                playerName = it.playerName.ifBlank { auth.name },
+                                guestName = auth.name,
+                                guestPass = pass,
+                            )
+                        }
+                        viewModelScope.launch { pullWallet() }
+                        onReady(auth.token)
+                    }
+                    else -> _banner.value = "guest_failed"
+                }
+            } finally {
+                ensuringSession = false
+            }
+        }
+    }
+
+    /** Reuse the device's guest account, or register one (rerolling on a name clash). */
+    private suspend fun guestSession(s: UserSettings, pass: String): AccountClient.Outcome {
+        if (s.guestName.isNotBlank() && s.guestPass.isNotBlank()) {
+            val again = account.authenticate(s.serverUrl, Login(s.guestName, s.guestPass))
+            if (again is AccountClient.Outcome.Ok) return again
+        }
+        repeat(5) {
+            val name = "guest" + kotlin.random.Random.nextInt(1000, 10000)
+            val r = account.authenticate(s.serverUrl, Register(name, pass))
+            if (r !is AccountClient.Outcome.Failed || r.code != "name_taken") return r
+        }
+        return AccountClient.Outcome.Failed("name_taken")
+    }
+
+    private fun randomSecret(): String {
+        val alphabet = "abcdefghjkmnpqrstuvwxyz23456789"
+        return (1..16).map { alphabet.random() }.joinToString("")
     }
 
     fun startCubeTraining(profile: TrainingProfile, botName: String, guided: Boolean = false) {
@@ -361,9 +405,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private fun onSessionExpired() {
+        // Drop the stale token; the next started match provisions (or re-enters) a session silently.
         settingsStore.update { it.copy(authToken = "") }
-        _login.value = LoginUiState(error = DuelError("session_expired"))
-        _screen.value = Screen.Login
+        _screen.value = Screen.Home
     }
 
     // ------------------------------------------------------------------ offline

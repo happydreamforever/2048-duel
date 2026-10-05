@@ -29,6 +29,9 @@ data class UserSettings(
     val coins: Int = com.duel2048.shared.social.Economy.START_COINS,
     /** BCP-47 tag such as "ko"; blank follows the system language. */
     val language: String = "",
+    /** Silent guest identity created on first online match so play never demands login. */
+    val guestName: String = "",
+    val guestPass: String = "",
 ) {
     val loggedIn: Boolean get() = authToken.isNotBlank()
 
@@ -84,6 +87,8 @@ class SettingsStore(context: Context) {
         score = prefs.getInt("score", 0),
         coins = if (prefs.contains("coins")) prefs.getInt("coins", com.duel2048.shared.social.Economy.START_COINS) else com.duel2048.shared.social.Economy.START_COINS,
         language = prefs.getString("lang", "") ?: "",
+        guestName = prefs.getString("guestName", "") ?: "",
+        guestPass = prefs.getString("guestPass", "") ?: "",
     )
 
     fun update(transform: (UserSettings) -> UserSettings) {
@@ -108,6 +113,8 @@ class SettingsStore(context: Context) {
             .putInt("score", s.score)
             .putInt("coins", s.coins)
             .putString("lang", s.language)
+            .putString("guestName", s.guestName)
+            .putString("guestPass", s.guestPass)
             .apply()
     }
 }

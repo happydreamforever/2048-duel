@@ -208,4 +208,5 @@
     <string name="score_label">SCORE</string>
     <string name="coins_label">COINS</string>
     <string name="need_coins">Not enough coins. Open Coins to add more.</string>
+    <string name="guest_failed">Could not reach the server to start a guest session. Check the server URL in Settings and try again.</string>
 </resources>

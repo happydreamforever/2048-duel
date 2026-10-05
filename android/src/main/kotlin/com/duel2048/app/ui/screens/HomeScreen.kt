@@ -53,6 +53,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.duel2048.app.HubGame
 import com.duel2048.app.MainViewModel
 import com.duel2048.app.R
 import com.duel2048.app.data.UserSettings
@@ -134,16 +135,23 @@ fun HomeScreen(vm: MainViewModel) {
                     modifier = Modifier.fillMaxWidth(),
                 ) { showTraining = true }
                 Spacer(Modifier.height(10.dp))
-                NeonButton(
-                    stringResource(R.string.more_games),
-                    subtitle = stringResource(R.string.more_games_sub),
-                    colors = listOf(Color(0xFF6B4EFF), Color(0xFF2D1B69)),
-                    modifier = Modifier.fillMaxWidth(),
-                ) { vm.openMoreGames() }
+                HubGame.entries.forEach { game ->
+                    NeonButton(
+                        game.title,
+                        subtitle = game.blurb,
+                        colors = game.colors,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) { vm.openGameModes(game) }
+                }
             }
             if (banner == "need_coins") {
                 Spacer(Modifier.height(10.dp))
                 Text(stringResource(R.string.need_coins), color = palette.danger, fontWeight = FontWeight.Bold)
+                TextButton(onClick = { vm.clearBanner() }) { Text(stringResource(R.string.ok), color = palette.accent) }
+            }
+            if (banner == "guest_failed") {
+                Spacer(Modifier.height(10.dp))
+                Text(stringResource(R.string.guest_failed), color = palette.danger, fontWeight = FontWeight.Bold)
                 TextButton(onClick = { vm.clearBanner() }) { Text(stringResource(R.string.ok), color = palette.accent) }
             }
             Spacer(Modifier.height(16.dp))
