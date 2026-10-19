@@ -17,6 +17,7 @@ import com.duel2048.app.MainViewModel
 import com.duel2048.app.cube.CubeDuelUiState
 import com.duel2048.app.cube.model3d.CubeModelBridge
 import com.duel2048.app.cube.model3d.RubiksCubeView
+import com.duel2048.app.game.DuelPhase
 import com.duel2048.shared.cube.CubeMove
 
 /** Cube duel on the glb model renderer (the only cube engine). */
@@ -27,11 +28,11 @@ internal fun CubeDuelModel3dRoute(vm: MainViewModel, cube: CubeDuelUiState) {
     var mine by remember(cube.scrambleNonce) { mutableStateOf<RubiksCubeView?>(null) }
     var opp by remember(cube.scrambleNonce) { mutableStateOf<RubiksCubeView?>(null) }
 
-    LaunchedEffect(cube.scrambleNonce, cube.scramble, mine, opp) {
-        val scramble = cube.scramble
-        if (scramble.isEmpty()) return@LaunchedEffect
-        mine?.let { CubeModelBridge.applyScrambleAnimated(it, scramble) }
-        opp?.let { CubeModelBridge.applyScrambleAnimated(it, scramble) }
+    LaunchedEffect(cube.scrambleNonce, cube.scramble, mine) {
+        mine?.let { CubeModelBridge.applyScrambleAnimated(it, cube.scramble) }
+    }
+    LaunchedEffect(cube.scrambleNonce, cube.scramble, opp) {
+        opp?.let { CubeModelBridge.applyScrambleAnimated(it, cube.scramble) }
     }
     LaunchedEffect(cube.oppSerial, opp) {
         val view = opp ?: return@LaunchedEffect
@@ -76,17 +77,22 @@ internal fun CubeDuelModel3dRoute(vm: MainViewModel, cube: CubeDuelUiState) {
             AndroidView(
                 factory = { ctx ->
                     RubiksCubeView(ctx).also { view ->
-                        CubeModelBridge.configure(view, gesturesEnabled = true)
-                        // Face drags behave exactly like button presses: animate + report.
-                        view.onMove = { move ->
-                            CubeModelBridge.applyMoveAnimated(view, move)
-                            vm.applyCubeMove(move)
-                        }
+                        CubeModelBridge.configure(view, gesturesEnabled = false)
                         mine = view
                     }
                 },
                 modifier = Modifier.fillMaxSize(),
-                update = { view -> if (mine == null) mine = view },
+                update = { view ->
+                    if (mine == null) mine = view
+                    val canTurn = cube.phase == DuelPhase.PLAYING && !cube.solved
+                    view.gesturesEnabled = canTurn
+                    view.onMove = { move ->
+                        if (canTurn && !view.animator.isBusy()) {
+                            vm.applyCubeMove(move)
+                            CubeModelBridge.applyMoveAnimated(view, move)
+                        }
+                    }
+                },
             )
         },
     )

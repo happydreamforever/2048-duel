@@ -4,6 +4,10 @@ JSON over a single WebSocket (`/ws`). Every message has a `type` discriminator.
 Types are defined once in `shared/.../protocol/Messages.kt` and serialized with
 kotlinx.serialization on both ends.
 
+Protocol version 4 corrects the shared Rubik's Cube move permutations to match the
+3D renderer and standard URFDLB face turns. Rebuild and update both the server and
+Android app together; clients using earlier rules cannot play compatible cube races.
+
 ## Client → server
 
 | type | fields | notes |

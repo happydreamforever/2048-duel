@@ -252,11 +252,20 @@ class RubiksCubeView(context: Context) : TextureView(context) {
     override fun onTouchEvent(event: MotionEvent): Boolean {
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
+                // A second swipe while a layer settles must not unexpectedly orbit the camera.
+                if (gesturesEnabled && animator.isBusy()) {
+                    drag = Done
+                    return true
+                }
                 val hit = if (gesturesEnabled) camera.pickRay(event.x, event.y)?.let { (o, d) -> animator.pick(o, d) } else null
                 drag = if (hit != null) Turn(hit, event.x, event.y) else Orbit(event.x, event.y)
             }
             MotionEvent.ACTION_MOVE -> when (val d = drag) {
                 is Turn -> {
+                    if (!gesturesEnabled || animator.isBusy()) {
+                        drag = Done
+                        return true
+                    }
                     val dx = event.x - d.x
                     val dy = event.y - d.y
                     if (sqrt(dx * dx + dy * dy) > touchSlop) {
@@ -269,7 +278,8 @@ class RubiksCubeView(context: Context) : TextureView(context) {
                             drag = Done
                             onMove?.invoke(move)
                         } else {
-                            drag = Orbit(event.x, event.y) // middle slice or ambiguous drag
+                            // Wait for a clear layer direction; orbiting starts on empty space.
+                            // This also lets a diagonal drag become clear as the finger moves.
                         }
                     }
                 }

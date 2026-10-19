@@ -25,8 +25,8 @@ class CubeGeometry {
         val nodeName: String get() = "cubie_${grid[0]}_${grid[1]}_${grid[2]}"
     }
 
-    /** One turn to animate: a layer's cubies rotate about the world +axis by [degrees]. */
-    class TurnSpec(val axis: Int, val coord: Int, val degrees: Float, val members: List<Int>)
+    /** One turn to animate: the layer at [coord] rotates about the world +axis by [degrees]. */
+    class TurnSpec(val axis: Int, val coord: Int, val degrees: Float)
 
     /** A touch hit on a cubie, in cube space (orbit undone, idle pose). */
     class PickHit(val cubie: Int, val point: FloatArray, val normalAxis: Int, val normalSign: Int)
@@ -64,7 +64,7 @@ class CubeGeometry {
             2 -> 180f
             else -> -quarterDegrees
         }
-        return TurnSpec(axis = axis, coord = sign, degrees = degrees, members = faceCubies(move.face()))
+        return TurnSpec(axis = axis, coord = sign, degrees = degrees)
     }
 
     /** Cube move for rotating layer (axis, coord) by [degrees] about +axis; null for middle slices. */
@@ -108,7 +108,10 @@ class CubeGeometry {
             // Ray in the cubie's rotated frame, where its box stays axis-aligned.
             val lo = CubeMath.transformPoint(inv, ox, oy, oz)
             val ld = CubeMath.transformDir(inv, dx, dy, dz)
-            val lc = CubeMath.transformPoint(inv, cubie.center[0], cubie.center[1], cubie.center[2])
+            // The ray is now in the cubie's original frame, so its box is still centred at
+            // the original grid position. Transforming the centre as well would cancel the
+            // visible turn and make picking follow the cubie's old position.
+            val lc = cubie.center
             val min = floatArrayOf(lc[0] - BODY_HALF, lc[1] - BODY_HALF, lc[2] - BODY_HALF)
             val max = floatArrayOf(lc[0] + BODY_HALF, lc[1] + BODY_HALF, lc[2] + BODY_HALF)
             val t = CubeMath.rayAabb(lo[0], lo[1], lo[2], ld[0], ld[1], ld[2], min, max) ?: continue
@@ -173,10 +176,9 @@ class CubeGeometry {
         t[bestAxis] = bestSign.toFloat()
         val rot = CubeMath.cross(n, t)
         var rotAxis = 0
-        var rotSign = 1f
         var maxComp = 0f
         for (a in 0 until 3) {
-            if (abs(rot[a]) > maxComp) { maxComp = abs(rot[a]); rotAxis = a; rotSign = if (rot[a] >= 0f) 1f else -1f }
+            if (abs(rot[a]) > maxComp) { maxComp = abs(rot[a]); rotAxis = a }
         }
         if (maxComp < 0.5f) return null // drag along the face normal — no turn
 
@@ -185,9 +187,9 @@ class CubeGeometry {
         val axisVec = FloatArray(3)
         axisVec[rotAxis] = 1f
         val v = CubeMath.cross(axisVec, hit.point)
-        val degreesAboutPositiveAxis = if (CubeMath.dot(v, t) >= 0f) 90f * rotSign else -90f * rotSign
+        val degreesAboutPositiveAxis = if (CubeMath.dot(v, t) >= 0f) 90f else -90f
 
-        val layerCoord = (hit.point[rotAxis] / spacing).roundToInt()
+        val layerCoord = (hit.point[rotAxis] / spacing).roundToInt().coerceIn(-1, 1)
         return moveForTurn(rotAxis, layerCoord, degreesAboutPositiveAxis)
     }
 

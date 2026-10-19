@@ -1,6 +1,7 @@
 package com.duel2048.app.cube.model3d
 
 import com.duel2048.shared.cube.CubeMove
+import kotlin.math.roundToInt
 
 /**
  * Layer-turn animation state for one cube. Each cubie has an accumulated pose (a product of
@@ -11,8 +12,9 @@ import com.duel2048.shared.cube.CubeMove
  */
 class CubeAnimator(val geometry: CubeGeometry, private val clock: () -> Long) {
 
-    private class PendingMove(val axis: Int, val degrees: Float, val members: List<Int>, val durationMs: Long) {
+    private class PendingMove(val axis: Int, val coord: Int, val degrees: Float, val durationMs: Long) {
         var startMs = 0L
+        var members: List<Int> = emptyList()
     }
 
     private val base: Array<FloatArray> = Array(geometry.cubies.size) { CubeMath.identity() }
@@ -68,7 +70,7 @@ class CubeAnimator(val geometry: CubeGeometry, private val clock: () -> Long) {
     private fun advance(): Pair<PendingMove, Float>? {
         val now = clock()
         while (true) {
-            val anim = active ?: (queue.removeFirstOrNull()?.also { it.startMs = now; active = it } ?: return null)
+            val anim = active ?: (queue.removeFirstOrNull()?.let { activate(it, now) } ?: return null)
             val t = (now - anim.startMs).coerceAtLeast(0).toFloat() / anim.durationMs
             if (t < 1f) return Pair(anim, t * t * (3f - 2f * t)) // smoothstep
             // Commit the exact quarter turn so float error never accumulates.
@@ -78,14 +80,26 @@ class CubeAnimator(val geometry: CubeGeometry, private val clock: () -> Long) {
             active = null
             // A turn that finished long ago must not delay the next one: chain from its end.
             val overshoot = now - (anim.startMs + anim.durationMs)
-            queue.firstOrNull()?.let { next -> next.startMs = now - overshoot; active = queue.removeFirst() }
-                ?: return null
+            queue.removeFirstOrNull()?.let { next -> activate(next, now - overshoot) } ?: return null
         }
+    }
+
+    /** Resolve a layer when its turn starts, after all preceding queued turns are committed. */
+    private fun activate(move: PendingMove, startMs: Long): PendingMove {
+        move.startMs = startMs
+        move.members = geometry.cubies.indices.filter { i ->
+            val center = geometry.cubies[i].center
+            val current = CubeMath.transformPoint(base[i], center[0], center[1], center[2])
+            current[move.axis].roundToInt() == move.coord
+        }
+        check(move.members.size == 9) { "cube layer has ${move.members.size} cubies" }
+        active = move
+        return move
     }
 
     private fun pendingFor(move: CubeMove, ms: Long): PendingMove {
         val spec = geometry.turnFor(move)
-        return PendingMove(spec.axis, spec.degrees, spec.members, if (move.quarterTurns() == 2) ms * 3 / 2 else ms)
+        return PendingMove(spec.axis, spec.coord, spec.degrees, if (move.quarterTurns() == 2) ms * 3 / 2 else ms)
     }
 
     private fun axisUnit(axis: Int): FloatArray = when (axis) {

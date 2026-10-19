@@ -4,7 +4,8 @@ import kotlinx.serialization.json.Json
 
 /** JSON wire format. Messages carry a "type" discriminator (see @SerialName in Messages.kt). */
 object Protocol {
-    const val VERSION = 3
+    // v4 corrects the cube move permutations; client and server must use the same rules.
+    const val VERSION = 4
     const val WS_PATH = "/ws"
 
     val json: Json = Json {
