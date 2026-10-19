@@ -18,17 +18,19 @@ class CubeStateTest {
 
     @Test
     fun `move and inverse return to solved`() {
+        val labelled = CubeState(CharArray(54) { it.toChar() })
         for (move in CubeMove.entries) {
             val scrambled = CubeState.SOLVED.apply(move)
             assertFalse(scrambled.isSolved(), move.notation())
             val restored = scrambled.apply(move.inverse())
             assertTrue(restored.isSolved(), move.notation())
+            assertEquals(labelled.fingerprint(), labelled.apply(move).apply(move.inverse()).fingerprint())
         }
     }
 
     @Test
     fun `double turn is self-inverse`() {
-        for (face in CubeMove.QUARTER_TURNS) {
+        for (face in CubeMove.entries.filter { it.quarterTurns() == 1 }) {
             val double = face.doubleTurn()
             val once = CubeState.SOLVED.apply(double)
             val twice = once.apply(double)
@@ -47,7 +49,7 @@ class CubeStateTest {
 
     @Test
     fun `notation round trip`() {
-        val moves = CubeScramble.generate(7L)
+        val moves = CubeMove.entries.toList()
         val text = moves.joinToString(" ") { it.notation() }
         val parsed = CubeMove.parseList(text)
         assertEquals(moves, parsed)
@@ -58,7 +60,7 @@ class CubeStateTest {
         val labelled = CubeState(CharArray(54) { ('A'.code + it).toChar() })
         val clockwise = listOf(6, 3, 0, 7, 4, 1, 8, 5, 2)
         for (move in CubeMove.QUARTER_TURNS) {
-            val base = move.face().baseIndex
+            val base = checkNotNull(move.face()).baseIndex
             val turned = labelled.apply(move)
             for (i in 0 until 9) {
                 assertEquals(labelled.stickers[base + clockwise[i]], turned.stickers[base + i], move.notation())
@@ -82,11 +84,12 @@ class CubeStateTest {
             positions.map { piece -> piece.map { state.stickers[it] }.toSet() }.toSet()
         var state = labelled
         for (move in CubeMove.entries + CubeScramble.generate(42L)) {
+            val previous = state
             state = state.apply(move)
             assertEquals(pieces(labelled, corners), pieces(state, corners), move.notation())
             assertEquals(pieces(labelled, edges), pieces(state, edges), move.notation())
-            for (face in CubeFace.entries) {
-                assertEquals(labelled.stickers[face.baseIndex + 4], state.stickers[face.baseIndex + 4])
+            if (move.face() != null) for (face in CubeFace.entries) {
+                assertEquals(previous.stickers[face.baseIndex + 4], state.stickers[face.baseIndex + 4])
             }
         }
     }
@@ -98,5 +101,57 @@ class CubeStateTest {
         var state = labelled
         repeat(6) { state = state.applyAll(algorithm) }
         assertEquals(labelled.fingerprint(), state.fingerprint())
+    }
+
+    @Test
+    fun `middle slices move centers in standard M E S directions`() {
+        val expectedCenters = mapOf(
+            CubeMove.M to "BRUFLD",
+            CubeMove.E to "UFLDBR",
+            CubeMove.S to "LUFRDB",
+        )
+        for ((move, centers) in expectedCenters) {
+            val turned = CubeState.SOLVED.apply(move)
+            val actual = CubeFace.entries.map { turned.stickers[it.baseIndex + 4] }.joinToString("")
+            assertEquals(centers, actual, move.notation())
+        }
+    }
+
+    @Test
+    fun `four quarter turns restore every sticker on every layer`() {
+        val labelled = CubeState(CharArray(54) { it.toChar() })
+        for (move in CubeMove.entries.filter { it.quarterTurns() == 1 }) {
+            assertEquals(labelled.fingerprint(), labelled.applyAll(List(4) { move }).fingerprint(), move.notation())
+        }
+    }
+
+    @Test
+    fun `mixed slice moves can be undone by the hint path`() {
+        val scramble = CubeScramble.generate(42L)
+        val played = CubeMove.parseList("M E' R S2 U M' F E S D2")
+        val state = CubeState.SOLVED.applyAll(scramble + played)
+        val restored = state.applyAll(CubeScramble.inverse(scramble + played))
+        assertEquals(CubeState.SOLVED.fingerprint(), restored.fingerprint())
+    }
+
+    @Test
+    fun `all 24 whole cube orientations are solved after slice turns`() {
+        val rotations = listOf(
+            listOf(CubeMove.R, CubeMove.Mi, CubeMove.Li),
+            listOf(CubeMove.U, CubeMove.Ei, CubeMove.Di),
+            listOf(CubeMove.F, CubeMove.S, CubeMove.Bi),
+        )
+        val seen = mutableSetOf<String>()
+        val pending = ArrayDeque<CubeState>()
+        pending.add(CubeState.SOLVED)
+        while (pending.isNotEmpty()) {
+            val state = pending.removeFirst()
+            if (!seen.add(state.fingerprint())) continue
+            assertTrue(seen.size <= 24, "rotations must generate only 24 orientations")
+            assertTrue(state.isSolved(), state.fingerprint())
+            assertFalse(state.apply(CubeMove.R).isSolved())
+            for (rotation in rotations) pending.add(state.applyAll(rotation))
+        }
+        assertEquals(24, seen.size)
     }
 }

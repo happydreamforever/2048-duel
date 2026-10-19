@@ -2,93 +2,49 @@ package com.duel2048.shared.cube
 
 import kotlinx.serialization.Serializable
 
-/** WCA face-turn notation for a 3x3 cube (outer slices only). */
+/** Standard face and middle-slice notation for a 3x3 cube. */
 @Serializable
-enum class CubeMove {
-    U, Ui, U2,
-    R, Ri, R2,
-    F, Fi, F2,
-    D, Di, D2,
-    L, Li, L2,
-    B, Bi, B2,
+enum class CubeMove(val layer: CubeLayer, private val turns: Int) {
+    U(CubeLayer.U, 1), Ui(CubeLayer.U, 3), U2(CubeLayer.U, 2),
+    R(CubeLayer.R, 1), Ri(CubeLayer.R, 3), R2(CubeLayer.R, 2),
+    F(CubeLayer.F, 1), Fi(CubeLayer.F, 3), F2(CubeLayer.F, 2),
+    D(CubeLayer.D, 1), Di(CubeLayer.D, 3), D2(CubeLayer.D, 2),
+    L(CubeLayer.L, 1), Li(CubeLayer.L, 3), L2(CubeLayer.L, 2),
+    B(CubeLayer.B, 1), Bi(CubeLayer.B, 3), B2(CubeLayer.B, 2),
+    M(CubeLayer.M, 1), Mi(CubeLayer.M, 3), M2(CubeLayer.M, 2),
+    E(CubeLayer.E, 1), Ei(CubeLayer.E, 3), E2(CubeLayer.E, 2),
+    S(CubeLayer.S, 1), Si(CubeLayer.S, 3), S2(CubeLayer.S, 2),
     ;
 
-    fun notation(): String = when (this) {
-        U -> "U"
-        Ui -> "U'"
-        U2 -> "U2"
-        R -> "R"
-        Ri -> "R'"
-        R2 -> "R2"
-        F -> "F"
-        Fi -> "F'"
-        F2 -> "F2"
-        D -> "D"
-        Di -> "D'"
-        D2 -> "D2"
-        L -> "L"
-        Li -> "L'"
-        L2 -> "L2"
-        B -> "B"
-        Bi -> "B'"
-        B2 -> "B2"
+    fun notation(): String = layer.name + when (turns) {
+        1 -> ""
+        2 -> "2"
+        else -> "'"
     }
 
-    fun inverse(): CubeMove = when (this) {
-        U -> Ui
-        Ui -> U
-        U2 -> U2
-        R -> Ri
-        Ri -> R
-        R2 -> R2
-        F -> Fi
-        Fi -> F
-        F2 -> F2
-        D -> Di
-        Di -> D
-        D2 -> D2
-        L -> Li
-        Li -> L
-        L2 -> L2
-        B -> Bi
-        Bi -> B
-        B2 -> B2
-    }
+    fun inverse(): CubeMove = of(layer, 4 - turns)
 
-    fun quarterTurns(): Int = when (this) {
-        U, R, F, D, L, B -> 1
-        Ui, Ri, Fi, Di, Li, Bi -> 3
-        U2, R2, F2, D2, L2, B2 -> 2
-    }
+    fun quarterTurns(): Int = turns
 
-    fun face(): CubeFace = when (this) {
-        U, Ui, U2 -> CubeFace.U
-        R, Ri, R2 -> CubeFace.R
-        F, Fi, F2 -> CubeFace.F
-        D, Di, D2 -> CubeFace.D
-        L, Li, L2 -> CubeFace.L
-        B, Bi, B2 -> CubeFace.B
-    }
+    /** Outer face, or null for M/E/S middle slices. */
+    fun face(): CubeFace? = layer.face
 
-    /** 180° turn on the same face as this move. */
-    fun doubleTurn(): CubeMove = when (face()) {
-        CubeFace.U -> U2
-        CubeFace.R -> R2
-        CubeFace.F -> F2
-        CubeFace.D -> D2
-        CubeFace.L -> L2
-        CubeFace.B -> B2
-    }
+    /** 180° turn on the same layer as this move. */
+    fun doubleTurn(): CubeMove = of(layer, 2)
 
     companion object {
         private val byNotation = entries.associateBy { it.notation() }
+        private val byLayerAndTurns = entries.associateBy { it.layer to it.turns }
+
+        fun of(layer: CubeLayer, quarterTurns: Int): CubeMove =
+            byLayerAndTurns.getValue(layer to quarterTurns)
 
         fun parse(text: String): CubeMove? = byNotation[text.trim()]
 
         fun parseList(text: String): List<CubeMove> =
             text.split(Regex("\\s+")).mapNotNull { parse(it) }
 
-        /** Base quarter-turn moves used when generating scrambles. */
+        /** Outer quarter-turn moves used when generating standard scrambles. */
         val QUARTER_TURNS: List<CubeMove> = listOf(U, R, F, D, L, B)
     }
 }

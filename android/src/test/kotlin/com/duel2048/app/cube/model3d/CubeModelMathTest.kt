@@ -15,6 +15,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Test
 import kotlin.math.abs
+import kotlin.random.Random
 
 class CubeModelMathTest {
 
@@ -77,7 +78,7 @@ class CubeModelMathTest {
     fun `scramble then inverse returns every cubie exactly home`() {
         var now = 0L
         val animator = CubeAnimator(geometry()) { now }
-        val scramble = listOf("R", "U2", "F'", "L", "D", "B2", "R'", "U")
+        val scramble = listOf("R", "M", "U2", "E'", "F'", "S2", "L", "D", "B2", "R'", "U")
         animator.applyScramble(scramble)
         for (notation in scramble.reversed()) {
             val move = CubeMove.parse(notation)!!
@@ -164,6 +165,9 @@ class CubeModelMathTest {
             val scramble = CubeScramble.generate(seed)
             assertSequence(scramble + CubeScramble.inverse(scramble))
         }
+        val random = Random(2048)
+        val mixed = List(80) { CubeMove.entries[random.nextInt(CubeMove.entries.size)] }
+        assertSequence(mixed + CubeScramble.inverse(mixed))
     }
 
     @Test
@@ -232,6 +236,9 @@ class CubeModelMathTest {
         assertEquals(180f, g.turnFor(CubeMove.R2).degrees, 1e-5f)
         // Primes take the short path to the same place as three quarters.
         assertEquals(90f, g.turnFor(CubeMove.Ui).degrees, 1e-5f)
+        assertEquals(90f, g.turnFor(CubeMove.M).degrees, 1e-5f)
+        assertEquals(90f, g.turnFor(CubeMove.E).degrees, 1e-5f)
+        assertEquals(-90f, g.turnFor(CubeMove.S).degrees, 1e-5f)
     }
 
     @Test
@@ -242,7 +249,15 @@ class CubeModelMathTest {
         assertEquals(CubeMove.D, g.moveForTurn(1, -1, 90f))
         assertEquals(CubeMove.Ri, g.moveForTurn(0, 1, 90f))
         assertEquals(CubeMove.L, g.moveForTurn(0, -1, 90f))
-        assertNull(g.moveForTurn(1, 0, 90f)) // middle slice has no move
+        assertEquals(CubeMove.M, g.moveForTurn(0, 0, 90f))
+        assertEquals(CubeMove.E, g.moveForTurn(1, 0, 90f))
+        assertEquals(CubeMove.S, g.moveForTurn(2, 0, -90f))
+        for (move in CubeMove.entries) {
+            val spec = g.turnFor(move)
+            assertEquals(move, g.moveForTurn(spec.axis, spec.coord, spec.degrees))
+        }
+        assertNull(g.moveForTurn(3, 0, 90f))
+        assertNull(g.moveForTurn(0, 2, 90f))
     }
 
     @Test
@@ -265,7 +280,7 @@ class CubeModelMathTest {
         var now = 0L
         val g = geometry()
         val animator = CubeAnimator(g) { now }
-        animator.applyScramble(listOf("R", "U", "F'", "L2", "D", "B"))
+        animator.applyScramble(listOf("R", "M", "U", "E2", "F'", "S'", "L2", "D", "B"))
         val out = Array(27) { FloatArray(16) }
         while (animator.frame(out)) now += 37
 
@@ -306,12 +321,23 @@ class CubeModelMathTest {
     }
 
     @Test
-    fun `middle layer drags do not resolve`() {
+    fun `front middle row and column drags turn in both directions`() {
         val g = geometry()
-        // Front-center sticker, middle row: dragging right is an E-slice, no move.
         val hit = CubeGeometry.PickHit(cubieIndex(g, 0, 0, 1), floatArrayOf(0f, 0f, 1f), 2, 1)
         val project = { p: FloatArray -> floatArrayOf(p[0], -p[1]) }
-        assertNull(g.resolveDragMove(hit, 10f, 0f, project))
+        assertEquals(CubeMove.E, g.resolveDragMove(hit, 10f, 0f, project))
+        assertEquals(CubeMove.Ei, g.resolveDragMove(hit, -10f, 0f, project))
+        assertEquals(CubeMove.Mi, g.resolveDragMove(hit, 0f, -10f, project))
+        assertEquals(CubeMove.M, g.resolveDragMove(hit, 0f, 10f, project))
+    }
+
+    @Test
+    fun `side middle column drags turn the standing slice in both directions`() {
+        val g = geometry()
+        val hit = CubeGeometry.PickHit(cubieIndex(g, 1, 0, 0), floatArrayOf(1f, 0f, 0f), 0, 1)
+        val project = { p: FloatArray -> floatArrayOf(-p[2], -p[1]) }
+        assertEquals(CubeMove.Si, g.resolveDragMove(hit, 0f, -10f, project))
+        assertEquals(CubeMove.S, g.resolveDragMove(hit, 0f, 10f, project))
     }
 
     private fun cubieIndex(g: CubeGeometry, x: Int, y: Int, z: Int): Int =

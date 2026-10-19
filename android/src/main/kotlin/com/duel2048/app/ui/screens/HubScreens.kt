@@ -82,7 +82,7 @@ fun GameModesScreen(vm: MainViewModel, game: HubGame) {
     ) {
         Text(game.title, style = MaterialTheme.typography.headlineMedium, color = palette.textPrimary, fontWeight = FontWeight.Black)
         Text(stringResource(R.string.mode_cost, Economy.joinCost("pvp"), Economy.joinCost("bot")), color = palette.textSecondary)
-        if (game == HubGame.MATH || game == HubGame.WORD || game == HubGame.CUBE || game == HubGame.CUBE2) {
+        if (game == HubGame.MATH || game == HubGame.WORD || game == HubGame.CUBE) {
             Text(stringResource(R.string.difficulty), color = palette.accent, fontWeight = FontWeight.Bold)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 val options = if (game == HubGame.WORD) listOf("4", "6") else if (game == HubGame.MATH) listOf("easy", "medium", "hard", "very_hard") else listOf("easy", "medium", "hard")

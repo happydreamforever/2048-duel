@@ -1,6 +1,7 @@
 package com.duel2048.app.cube.model3d
 
 import com.duel2048.shared.cube.CubeFace
+import com.duel2048.shared.cube.CubeLayer
 import com.duel2048.shared.cube.CubeMove
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -53,44 +54,30 @@ class CubeGeometry {
     }
 
     /**
-     * Exact spec for animating [move]: the face's layer rotates about the world +axis by
+     * Exact spec for animating [move]: its layer rotates about the world +axis by
      * [degrees] (three-quarter turns animate the short way round, same end state).
      */
     fun turnFor(move: CubeMove): TurnSpec {
-        val (axis, sign) = checkNotNull(faceLayer[move.face()])
-        val quarterDegrees = -90f * sign
+        val layer = move.layer
+        val quarterDegrees = layer.quarterDegrees.toFloat()
         val degrees = when (move.quarterTurns()) {
             1 -> quarterDegrees
             2 -> 180f
             else -> -quarterDegrees
         }
-        return TurnSpec(axis = axis, coord = sign, degrees = degrees)
+        return TurnSpec(axis = layer.axis, coord = layer.coord, degrees = degrees)
     }
 
-    /** Cube move for rotating layer (axis, coord) by [degrees] about +axis; null for middle slices. */
+    /** Cube move for rotating any outer or middle layer by [degrees] about +axis. */
     fun moveForTurn(axis: Int, coord: Int, degrees: Float): CubeMove? {
-        if (coord == 0) return null
-        for ((face, layer) in faceLayer) {
-            if (layer.first == axis && layer.second == coord) {
-                val quarterDegrees = -90f * coord
-                val quarters = when (degrees) {
-                    quarterDegrees -> 1
-                    -quarterDegrees -> 3
-                    else -> 2
-                }
-                return moveOf(face, quarters)
-            }
+        val layer = CubeLayer.entries.firstOrNull { it.axis == axis && it.coord == coord } ?: return null
+        val quarters = when (degrees) {
+            layer.quarterDegrees.toFloat() -> 1
+            -layer.quarterDegrees.toFloat() -> 3
+            180f, -180f -> 2
+            else -> return null
         }
-        return null
-    }
-
-    private fun moveOf(face: CubeFace, quarters: Int): CubeMove = when (face) {
-        CubeFace.U -> if (quarters == 1) CubeMove.U else if (quarters == 2) CubeMove.U2 else CubeMove.Ui
-        CubeFace.R -> if (quarters == 1) CubeMove.R else if (quarters == 2) CubeMove.R2 else CubeMove.Ri
-        CubeFace.F -> if (quarters == 1) CubeMove.F else if (quarters == 2) CubeMove.F2 else CubeMove.Fi
-        CubeFace.D -> if (quarters == 1) CubeMove.D else if (quarters == 2) CubeMove.D2 else CubeMove.Di
-        CubeFace.L -> if (quarters == 1) CubeMove.L else if (quarters == 2) CubeMove.L2 else CubeMove.Li
-        CubeFace.B -> if (quarters == 1) CubeMove.B else if (quarters == 2) CubeMove.B2 else CubeMove.Bi
+        return CubeMove.of(layer, quarters)
     }
 
     // ---- touch picking -----------------------------------------------------------------------

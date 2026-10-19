@@ -68,7 +68,6 @@ enum class HubMode { PVP, BOT, TRAIN, WATCH }
 
 enum class HubGame(val title: String, val blurb: String) {
     CUBE("Cube", "3D cube, same scramble"),
-    CUBE2("Cube 2", "cube race"),
     MATH("Math", "Beat the clock"),
     WORD("Word puzzle", "Find the hidden word"),
     ;
@@ -76,7 +75,6 @@ enum class HubGame(val title: String, val blurb: String) {
     val colors: List<Color>
         get() = when (this) {
             CUBE -> listOf(Color(0xFF6B4EFF), Color(0xFF2D1B69))
-            CUBE2 -> listOf(Color(0xFF4A6FA5), Color(0xFF1B3A5C))
             MATH -> listOf(Color(0xFFB8860B), Color(0xFF7A4B00))
             WORD -> listOf(Color(0xFF1F9D6B), Color(0xFF0E6B8A))
         }
@@ -476,7 +474,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun openGameModes(game: HubGame) { _screen.value = Screen.GameModes(game) }
 
     fun startHub(game: HubGame, mode: HubMode, difficulty: String) {
-        if (game == HubGame.CUBE || game == HubGame.CUBE2) {
+        if (game == HubGame.CUBE) {
             when (mode) {
                 HubMode.PVP -> startCubeDuel(MatchMode.PVP)
                 HubMode.BOT -> startCubeTraining(profileFor(difficulty), "Bot")
