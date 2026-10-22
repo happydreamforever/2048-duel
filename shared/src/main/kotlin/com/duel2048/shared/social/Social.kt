@@ -73,7 +73,7 @@ data class NotifyBody(val text: String)
 data class MiniJoinBody(val token: String = "", val name: String = "", val game: String, val mode: String, val difficulty: String = "easy")
 
 @Serializable
-data class MiniAnswerBody(val roomId: String, val name: String, val answer: String)
+data class MiniAnswerBody(val roomId: String, val name: String, val answer: String, val token: String = "")
 
 @Serializable
 data class MiniRoomView(

@@ -15,6 +15,10 @@ import com.duel2048.shared.protocol.MatchStarted
 import com.duel2048.shared.protocol.PlayerInfo
 import com.duel2048.shared.protocol.ServerMessage
 import com.duel2048.shared.protocol.Tick
+import com.duel2048.shared.protocol.SavedGame
+import com.duel2048.shared.protocol.SavedGameType
+import com.duel2048.shared.protocol.SavedGameMode
+import com.duel2048.shared.protocol.MatchRestored
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
@@ -28,7 +32,7 @@ import java.util.concurrent.ThreadLocalRandom
 
 class CubeParticipant(
     val info: PlayerInfo,
-    private val session: PlayerSession?,
+    var session: PlayerSession?,
     val botSolution: List<CubeMove>?,
 ) {
     @Volatile lateinit var state: CubeState
@@ -36,6 +40,7 @@ class CubeParticipant(
     @Volatile var moveCount: Int = 0
     @Volatile var solved: Boolean = false
     @Volatile var finishedAtMs: Long = 0L
+    val played = ArrayList<String>()
 
     fun send(msg: ServerMessage) {
         session?.send(msg)
@@ -54,6 +59,7 @@ class CubeMatch(
     private val scramble: List<CubeMove>,
     private val config: ServerConfig,
     private val scope: CoroutineScope,
+    private val onCheckpoint: suspend (String, SavedGame) -> Unit = { _, _ -> },
     private val onFinished: (CubeMatch, CubeMatchOver) -> Unit,
 ) {
     private val log = LoggerFactory.getLogger("CubeMatch")
@@ -63,6 +69,9 @@ class CubeMatch(
     @Volatile private var started = false
     @Volatile private var finished = false
     private var startedAt = 0L
+    private var countdown = config.countdownSeconds
+    private var revision = 0L
+    private var result: CubeMatchOver? = null
 
     init {
         val scrambled = CubeScramble.apply(seed)
@@ -70,12 +79,14 @@ class CubeMatch(
         p2.state = scrambled
     }
 
-    fun start() {
+    suspend fun start() {
+        checkpoint()
         val notation = scramble.map { it.notation() }
         p1.send(CubeMatchFound(id, p1.info, p2.info, seed, notation, config.cubeTimeLimitMs, config.countdownSeconds))
         p2.send(CubeMatchFound(id, p2.info, p1.info, seed, notation, config.cubeTimeLimitMs, config.countdownSeconds))
         jobs += scope.launch {
             for (s in config.countdownSeconds downTo 1) {
+                countdown = s
                 broadcast(Countdown(id, s))
                 delay(1000)
             }
@@ -83,6 +94,7 @@ class CubeMatch(
                 if (finished) return@launch
                 started = true
                 startedAt = System.currentTimeMillis()
+                checkpoint()
             }
             broadcast(MatchStarted(id, config.cubeTimeLimitMs))
             if (p1.botSolution != null) jobs += scope.launch { runBot(p1) }
@@ -133,6 +145,8 @@ class CubeMatch(
             p.expectedSeq++
             p.state = p.state.apply(move)
             p.moveCount++
+            p.played.add(move.notation())
+            checkpoint()
             p.send(CubeMoveAck(id, seq, p.state.fingerprint(), p.moveCount))
             val o = other(p)
             o.send(CubeOpponentProgress(id, p.moveCount, p.state.isSolved(), move.notation()))
@@ -159,7 +173,7 @@ class CubeMatch(
         }
     }
 
-    private fun markSolved(p: CubeParticipant, elapsedMs: Long = System.currentTimeMillis() - startedAt) {
+    private suspend fun markSolved(p: CubeParticipant, elapsedMs: Long = System.currentTimeMillis() - startedAt) {
         p.solved = true
         p.finishedAtMs = elapsedMs
         val o = other(p)
@@ -186,7 +200,7 @@ class CubeMatch(
         return done.minWithOrNull(compareBy<CubeParticipant> { it.finishedAtMs }.thenBy { it.moveCount })
     }
 
-    private fun finishLocked(reason: EndReason, winner: CubeParticipant?) {
+    private suspend fun finishLocked(reason: EndReason, winner: CubeParticipant?) {
         if (finished) return
         finished = true
         val results = listOf(p1, p2).map { p ->
@@ -202,6 +216,8 @@ class CubeMatch(
                 "moves=${p1.moveCount}/${p2.moveCount} solved=${p1.solved}/${p2.solved}",
         )
         val over = CubeMatchOver(id, winner?.info?.id, reason, results)
+        result = over
+        checkpoint()
         broadcast(over)
         jobs.forEach { it.cancel() }
         onFinished(this, over)
@@ -219,6 +235,25 @@ class CubeMatch(
     }
 
     private fun other(p: CubeParticipant): CubeParticipant = if (p === p1) p2 else p1
+
+    private fun snapshot(p: CubeParticipant): SavedGame = SavedGame(
+        id = id, game = SavedGameType.CUBE, mode = SavedGameMode.ONLINE, revision = revision,
+        completed = finished, seed = seed, played = p.played.toList(), opponentPlayed = other(p).played.toList(),
+        remainingMs = if (started) remainingMs().coerceAtLeast(0) else config.cubeTimeLimitMs,
+        durationMs = config.cubeTimeLimitMs, expectedSeq = p.expectedSeq, started = started,
+        countdown = countdown, you = p.info, opponent = other(p).info, cubeResult = result,
+    )
+
+    private suspend fun checkpoint() {
+        revision++
+        for (p in listOf(p1, p2)) if (!p.info.isBot) onCheckpoint(p.info.id, snapshot(p))
+    }
+
+    suspend fun restoreTo(playerId: String, session: PlayerSession) = mutex.withLock {
+        val p = participant(playerId) ?: return@withLock
+        p.session = session
+        session.send(MatchRestored(snapshot(p)))
+    }
 
     fun liveRow() = com.duel2048.shared.social.LiveGame(
         id, "cube", p1.info.name, p1.moveCount, p2.info.name, p2.moveCount,

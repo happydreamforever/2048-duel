@@ -11,8 +11,12 @@ import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.AlertDialog
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -30,8 +34,15 @@ import com.duel2048.app.ui.theme.LocalPalette
 @Composable
 fun CubeDuelScreen(vm: MainViewModel) {
     val cube by vm.cubeUiState.collectAsStateWithLifecycle()
-    BackHandler { vm.leaveCubeDuel() }
-    CubeDuelModel3dRoute(vm, cube)
+    var confirmLeave by remember { mutableStateOf(false) }
+    val leave: () -> Unit = { if (cube.training || cube.phase == DuelPhase.OVER) vm.leaveCubeDuel() else confirmLeave = true }
+    BackHandler(onBack = leave)
+    CubeDuelModel3dRoute(vm, cube, leave)
+    if (confirmLeave) AlertDialog(onDismissRequest = { confirmLeave = false },
+        title = { Text(stringResource(R.string.product_leave_match)) },
+        text = { Text(stringResource(R.string.product_leave_match_hint)) },
+        confirmButton = { TextButton(onClick = { confirmLeave = false; vm.leaveCubeDuel() }) { Text(stringResource(R.string.leave)) } },
+        dismissButton = { TextButton(onClick = { confirmLeave = false }) { Text(stringResource(R.string.stay)) } })
 }
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -53,7 +64,9 @@ internal fun CubeDuelOverlay(
             fontWeight = FontWeight.Black,
             modifier = Modifier.align(Alignment.CenterHorizontally),
         )
-        if (cube.countdown != null) {
+        if (cube.reconnecting) {
+            Text(stringResource(R.string.product_reconnecting), color = palette.gold)
+        } else if (cube.countdown != null) {
             Text("${cube.countdown}", fontSize = 36.sp, fontWeight = FontWeight.Black, color = palette.gold, modifier = Modifier.align(Alignment.CenterHorizontally))
         } else if (cube.phase == DuelPhase.PLAYING) {
             val rem = cube.remainingNow(System.currentTimeMillis()) / 1000
@@ -83,7 +96,7 @@ internal fun CubeDuelOverlay(
             }
         }
         TextButton(onClick = onLeave, modifier = Modifier.align(Alignment.End)) {
-            Text(stringResource(R.string.leave), color = palette.danger)
+            Text(stringResource(if (cube.training) R.string.product_save_exit else R.string.leave), color = palette.danger)
         }
     }
 }

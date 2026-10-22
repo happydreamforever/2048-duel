@@ -5,6 +5,12 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.duel2048.app.data.SettingsStore
 import com.duel2048.app.data.UserSettings
+import com.duel2048.app.data.GameSaves
+import com.duel2048.shared.protocol.SavedGame
+import com.duel2048.shared.protocol.SavedGameType
+import com.duel2048.shared.protocol.SavedGameMode
+import java.util.UUID
+import kotlinx.coroutines.flow.combine
 import com.duel2048.app.game.DuelError
 import com.duel2048.app.game.DuelPhase
 import com.duel2048.app.cube.CubeDuelUiState
@@ -49,6 +55,9 @@ import kotlinx.coroutines.launch
 
 sealed interface Screen {
     data object Home : Screen
+    data object SavedGames : Screen
+    data object Community : Screen
+    data object Profile : Screen
     data object Login : Screen
     data object Matchmaking : Screen
     data object Duel : Screen
@@ -58,7 +67,6 @@ sealed interface Screen {
     data object CubeDuel : Screen
     data object CubeResult : Screen
     data object Leaderboard : Screen
-    data object MoreGames : Screen
     data class GameModes(val game: HubGame) : Screen
     data object MiniPlay : Screen
     data object Watch : Screen
@@ -67,6 +75,7 @@ sealed interface Screen {
 enum class HubMode { PVP, BOT, TRAIN, WATCH }
 
 enum class HubGame(val title: String, val blurb: String) {
+    TILES("2048", "Merge, build, and outplay"),
     CUBE("Cube", "3D cube, same scramble"),
     MATH("Math", "Beat the clock"),
     WORD("Word puzzle", "Find the hidden word"),
@@ -74,6 +83,7 @@ enum class HubGame(val title: String, val blurb: String) {
 
     val colors: List<Color>
         get() = when (this) {
+            TILES -> listOf(Color(0xFF007F9E), Color(0xFF06455B))
             CUBE -> listOf(Color(0xFF6B4EFF), Color(0xFF2D1B69))
             MATH -> listOf(Color(0xFFB8860B), Color(0xFF7A4B00))
             WORD -> listOf(Color(0xFF1F9D6B), Color(0xFF0E6B8A))
@@ -92,6 +102,9 @@ data class MiniUi(
     val won: Boolean = false,
     val guided: Boolean = false,
     val mode: String = "bot",
+    val saveId: String = UUID.randomUUID().toString(),
+    val game: SavedGameType = SavedGameType.MATH,
+    val difficulty: String = "easy",
 )
 
 data class LoginUiState(val busy: Boolean = false, val error: DuelError? = null)
@@ -103,6 +116,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     private val settingsStore = SettingsStore(app)
     val settings: StateFlow<UserSettings> = settingsStore.settings
+    val gameSaves = GameSaves(app, viewModelScope)
 
     val client = DuelClient()
     private val cubeClient = DuelClient()
@@ -114,10 +128,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val localCubeHolder = MutableStateFlow<LocalCubeSession?>(null)
     private val cubeIsLocal = MutableStateFlow(false)
     /** Online cube match or offline cube training, depending on [cubeIsLocal]. */
-    val cubeUiState = cubeIsLocal.flatMapLatest { local ->
-        if (local) localCubeHolder.value?.state ?: flowOf(CubeDuelUiState(training = true))
+    val cubeUiState = combine(cubeIsLocal, localCubeHolder) { local, holder ->
+        if (local) holder?.state ?: flowOf(CubeDuelUiState(training = true))
         else cubeMatch.state
-    }.stateIn(viewModelScope, SharingStarted.Eagerly, CubeDuelUiState())
+    }.flatMapLatest { it }.stateIn(viewModelScope, SharingStarted.Eagerly, CubeDuelUiState())
     val solo = SoloController(initialBest = settings.value.bestSolo) { best ->
         settingsStore.update { it.copy(bestSolo = best) }
     }
@@ -159,8 +173,37 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val _mini = MutableStateFlow<MiniUi?>(null)
     val mini: StateFlow<MiniUi?> = _mini.asStateFlow()
     private var watchGame: HubGame? = null
+    private var saveIdentity: String? = null
 
     init {
+        viewModelScope.launch {
+            settings.map { Triple(it.serverUrl, it.authToken, it.accountName) }.distinctUntilChanged().collect { (url, token, name) ->
+                val identity = "$url|$name"
+                if (saveIdentity != null && saveIdentity != identity) {
+                    solo.snapshot()?.let(gameSaves::save)
+                    (_session.value as? LocalDuelSession)?.let { gameSaves.save(it.snapshot()); it.leave() }
+                    localCubeHolder.value?.let { it.snapshot()?.let(gameSaves::save); it.leave() }
+                    _mini.value?.let { gameSaves.save(miniSnapshot(it)) }
+                    miniJob?.cancel()
+                    _mini.value = null
+                    localCubeHolder.value = null
+                    cubeIsLocal.value = false
+                    _session.value = match
+                    solo.clear()
+                }
+                saveIdentity = identity
+                gameSaves.configure(url, token, name)
+                viewModelScope.launch { gameSaves.synchronize() }
+            }
+        }
+        viewModelScope.launch { solo.state.collect { solo.snapshot()?.let(gameSaves::save) } }
+        viewModelScope.launch { _session.flatMapLatest { it.state }.collect { state ->
+            if (state.phase != DuelPhase.IDLE) (_session.value as? LocalDuelSession)?.let { gameSaves.save(it.snapshot()) }
+        } }
+        viewModelScope.launch { cubeUiState.collect { state ->
+            if (cubeIsLocal.value && state.phase != DuelPhase.IDLE) localCubeHolder.value?.snapshot()?.let(gameSaves::save)
+        } }
+        viewModelScope.launch { mini.collect { state -> state?.let { gameSaves.save(miniSnapshot(it)) } } }
         viewModelScope.launch {
             _session.flatMapLatest { it.state }.map { it.phase }.distinctUntilChanged().collect { phase ->
                 when (phase) {
@@ -230,7 +273,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     // ------------------------------------------------------------------ online
 
     fun startDuel(mode: MatchMode) {
-        ensureAccount { token -> match.start(settings.value.serverUrl, token, mode) }
+        ensureAccount { token -> _session.value = match; match.start(settings.value.serverUrl, token, mode) }
     }
 
     fun startCubeDuel(mode: MatchMode) {
@@ -321,6 +364,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     fun leaveCubeDuel() {
         if (cubeIsLocal.value) {
+            localCubeHolder.value?.snapshot()?.let(gameSaves::save)
             localCubeHolder.value?.leave()
             cubeIsLocal.value = false
             localCubeHolder.value = null
@@ -451,6 +495,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun leaveMatch() {
+        (_session.value as? LocalDuelSession)?.let { gameSaves.save(it.snapshot()) }
         _session.value.leave()
         _screen.value = Screen.Home
     }
@@ -469,12 +514,74 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun openMoreGames() { _screen.value = Screen.MoreGames }
+    fun openSavedGames() { _screen.value = Screen.SavedGames; syncGames() }
+    fun openCommunity() { _screen.value = Screen.Community }
+    fun openProfile() { _screen.value = Screen.Profile }
+    fun syncGames() { viewModelScope.launch { gameSaves.synchronize() } }
+
+    fun resumeSavedGame(saved: SavedGame) {
+        if (saved.id in gameSaves.sync.value.conflicts) { openSavedGames(); return }
+        if (runCatching { saved.validate() }.isFailure) { _banner.value = "invalid_save"; return }
+        if (saved.deleted || saved.completed || !saved.resumable) return
+        if (saved.mode == SavedGameMode.ONLINE) {
+            charged.add("join-2048-${saved.id}")
+            charged.add("join-cube-${saved.id}-1")
+            ensureAccount { token ->
+                val mode = if (saved.opponent?.isBot == true) MatchMode.BOT else MatchMode.PVP
+                if (saved.game == SavedGameType.CUBE) {
+                    cubeIsLocal.value = false
+                    cubeMatch.start(settings.value.serverUrl, token, mode, saved.id)
+                } else {
+                    _session.value = match
+                    match.start(settings.value.serverUrl, token, mode, saved.id)
+                }
+            }
+            return
+        }
+        when (saved.game) {
+            SavedGameType.TILES -> if (saved.mode == SavedGameMode.SOLO) {
+                solo.restore(saved)
+                _screen.value = Screen.Solo
+            } else {
+                charged.add("join-2048-${saved.id}")
+                val local = LocalDuelSession(viewModelScope, profileFor(saved.difficulty), settings.value.accountName,
+                    saved.opponentName, durationMs = saved.durationMs)
+                _session.value = local
+                local.start(saved)
+            }
+            SavedGameType.CUBE -> {
+                charged.add("join-cube-${saved.id}-1")
+                val local = LocalCubeSession(viewModelScope, profileFor(saved.difficulty), settings.value.accountName,
+                    saved.opponentName, guided = saved.guided, durationMs = saved.durationMs)
+                localCubeHolder.value = local
+                cubeIsLocal.value = true
+                local.start(saved)
+            }
+            else -> {
+                miniJob?.cancel()
+                miniSolution = saved.solution
+                miniRoom = saved.roomId
+                _mini.value = MiniUi(if (saved.game == SavedGameType.WORD) "Word puzzle" else "Math", saved.opponentName,
+                    saved.prompt, saved.grid, (saved.remainingMs / 1000).toInt(), if (saved.roomId.isEmpty()) "playing" else "waiting", guided = saved.guided,
+                    mode = if (saved.roomId.isNotEmpty()) "pvp" else if (saved.guided) "train" else "bot",
+                    saveId = saved.id, game = saved.game, difficulty = saved.difficulty)
+                _screen.value = Screen.MiniPlay
+                startMiniTimer()
+            }
+        }
+    }
 
     fun openGameModes(game: HubGame) { _screen.value = Screen.GameModes(game) }
 
     fun startHub(game: HubGame, mode: HubMode, difficulty: String) {
-        if (game == HubGame.CUBE) {
+        if (game == HubGame.TILES) {
+            when (mode) {
+                HubMode.PVP -> startDuel(MatchMode.PVP)
+                HubMode.BOT -> startDuel(MatchMode.BOT)
+                HubMode.TRAIN -> startTraining(profileFor(difficulty), "Trainer")
+                HubMode.WATCH -> openWatch(game)
+            }
+        } else if (game == HubGame.CUBE) {
             when (mode) {
                 HubMode.PVP -> startCubeDuel(MatchMode.PVP)
                 HubMode.BOT -> startCubeTraining(profileFor(difficulty), "Bot")
@@ -502,7 +609,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             social.live(settings.value.serverUrl).onSuccess { games ->
                 val filtered = watchGame?.let { g ->
-                    val key = if (g == HubGame.WORD) "word" else if (g == HubGame.MATH) "math" else "cube"
+                    val key = if (g == HubGame.WORD) "word" else if (g == HubGame.MATH) "math" else if (g == HubGame.TILES) "2048" else "cube"
                     games.filter { it.game == key || (key == "cube" && it.game == "cube") }
                 } ?: games
                 _liveGames.value = filtered
@@ -553,14 +660,15 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             if (miniRoom.isNotBlank()) {
                 val name = settings.value.accountName.ifBlank { "Player" }
-                val room = social.answerMini(settings.value.serverUrl, miniRoom, name, answer.trim()).getOrNull() ?: return@launch
+                val room = social.answerMini(settings.value.serverUrl, miniRoom, name, answer.trim(), settings.value.authToken).getOrNull() ?: return@launch
+                if (_mini.value?.saveId != s.saveId) return@launch
                 val won = room.winner == name
                 _mini.value = s.copy(status = room.status, won = won, solution = room.solution)
                 if (room.status == "over") rewardOnce("mini-$miniRoom", s.mode, won)
             } else {
                 val won = answer.trim().equals(miniSolution, ignoreCase = true)
                 _mini.value = s.copy(status = "over", won = won, solution = miniSolution, secondsLeft = 0)
-                rewardOnce("mini-${s.prompt}-${s.grid.joinToString()}", s.mode, won)
+                rewardOnce("mini-${s.saveId}", s.mode, won)
             }
         }
     }
@@ -573,14 +681,15 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun closeMini() {
+        _mini.value?.let { gameSaves.save(miniSnapshot(it)) }
         miniJob?.cancel()
         _mini.value = null
-        _screen.value = Screen.MoreGames
+        _screen.value = Screen.Home
     }
 
     fun clearBanner() { _banner.value = null }
 
-    private fun openWatch(game: HubGame) {
+    fun openWatch(game: HubGame? = null) {
         watchGame = game
         _watchFocus.value = null
         _screen.value = Screen.Watch
@@ -588,6 +697,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private fun startMini(game: HubGame, mode: HubMode, difficulty: String) {
+        if (mode == HubMode.PVP && settings.value.authToken.isBlank()) {
+            ensureAccount { startMini(game, mode, difficulty) }
+            return
+        }
         miniJob?.cancel()
         val guided = mode == HubMode.TRAIN
         val modeId = when (mode) {
@@ -601,16 +714,21 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             var grid = emptyList<String>()
             var seconds = 30
             var opponent = if (mode == HubMode.PVP) "waiting" else "Bot"
+            var initialStatus = "playing"
             miniRoom = ""
             miniSolution = ""
             if (mode == HubMode.PVP) {
-                val joined = social.joinMini(settings.value.serverUrl, name, if (game == HubGame.WORD) "word" else "math", "pvp", difficulty).getOrNull()
+                val joined = social.joinMini(settings.value.serverUrl, name, if (game == HubGame.WORD) "word" else "math", "pvp", difficulty, settings.value.authToken).getOrNull()
                 if (joined != null && joined.roomId.isNotBlank()) {
                     miniRoom = joined.roomId
                     prompt = joined.prompt
                     grid = joined.grid
                     seconds = joined.seconds
                     opponent = joined.opponent
+                    initialStatus = joined.status
+                } else {
+                    _banner.value = "guest_failed"
+                    return@launch
                 }
             }
             if (miniRoom.isBlank()) {
@@ -632,22 +750,50 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                     } + if (guided) 20 else 0
                 }
             }
-            _mini.value = MiniUi(game.title, opponent, prompt, grid, seconds, "playing", guided = guided, mode = modeId)
+            _mini.value = MiniUi(game.title, opponent, prompt, grid, seconds, initialStatus, guided = guided, mode = modeId,
+                game = if (game == HubGame.WORD) SavedGameType.WORD else SavedGameType.MATH, difficulty = difficulty)
             _screen.value = Screen.MiniPlay
-            miniJob = viewModelScope.launch {
-                var left = seconds
-                while (left > 0 && _mini.value?.status == "playing") {
+            startMiniTimer()
+        }
+    }
+
+    private fun miniSnapshot(s: MiniUi) = SavedGame(s.saveId, s.game,
+        if (s.guided) SavedGameMode.TRAINING else SavedGameMode.BOT,
+        completed = s.status == "over", remainingMs = s.secondsLeft.coerceAtLeast(0) * 1000L,
+        durationMs = 300_000, prompt = s.prompt, grid = s.grid, solution = miniSolution, roomId = miniRoom,
+        opponentName = s.opponent, guided = s.guided, difficulty = s.difficulty)
+
+    private fun startMiniTimer() {
+        miniJob = viewModelScope.launch {
+                while (_mini.value?.status in listOf("waiting", "playing")) {
                     delay(1000)
-                    left--
-                    _mini.value = _mini.value?.copy(secondsLeft = left)
+                    val current = _mini.value ?: return@launch
+                    if (miniRoom.isNotBlank()) {
+                        val name = settings.value.accountName
+                        social.mini(settings.value.serverUrl, miniRoom, name).onSuccess { room ->
+                            val latest = _mini.value ?: return@onSuccess
+                            if (latest.saveId != current.saveId || latest.status == "over" && room.status != "over") return@onSuccess
+                            _mini.value = latest.copy(secondsLeft = room.seconds, status = room.status,
+                                opponent = room.opponent, solution = room.solution, won = room.winner == name)
+                            if (room.status == "over") rewardOnce("mini-$miniRoom", current.mode, room.winner == name)
+                        }
+                    } else {
+                        _mini.value = current.copy(secondsLeft = (current.secondsLeft - 1).coerceAtLeast(0))
+                        if (current.secondsLeft <= 1) break
+                    }
                 }
                 val cur = _mini.value ?: return@launch
                 if (cur.status == "playing") {
                     _mini.value = cur.copy(status = "over", won = false, solution = miniSolution, secondsLeft = 0)
-                    rewardOnce("mini-time-${cur.prompt}", cur.mode, false)
+                    rewardOnce("mini-${cur.saveId}", cur.mode, false)
                 }
             }
-        }
+    }
+
+    fun playMiniAgain() {
+        val current = _mini.value ?: return
+        startMini(if (current.game == SavedGameType.WORD) HubGame.WORD else HubGame.MATH,
+            if (current.mode == "pvp") HubMode.PVP else if (current.guided) HubMode.TRAIN else HubMode.BOT, current.difficulty)
     }
 
     private fun profileFor(id: String) = when (id) {
@@ -703,11 +849,15 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         _screen.value = Screen.Home
     }
 
-    fun clearError() = (_session.value as? MatchController)?.clearError()
+    fun clearError() {
+        (_session.value as? MatchController)?.clearError()
+        cubeMatch.clearError()
+    }
 
     fun updateSettings(transform: (UserSettings) -> UserSettings) = settingsStore.update(transform)
 
     override fun onCleared() {
+        solo.snapshot()?.let(gameSaves::save)
         client.disconnect()
         cubeClient.disconnect()
     }

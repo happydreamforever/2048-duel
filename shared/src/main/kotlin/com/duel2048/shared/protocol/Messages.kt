@@ -134,10 +134,22 @@ data class CubeMoveMsg(val matchId: String, val seq: Int, val move: String) : Cl
 @SerialName("cube_solved")
 data class CubeSolvedMsg(val matchId: String, val moves: Int, val elapsedMs: Long, val fingerprint: String) : ClientMessage
 
+@Serializable
+@SerialName("resume_match")
+data class ResumeMatch(val matchId: String) : ClientMessage
+
+@Serializable
+@SerialName("request_match_state")
+data class RequestMatchState(val matchId: String) : ClientMessage
+
 // ---------------------------------------------------------------- server -> client
 
 @Serializable
 sealed interface ServerMessage
+
+@Serializable
+@SerialName("match_restored")
+data class MatchRestored(val game: SavedGame) : ServerMessage
 
 @Serializable
 @SerialName("welcome")

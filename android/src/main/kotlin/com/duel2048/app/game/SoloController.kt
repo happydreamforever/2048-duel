@@ -4,6 +4,10 @@ import com.duel2048.shared.engine.Direction
 import com.duel2048.shared.engine.GameEngine
 import com.duel2048.shared.engine.GameState
 import com.duel2048.shared.engine.MoveEvents
+import com.duel2048.shared.protocol.SavedGame
+import com.duel2048.shared.protocol.SavedGameType
+import com.duel2048.shared.protocol.SavedGameMode
+import java.util.UUID
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -34,12 +38,33 @@ class SoloController(initialBest: Int, private val onNewBest: (Int) -> Unit) {
 
     private var game: GameState? = null
     private var version = 0L
+    private var saveId = UUID.randomUUID().toString()
+
+    fun clear() {
+        game = null
+        _state.value = SoloUiState(best = _state.value.best)
+    }
+
+    fun snapshot(): SavedGame? = game?.let { SavedGame(saveId, SavedGameType.TILES, SavedGameMode.SOLO,
+        board = it, completed = it.gameOver, durationMs = 0, remainingMs = 0) }
+
+    fun restore(saved: SavedGame) {
+        val restored = saved.board ?: return
+        saveId = saved.id
+        game = restored
+        version++
+        val best = maxOf(_state.value.best, restored.score)
+        if (best > _state.value.best) onNewBest(best)
+        _state.value = SoloUiState(BoardUiBuilder.fromState(restored, version), restored.score, best,
+            restored.board.maxValue(), restored.moves, restored.gameOver, restored.energy)
+    }
 
     fun ensureGame() {
         if (game == null) newGame()
     }
 
     fun newGame() {
+        saveId = UUID.randomUUID().toString()
         val g = GameEngine.newGame(Random.nextLong())
         game = g
         version++

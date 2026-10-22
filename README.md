@@ -1,6 +1,6 @@
 # 2048 Duel
 
-Real-time 1v1 **2048 PvP** for Android with an authoritative Kotlin server.
+An Android game hub for **2048, Cube, Math, and Word puzzles**, with an authoritative Kotlin server.
 
 Both players get the same seeded board. Merges charge an **attack meter**; every
 12 energy launches a **garbage tile** onto the opponent's board. Garbage slides but never
@@ -22,7 +22,50 @@ so the game is always playable.
 |---|---|
 | `shared/` | Deterministic game engine (SplitMix64 RNG, attack energy, garbage tiles), heuristic bot, and the WebSocket message types. Used by both sides, so the client predicts moves instantly and the server verifies them. |
 | `server/` | Ktor server: accounts and match history in MySQL (HikariCP + JDBC), FIFO matchmaking with bot fallback, authoritative match loop, countdown/timer, `/stats` and `/leaderboard` endpoints. |
-| `android/` | Jetpack Compose client: login, home, leaderboard, matchmaking, duel, result, offline **training** (full duel rules vs an on-device bot) and solo screens. |
+| `android/` | Jetpack Compose client with Play, Saved games, Community, and Profile pages, online matches, offline training, and solo play. |
+
+## Navigation and saved games
+
+- **Play** contains the four games, mode selection, and a Continue card for recent progress.
+- **Saved games** contains ongoing and finished games, sync status, deletion, and explicit choices when two devices change the same save.
+- **Community** contains live games, chat, player search, updates, and rankings.
+- **Profile** contains account access, progress, the shop, settings, and feedback. Signed-out games can be copied into the signed-in account with **Back up signed-out games to this account**.
+
+Solo, training, and local bot games save on the device automatically. Signed-in clients
+sync pending changes every five seconds and refresh when opening Play or Saved games.
+Offline changes remain queued. Each save belongs to one server/account; switching accounts
+does not expose the previous account's games. A revision conflict asks the player which
+version to keep instead of silently discarding progress.
+
+The server stores atomic, versioned account checkpoints in `DATA_DIR/game-saves/`,
+alongside `social.json` for math/word rooms. These files are required even when accounts
+use MySQL; preserve the complete data directory when upgrading or backing up the server.
+Cube checkpoints include the scramble seed and both move histories; 2048 checkpoints
+include both complete boards, RNG state, attack energy, and counters. Local timers pause
+when using **Save and exit**. Online match timers continue during disconnection.
+
+An interrupted online cube/2048 match can reconnect for up to **90 seconds** while the
+same server process is running. The client restores the authoritative position and move
+sequence, including moves whose acknowledgment was lost. Taking over a match on another
+device closes the previous connection. Accepted moves are written before acknowledgment.
+After a server restart, checkpoint files and finished results remain, but unfinished
+cube/2048 matches are displayed as unavailable: live matches are not reconstructed yet.
+Math/word rooms do retain their puzzle and absolute timer across server restarts.
+
+This update uses **protocol version 6**. Rebuild and update the server and Android client
+together. See [the protocol reference](docs/PROTOCOL.md) for save APIs and reconnect messages.
+
+Windows validation (from the project folder, with JDK/Android SDK configured):
+
+```powershell
+.\gradlew.bat :shared:test :server:test :android:testDebugUnitTest :android:assembleDebug
+.\gradlew.bat -Pduel2048.serverOnly :server:installDist
+```
+
+The debug APK is `android/build/outputs/apk/debug/android-debug.apk`.
+To check synchronization, save a cube after several face and middle-layer turns, reopen it
+from Saved games, then sign in on a second device and sync. Also test 2048, offline edits,
+conflict choices, and a brief network interruption during an online match.
 
 ## Visual effects in the client
 

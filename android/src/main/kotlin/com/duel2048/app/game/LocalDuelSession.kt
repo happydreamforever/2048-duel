@@ -10,6 +10,10 @@ import com.duel2048.shared.protocol.MatchMode
 import com.duel2048.shared.protocol.MatchOver
 import com.duel2048.shared.protocol.PlayerInfo
 import com.duel2048.shared.protocol.PlayerResult
+import com.duel2048.shared.protocol.SavedGame
+import com.duel2048.shared.protocol.SavedGameType
+import com.duel2048.shared.protocol.SavedGameMode
+import java.util.UUID
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
@@ -56,31 +60,38 @@ class LocalDuelSession(
     private var job: Job? = null
     private var finished = false
 
-    fun start() {
+    fun snapshot(): SavedGame = SavedGame(
+        id = _state.value.matchId ?: "training", game = SavedGameType.TILES, mode = SavedGameMode.TRAINING,
+        completed = finished, board = me, opponentBoard = bot, durationMs = durationMs,
+        remainingMs = _state.value.remainingNow(System.currentTimeMillis()), difficulty = profile.id, opponentName = botName,
+        you = meInfo, opponent = botInfo, duelResult = _state.value.result,
+    )
+
+    fun start(saved: SavedGame? = null) {
         val seed = Random.nextLong()
-        me = GameEngine.newGame(seed)
-        bot = GameEngine.newGame(seed)
+        me = saved?.board ?: GameEngine.newGame(seed)
+        bot = saved?.opponentBoard ?: GameEngine.newGame(seed)
         finished = false
         version++
         _state.value = DuelUiState(
             phase = DuelPhase.FOUND,
             mode = MatchMode.BOT,
             training = true,
-            matchId = "training",
+            matchId = saved?.id ?: UUID.randomUUID().toString(),
             me = PlayerSide(info = meInfo).with(me, BoardUiBuilder.fromState(me, version, TileKind.SPAWN)),
             opponent = PlayerSide(info = botInfo).with(bot, BoardUiBuilder.fromState(bot, version, TileKind.SPAWN)),
             countdown = Rules.COUNTDOWN_SECONDS,
             durationMs = durationMs,
-            remainingMs = durationMs,
+            remainingMs = saved?.remainingMs ?: durationMs,
         )
         job = scope.launch {
-            for (s in Rules.COUNTDOWN_SECONDS downTo 1) {
+            for (s in (if (saved == null) Rules.COUNTDOWN_SECONDS else 0) downTo 1) {
                 _state.update { it.copy(countdown = s) }
                 _effects.tryEmit(GameEffect.CountdownTick(s))
                 delay(1000)
             }
-            startedAt = System.currentTimeMillis()
-            _state.update { it.copy(phase = DuelPhase.PLAYING, countdown = null, remainingMs = durationMs, remainingAnchor = startedAt) }
+            startedAt = System.currentTimeMillis() - (durationMs - (saved?.remainingMs ?: durationMs))
+            _state.update { it.copy(phase = DuelPhase.PLAYING, countdown = null, remainingMs = saved?.remainingMs ?: durationMs, remainingAnchor = System.currentTimeMillis()) }
             _effects.tryEmit(GameEffect.Go)
             launch { botLoop() }
             while (isActive && !finished) {
@@ -165,7 +176,7 @@ class LocalDuelSession(
         if (finished) return
         finished = true
         job?.cancel()
-        val over = MatchOver("training", winnerId, reason, listOf(result(meInfo, me), result(botInfo, bot)))
+        val over = MatchOver(_state.value.matchId ?: "training", winnerId, reason, listOf(result(meInfo, me), result(botInfo, bot)))
         _state.update { it.copy(phase = DuelPhase.OVER, result = over, countdown = null) }
         _effects.tryEmit(GameEffect.MatchEnd(won = winnerId == meInfo.id, draw = winnerId == null))
     }

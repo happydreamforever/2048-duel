@@ -11,6 +11,10 @@ import com.duel2048.shared.protocol.CubePlayerResult
 import com.duel2048.shared.protocol.EndReason
 import com.duel2048.shared.protocol.MatchMode
 import com.duel2048.shared.protocol.PlayerInfo
+import com.duel2048.shared.protocol.SavedGame
+import com.duel2048.shared.protocol.SavedGameType
+import com.duel2048.shared.protocol.SavedGameMode
+import java.util.UUID
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
@@ -47,47 +51,57 @@ class LocalCubeSession(
     private var job: Job? = null
     private var finished = false
 
-    fun start() {
+    fun snapshot(): SavedGame? = local?.let { SavedGame(
+        id = _state.value.matchId ?: return null, game = SavedGameType.CUBE,
+        mode = if (guided) SavedGameMode.TRAINING else SavedGameMode.BOT, completed = finished,
+        durationMs = durationMs, remainingMs = _state.value.remainingNow(now()), seed = _state.value.scrambleSeed,
+        played = _state.value.played, opponentPlayed = botSolution.take(botMoves).map { it.notation() },
+        difficulty = profile.id, guided = guided, opponentName = botName,
+        you = meInfo, opponent = botInfo, cubeResult = _state.value.result,
+    ) }
+
+    fun start(saved: SavedGame? = null) {
         job?.cancel()
         finished = false
-        val seed = Random.nextLong()
+        val seed = saved?.seed ?: Random.nextLong()
         val scramble = CubeScramble.generate(seed)
         botSolution = CubeScramble.inverse(scramble)
-        local = CubeScramble.apply(seed)
-        botMoves = 0
+        local = CubeScramble.apply(seed).applyAll(saved?.played.orEmpty().map { checkNotNull(CubeMove.parse(it)) })
+        botMoves = saved?.opponentPlayed?.size ?: 0
         botSolved = false
         _state.value = CubeDuelUiState(
             phase = DuelPhase.FOUND,
             mode = MatchMode.BOT,
             training = true,
             guided = guided,
-            matchId = "cube-training",
+            matchId = saved?.id ?: UUID.randomUUID().toString(),
             me = meInfo,
             opponent = botInfo,
             scramble = scramble.map { it.notation() },
             scrambleSeed = seed,
             scrambleNonce = _state.value.scrambleNonce + 1,
-            myMoves = 0,
-            oppMoves = 0,
+            myMoves = saved?.played?.size ?: 0,
+            oppMoves = botMoves,
             oppLastMove = "",
             oppSerial = 0,
-            played = emptyList(),
+            played = saved?.played.orEmpty(),
+            opponentPlayed = botSolution.take(botMoves).map { it.notation() },
             solutionHint = "",
             oppSolved = false,
             solved = false,
             countdown = Rules.COUNTDOWN_SECONDS,
             durationMs = durationMs,
-            remainingMs = durationMs,
+            remainingMs = saved?.remainingMs ?: durationMs,
             result = null,
         )
         job = scope.launch {
-            for (s in Rules.COUNTDOWN_SECONDS downTo 1) {
+            for (s in (if (saved == null) Rules.COUNTDOWN_SECONDS else 0) downTo 1) {
                 _state.update { it.copy(countdown = s) }
                 delay(1000)
             }
-            startedAt = now()
+            startedAt = now() - (durationMs - (saved?.remainingMs ?: durationMs))
             _state.update {
-                it.copy(phase = DuelPhase.PLAYING, countdown = null, remainingMs = durationMs, remainingAnchor = startedAt)
+                it.copy(phase = DuelPhase.PLAYING, countdown = null, remainingMs = saved?.remainingMs ?: durationMs, remainingAnchor = now())
             }
             launch { if (!guided) botLoop() }
             while (isActive && !finished) {
@@ -148,6 +162,7 @@ class LocalCubeSession(
                     oppMoves = botMoves,
                     oppSolved = botSolved,
                     oppLastMove = move.notation(),
+                    opponentPlayed = it.opponentPlayed + move.notation(),
                     oppSerial = it.oppSerial + 1,
                 )
             }

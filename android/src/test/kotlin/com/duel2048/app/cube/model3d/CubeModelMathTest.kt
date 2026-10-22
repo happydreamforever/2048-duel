@@ -75,6 +75,29 @@ class CubeModelMathTest {
     // ---- animation ---------------------------------------------------------------------------
 
     @Test
+    fun `restoring a long history matches animation and accepts the next turn`() {
+        var now = 0L
+        val animated = CubeAnimator(geometry()) { now }
+        val restored = CubeAnimator(geometry()) { now }
+        val history = CubeScramble.generate(67).map { it.notation() } + listOf("M", "E'", "S2", "U", "R'")
+        animated.applyScramble(history)
+        val out = Array(27) { FloatArray(16) }
+        while (animated.frame(out)) now += 1000
+        restored.applyMove(CubeMove.B) // obsolete pending animation must be discarded
+        restored.setPosition(history)
+        assertTrue(!restored.isBusy())
+        for (i in 0 until 27) assertTrue(animated.poseOf(i).contentEquals(restored.poseOf(i)))
+        animated.applyMove(CubeMove.Mi)
+        restored.applyMove(CubeMove.Mi)
+        do {
+            animated.frame(out)
+            restored.frame(out)
+            now += 1000
+        } while (animated.isBusy() || restored.isBusy())
+        for (i in 0 until 27) assertTrue(animated.poseOf(i).contentEquals(restored.poseOf(i)))
+    }
+
+    @Test
     fun `scramble then inverse returns every cubie exactly home`() {
         var now = 0L
         val animator = CubeAnimator(geometry()) { now }

@@ -109,7 +109,7 @@ fun DuelScreen(vm: MainViewModel) {
     }
     var confirmLeave by remember { mutableStateOf(false) }
     BackHandler {
-        if (duel.phase == DuelPhase.OVER) vm.goHome() else confirmLeave = true
+        if (duel.phase == DuelPhase.OVER) vm.goHome() else if (duel.training) vm.leaveMatch() else confirmLeave = true
     }
     val view = LocalView.current
     DisposableEffect(Unit) {
@@ -132,6 +132,7 @@ fun DuelScreen(vm: MainViewModel) {
             .keyboardInput { session.swipe(it) },
     ) {
         VsHeader(duel, remaining)
+        if (duel.reconnecting) Text(stringResource(R.string.product_reconnecting), color = palette.gold)
         Spacer(Modifier.height(10.dp))
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
             Column(Modifier.weight(0.42f)) {
@@ -194,10 +195,10 @@ fun DuelScreen(vm: MainViewModel) {
         AlertDialog(
             onDismissRequest = { confirmLeave = false },
             containerColor = palette.bgTop,
-            title = { Text(stringResource(R.string.leave_title), color = palette.textPrimary) },
-            text = { Text(stringResource(R.string.leave_text), color = palette.textSecondary) },
+            title = { Text(stringResource(if (duel.training) R.string.product_save_exit else R.string.leave_title), color = palette.textPrimary) },
+            text = { Text(stringResource(if (duel.training) R.string.product_saves_subtitle else R.string.leave_text), color = palette.textSecondary) },
             confirmButton = {
-                TextButton(onClick = { confirmLeave = false; vm.leaveMatch() }) { Text(stringResource(R.string.leave), color = palette.danger) }
+                TextButton(onClick = { confirmLeave = false; vm.leaveMatch() }) { Text(stringResource(if (duel.training) R.string.product_save_exit else R.string.leave), color = palette.danger) }
             },
             dismissButton = { TextButton(onClick = { confirmLeave = false }) { Text(stringResource(R.string.stay), color = palette.accent) } },
         )

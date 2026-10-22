@@ -4,8 +4,8 @@ import kotlinx.serialization.json.Json
 
 /** JSON wire format. Messages carry a "type" discriminator (see @SerialName in Messages.kt). */
 object Protocol {
-    // v5 adds middle-slice moves and recognizes solved cubes in any orientation.
-    const val VERSION = 5
+    // v6 adds authoritative match snapshots and authenticated checkpoint synchronization.
+    const val VERSION = 6
     const val WS_PATH = "/ws"
 
     val json: Json = Json {

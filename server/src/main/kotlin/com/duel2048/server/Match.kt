@@ -17,6 +17,10 @@ import com.duel2048.shared.protocol.PlayerInfo
 import com.duel2048.shared.protocol.PlayerResult
 import com.duel2048.shared.protocol.ServerMessage
 import com.duel2048.shared.protocol.Tick
+import com.duel2048.shared.protocol.SavedGame
+import com.duel2048.shared.protocol.SavedGameType
+import com.duel2048.shared.protocol.SavedGameMode
+import com.duel2048.shared.protocol.MatchRestored
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
@@ -29,7 +33,7 @@ import org.slf4j.LoggerFactory
 import java.util.concurrent.ThreadLocalRandom
 
 /** A human or bot seat in a match. */
-class Participant(val info: PlayerInfo, private val session: PlayerSession?, val bot: Bot.Profile?) {
+class Participant(val info: PlayerInfo, var session: PlayerSession?, val bot: Bot.Profile?) {
     @Volatile lateinit var state: GameState
     @Volatile var expectedSeq: Int = 0
 
@@ -49,6 +53,7 @@ class Match(
     private val seed: Long,
     private val config: ServerConfig,
     private val scope: CoroutineScope,
+    private val onCheckpoint: suspend (String, SavedGame) -> Unit = { _, _ -> },
     private val onFinished: (Match, MatchOver) -> Unit,
 ) {
     private val log = LoggerFactory.getLogger("Match")
@@ -58,17 +63,22 @@ class Match(
     @Volatile private var started = false
     @Volatile private var finished = false
     private var startedAt = 0L
+    private var countdown = config.countdownSeconds
+    private var revision = 0L
+    private var result: MatchOver? = null
 
     init {
         p1.state = GameEngine.newGame(seed, config.boardSize)
         p2.state = GameEngine.newGame(seed, config.boardSize)
     }
 
-    fun start() {
+    suspend fun start() {
+        checkpoint()
         p1.send(MatchFound(id, p1.info, p2.info, seed, config.boardSize, config.matchDurationMs, config.countdownSeconds, p1.state, p2.state))
         p2.send(MatchFound(id, p2.info, p1.info, seed, config.boardSize, config.matchDurationMs, config.countdownSeconds, p2.state, p1.state))
         jobs += scope.launch {
             for (s in config.countdownSeconds downTo 1) {
+                countdown = s
                 broadcast(Countdown(id, s))
                 delay(1000)
             }
@@ -76,6 +86,7 @@ class Match(
                 if (finished) return@launch
                 started = true
                 startedAt = System.currentTimeMillis()
+                checkpoint()
             }
             broadcast(MatchStarted(id, config.matchDurationMs))
             for (p in listOf(p1, p2)) {
@@ -122,14 +133,16 @@ class Match(
             p.expectedSeq++
             val result = GameEngine.move(p.state, direction)
             p.state = result.state
-            p.send(MoveAck(id, seq, p.state, result.events))
             val o = other(p)
-            o.send(OpponentMoved(id, p.state, result.events))
-
-            if (result.events.garbageSent > 0) {
+            val landed = if (result.events.garbageSent > 0) {
                 val g = GameEngine.addGarbage(o.state, result.events.garbageSent)
                 o.state = g.state
-                val landed = GarbageLanded(id, o.info.id, p.info.id, o.state, g.placements)
+                GarbageLanded(id, o.info.id, p.info.id, o.state, g.placements)
+            } else null
+            checkpoint()
+            p.send(MoveAck(id, seq, p.state, result.events))
+            o.send(OpponentMoved(id, p.state, result.events))
+            if (landed != null) {
                 o.send(landed)
                 p.send(landed)
             }
@@ -156,7 +169,7 @@ class Match(
         else -> null
     }
 
-    private fun finishLocked(reason: EndReason, winner: Participant?) {
+    private suspend fun finishLocked(reason: EndReason, winner: Participant?) {
         if (finished) return
         finished = true
         val results = listOf(p1, p2).map { p ->
@@ -173,6 +186,8 @@ class Match(
         }
         log.info("match $id over: reason=$reason winner=${winner?.info?.name ?: "draw"} scores=${p1.state.score}/${p2.state.score}")
         val over = MatchOver(id, winner?.info?.id, reason, results)
+        result = over
+        checkpoint()
         broadcast(over)
         jobs.forEach { it.cancel() }
         onFinished(this, over)
@@ -190,6 +205,25 @@ class Match(
     }
 
     private fun other(p: Participant): Participant = if (p === p1) p2 else p1
+
+    private fun snapshot(p: Participant): SavedGame = SavedGame(
+        id = id, game = SavedGameType.TILES, mode = SavedGameMode.ONLINE, revision = revision,
+        completed = finished, board = p.state, opponentBoard = other(p).state, seed = seed,
+        remainingMs = if (started) remainingMs().coerceAtLeast(0) else config.matchDurationMs,
+        durationMs = config.matchDurationMs, expectedSeq = p.expectedSeq, started = started,
+        countdown = countdown, you = p.info, opponent = other(p).info, duelResult = result,
+    )
+
+    private suspend fun checkpoint() {
+        revision++
+        for (p in listOf(p1, p2)) if (!p.info.isBot) onCheckpoint(p.info.id, snapshot(p))
+    }
+
+    suspend fun restoreTo(playerId: String, session: PlayerSession) = mutex.withLock {
+        val p = participant(playerId) ?: return@withLock
+        p.session = session
+        session.send(MatchRestored(snapshot(p)))
+    }
 
     fun liveRow() = com.duel2048.shared.social.LiveGame(
         id, "2048", p1.info.name, p1.state.score, p2.info.name, p2.state.score,

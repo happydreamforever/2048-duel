@@ -5,11 +5,13 @@ import com.duel2048.shared.protocol.Protocol
 import com.duel2048.shared.protocol.ServerMessage
 import io.ktor.server.websocket.DefaultWebSocketServerSession
 import io.ktor.websocket.Frame
+import io.ktor.websocket.CloseReason
+import io.ktor.websocket.close
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
 
 /** One connected human. Outgoing messages go through a channel so ordering is preserved. */
-class PlayerSession(val id: String, private val ws: DefaultWebSocketServerSession) {
+class PlayerSession(var id: String, private val ws: DefaultWebSocketServerSession) {
 
     @Volatile var name: String = "Player"
     @Volatile var match: Match? = null
@@ -40,4 +42,6 @@ class PlayerSession(val id: String, private val ws: DefaultWebSocketServerSessio
     fun close() {
         outbox.close()
     }
+
+    fun supersede() { ws.launch { ws.close(CloseReason(4001.toShort(), "session_replaced")) } }
 }

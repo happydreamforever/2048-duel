@@ -36,6 +36,7 @@ dependencies {
     implementation(libs.mysql.connector)
     implementation(libs.mariadb.client)
     testImplementation(kotlin("test"))
+    testImplementation("io.ktor:ktor-server-test-host:${libs.versions.ktor.get()}")
 }
 
 tasks.test {

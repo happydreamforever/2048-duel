@@ -90,7 +90,8 @@ class MySqlStore(jdbcUrl: String, user: String, password: String) : UserStore {
         val user = selectWhere(c, "name_lower = ?", name.trim().lowercase())
             ?: return@db AuthResult.Failed("bad_credentials", "Wrong name or password")
         if (!Passwords.verify(password, user.salt, user.passwordHash)) return@db AuthResult.Failed("bad_credentials", "Wrong name or password")
-        val token = Passwords.newToken()
+        // Preserve the account session across devices; explicit logout revokes it.
+        val token = user.token ?: Passwords.newToken()
         val now = System.currentTimeMillis()
         c.prepareStatement("UPDATE users SET token = ?, last_login_at = ? WHERE id = ?").use { ps ->
             ps.setString(1, token); ps.setLong(2, now); ps.setString(3, user.id); ps.executeUpdate()

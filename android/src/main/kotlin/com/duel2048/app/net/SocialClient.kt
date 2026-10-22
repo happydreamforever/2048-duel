@@ -45,16 +45,19 @@ class SocialClient {
     suspend fun applyWallet(ws: String, token: String, scoreDelta: Int, coinDelta: Int): Result<WalletView> =
         post(ws, "/social/wallet", Protocol.json.encodeToString(WalletBody.serializer(), WalletBody(token, scoreDelta, coinDelta)), WalletView.serializer())
 
-    suspend fun joinMini(ws: String, name: String, game: String, mode: String, difficulty: String): Result<MiniRoomView> =
+    suspend fun mini(ws: String, roomId: String, name: String): Result<MiniRoomView> =
+        get(ws, "/social/mini/$roomId?name=${java.net.URLEncoder.encode(name, "UTF-8")}", MiniRoomView.serializer())
+
+    suspend fun joinMini(ws: String, name: String, game: String, mode: String, difficulty: String, token: String = ""): Result<MiniRoomView> =
         post(
             ws,
             "/social/mini/join",
-            Protocol.json.encodeToString(MiniJoinBody.serializer(), MiniJoinBody(name = name, game = game, mode = mode, difficulty = difficulty)),
+            Protocol.json.encodeToString(MiniJoinBody.serializer(), MiniJoinBody(token = token, name = name, game = game, mode = mode, difficulty = difficulty)),
             MiniRoomView.serializer(),
         )
 
-    suspend fun answerMini(ws: String, roomId: String, name: String, answer: String): Result<MiniRoomView> =
-        post(ws, "/social/mini/answer", Protocol.json.encodeToString(MiniAnswerBody.serializer(), MiniAnswerBody(roomId, name, answer)), MiniRoomView.serializer())
+    suspend fun answerMini(ws: String, roomId: String, name: String, answer: String, token: String = ""): Result<MiniRoomView> =
+        post(ws, "/social/mini/answer", Protocol.json.encodeToString(MiniAnswerBody.serializer(), MiniAnswerBody(roomId, name, answer, token)), MiniRoomView.serializer())
 
     private suspend fun <T> get(ws: String, path: String, serializer: kotlinx.serialization.KSerializer<T>): Result<T> =
         withContext(Dispatchers.IO) {

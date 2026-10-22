@@ -4,6 +4,11 @@ import com.duel2048.server.db.AuthResult
 import com.duel2048.server.db.MatchRecord
 import com.duel2048.server.db.UserStore
 import com.duel2048.server.db.UserRecord
+import com.duel2048.server.db.GameSaveStore
+import com.duel2048.shared.protocol.ResumeMatch
+import com.duel2048.shared.protocol.RequestMatchState
+import com.duel2048.shared.protocol.MatchRestored
+import com.duel2048.shared.protocol.SavedGame
 import com.duel2048.shared.bot.Bot
 import com.duel2048.shared.protocol.Auth
 import com.duel2048.shared.protocol.AuthFailed
@@ -38,6 +43,8 @@ import io.ktor.websocket.Frame
 import io.ktor.websocket.readText
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.channels.ClosedReceiveChannelException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -56,7 +63,8 @@ import java.util.concurrent.atomic.AtomicInteger
  * If nobody shows up within [ServerConfig.botFallbackMs] a bot fills in so the game is
  * always playable.
  */
-class Lobby(private val config: ServerConfig, private val scope: CoroutineScope, private val db: UserStore) {
+class Lobby(private val config: ServerConfig, private val scope: CoroutineScope, private val db: UserStore,
+    private val gameSaves: GameSaveStore = GameSaveStore(java.io.File(config.dataDir, "game-saves"))) {
 
     private val log = LoggerFactory.getLogger("Lobby")
     private val players = ConcurrentHashMap<String, PlayerSession>()
@@ -67,6 +75,9 @@ class Lobby(private val config: ServerConfig, private val scope: CoroutineScope,
     private val queueMutex = Mutex()
     private val fallbackJobs = ConcurrentHashMap<String, Job>()
     private val totalMatches = AtomicInteger()
+    private val detached = ConcurrentHashMap<String, PlayerSession>()
+    private val reconnectJobs = ConcurrentHashMap<String, Job>()
+    private val reconnectMutex = Mutex()
 
     suspend fun handleSession(ws: DefaultWebSocketServerSession) {
         val session = PlayerSession(UUID.randomUUID().toString().substring(0, 8), ws)
@@ -94,7 +105,14 @@ class Lobby(private val config: ServerConfig, private val scope: CoroutineScope,
     }
 
     private suspend fun dispatch(s: PlayerSession, msg: ClientMessage) {
+        if (players[s.id] !== s) return
         when (msg) {
+            is ResumeMatch -> resume(s, msg.matchId)
+            is RequestMatchState -> {
+                if (s.match?.id == msg.matchId) s.match?.restoreTo(s.id, s)
+                else if (s.cubeMatch?.id == msg.matchId) s.cubeMatch?.restoreTo(s.id, s)
+                else s.send(ErrorMsg("no_match", "This match is no longer active"))
+            }
             is Hello -> {
                 s.name = msg.name.trim().take(16).ifBlank { "Player" }
                 if (msg.clientVersion != Protocol.VERSION) {
@@ -113,6 +131,8 @@ class Lobby(private val config: ServerConfig, private val scope: CoroutineScope,
             }
             is FindMatch -> if (s.userId == null) {
                 s.send(ErrorMsg("not_logged_in", "Log in first"))
+            } else if ((players.values + detached.values).any { it !== s && it.userId == s.userId && (it.match != null || it.cubeMatch != null) }) {
+                s.send(ErrorMsg("resume_available", "You have an active match. Continue it from Saved games."))
             } else if (msg.game == GameType.CUBE_SOLVE) {
                 findCubeMatch(s, msg.mode)
             } else {
@@ -189,7 +209,7 @@ class Lobby(private val config: ServerConfig, private val scope: CoroutineScope,
                     garbageSent = st.garbageSent + res.garbageSent,
                 )
             }
-            if (updated != null) session.send(StatsUpdated(updated.stats))
+            if (updated != null) (players[session.id] ?: session).send(StatsUpdated(updated.stats))
         }
     }
 
@@ -253,7 +273,7 @@ class Lobby(private val config: ServerConfig, private val scope: CoroutineScope,
         }
     }
 
-    private fun startMatch(a: PlayerSession, b: PlayerSession?) {
+    private suspend fun startMatch(a: PlayerSession, b: PlayerSession?) {
         val seed = ThreadLocalRandom.current().nextLong()
         val p1 = Participant(a.info, a, bot = null)
         val p2 = if (b != null) {
@@ -268,7 +288,8 @@ class Lobby(private val config: ServerConfig, private val scope: CoroutineScope,
         }
         val id = "m" + UUID.randomUUID().toString().substring(0, 8)
         val startedAt = System.currentTimeMillis()
-        val match = Match(id, p1, p2, seed, config, scope) { finished, over ->
+        val match = Match(id, p1, p2, seed, config, scope, onCheckpoint = checkpointWriter(a, b)) { finished, over ->
+            clearMatch(finished.id)
             matches.remove(finished.id)
             if (a.match === finished) a.match = null
             if (b != null && b.match === finished) b.match = null
@@ -299,7 +320,7 @@ class Lobby(private val config: ServerConfig, private val scope: CoroutineScope,
         match.start()
     }
 
-    private fun startCubeMatch(a: PlayerSession, b: PlayerSession?) {
+    private suspend fun startCubeMatch(a: PlayerSession, b: PlayerSession?) {
         val seed = ThreadLocalRandom.current().nextLong()
         val scramble = CubeScramble.generate(seed)
         val botSolution = CubeScramble.inverse(scramble)
@@ -312,7 +333,8 @@ class Lobby(private val config: ServerConfig, private val scope: CoroutineScope,
         }
         val id = "c" + UUID.randomUUID().toString().substring(0, 8)
         val startedAt = System.currentTimeMillis()
-        val match = CubeMatch(id, p1, p2, seed, scramble, config, scope) { finished, over ->
+        val match = CubeMatch(id, p1, p2, seed, scramble, config, scope, onCheckpoint = checkpointWriter(a, b)) { finished, over ->
+            clearMatch(finished.id)
             cubeMatches.remove(finished.id)
             if (a.cubeMatch === finished) a.cubeMatch = null
             if (b != null && b.cubeMatch === finished) b.cubeMatch = null
@@ -358,19 +380,32 @@ class Lobby(private val config: ServerConfig, private val scope: CoroutineScope,
                     matches = st.matches + 1,
                 )
             }
-            if (updated != null) session.send(StatsUpdated(updated.stats))
+            if (updated != null) (players[session.id] ?: session).send(StatsUpdated(updated.stats))
         }
     }
 
     private suspend fun disconnect(s: PlayerSession) {
-        players.remove(s.id)
+        if (!players.remove(s.id, s)) return
         fallbackJobs.remove(s.id)?.cancel()
         queueMutex.withLock {
             queue2048.remove(s)
             queueCube.remove(s)
         }
-        s.match?.forfeit(s.id)
-        s.cubeMatch?.forfeit(s.id)
+        val userId = s.userId
+        if (userId != null && (s.match != null || s.cubeMatch != null)) {
+            detached[userId] = s
+            reconnectJobs.remove(userId)?.cancel()
+            reconnectJobs[userId] = scope.launch {
+                delay(90_000)
+                reconnectMutex.withLock {
+                    if (detached.remove(userId, s)) {
+                        reconnectJobs.remove(userId)
+                        s.match?.forfeit(s.id)
+                        s.cubeMatch?.forfeit(s.id)
+                    }
+                }
+            }
+        }
         s.close()
         log.info("disconnected ${s.id} (online=${players.size})")
     }
@@ -381,6 +416,51 @@ class Lobby(private val config: ServerConfig, private val scope: CoroutineScope,
 
     fun liveGames(): List<com.duel2048.shared.social.LiveGame> =
         matches.values.map { it.liveRow() } + cubeMatches.values.map { it.liveRow() }
+
+    fun canResume(userId: String, matchId: String): Boolean =
+        (players.values + detached.values).any { it.userId == userId && (it.match?.id == matchId || it.cubeMatch?.id == matchId) }
+
+    private fun clearMatch(id: String) {
+        for (s in players.values + detached.values) {
+            if (s.match?.id == id) s.match = null
+            if (s.cubeMatch?.id == id) s.cubeMatch = null
+        }
+    }
+
+    private fun checkpointWriter(a: PlayerSession, b: PlayerSession?): suspend (String, SavedGame) -> Unit {
+        val owners = listOfNotNull(a, b).mapNotNull { s -> s.userId?.let { s.id to it } }.toMap()
+        return { playerId, game -> owners[playerId]?.let { userId ->
+            // Finish an accepted checkpoint even if the socket closes during the disk write.
+            withContext(NonCancellable) { gameSaves.put(userId, game, authoritative = true) }
+        }; Unit }
+    }
+
+    private suspend fun resume(s: PlayerSession, matchId: String) {
+        val userId = s.userId ?: run { s.send(ErrorMsg("not_logged_in", "Sign in to reconnect")); return }
+        reconnectMutex.withLock {
+            val old = detached[userId] ?: players.values.firstOrNull {
+                it !== s && it.userId == userId && (it.match?.id == matchId || it.cubeMatch?.id == matchId)
+            }
+            if (old != null && (old.match?.id == matchId || old.cubeMatch?.id == matchId)) {
+                detached.remove(userId)
+                reconnectJobs.remove(userId)?.cancel()
+                players.remove(s.id, s)
+                players.remove(old.id, old)
+                s.id = old.id
+                s.match = old.match
+                s.cubeMatch = old.cubeMatch
+                players[s.id] = s
+                old.close()
+                old.supersede()
+                s.match?.restoreTo(s.id, s)
+                s.cubeMatch?.restoreTo(s.id, s)
+            } else {
+                val saved = gameSaves.list(userId).find { it.id == matchId && it.completed }
+                if (saved != null) s.send(MatchRestored(saved))
+                else s.send(ErrorMsg("match_unavailable", "The match has ended or its reconnect window expired"))
+            }
+        }
+    }
 
     companion object {
         private val BOT_NAMES = listOf("Nova", "Byte", "Pixel", "Vega", "Orion", "Quark", "Echo", "Zed")

@@ -32,6 +32,17 @@ class CubeAnimator(val geometry: CubeGeometry, private val clock: () -> Long) {
         queue.add(pendingFor(move, MOVE_MS))
     }
 
+    /** Restore a checkpoint without waiting for its entire history to animate. */
+    fun setPosition(notations: List<String>) {
+        val moves = notations.map { checkNotNull(CubeMove.parse(it)) }
+        reset()
+        for (move in moves) {
+            val turn = activate(pendingFor(move, MOVE_MS), 0)
+            commit(turn)
+        }
+        active = null
+    }
+
     fun isBusy(): Boolean = queue.isNotEmpty() || active != null
 
     fun reset() {
@@ -74,14 +85,18 @@ class CubeAnimator(val geometry: CubeGeometry, private val clock: () -> Long) {
             val t = (now - anim.startMs).coerceAtLeast(0).toFloat() / anim.durationMs
             if (t < 1f) return Pair(anim, t * t * (3f - 2f * t)) // smoothstep
             // Commit the exact quarter turn so float error never accumulates.
-            val a = axisUnit(anim.axis)
-            val exact = CubeMath.rotationAxis(a[0], a[1], a[2], anim.degrees)
-            for (member in anim.members) base[member] = CubeMath.multiply(exact, base[member])
+            commit(anim)
             active = null
             // A turn that finished long ago must not delay the next one: chain from its end.
             val overshoot = now - (anim.startMs + anim.durationMs)
             queue.removeFirstOrNull()?.let { next -> activate(next, now - overshoot) } ?: return null
         }
+    }
+
+    private fun commit(turn: PendingMove) {
+        val a = axisUnit(turn.axis)
+        val exact = CubeMath.rotationAxis(a[0], a[1], a[2], turn.degrees)
+        for (member in turn.members) base[member] = CubeMath.multiply(exact, base[member])
     }
 
     /** Resolve a layer when its turn starts, after all preceding queued turns are committed. */

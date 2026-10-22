@@ -34,6 +34,8 @@ import com.duel2048.shared.protocol.ServerMessage
 import com.duel2048.shared.protocol.StatsUpdated
 import com.duel2048.shared.protocol.Tick
 import com.duel2048.shared.protocol.Welcome
+import com.duel2048.shared.protocol.ResumeMatch
+import com.duel2048.shared.protocol.MatchRestored
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -73,6 +75,7 @@ data class PlayerSide(
 }
 
 data class DuelUiState(
+    val reconnecting: Boolean = false,
     val phase: DuelPhase = DuelPhase.IDLE,
     val mode: MatchMode = MatchMode.PVP,
     /** True for offline training against the on-device bot. */
@@ -126,10 +129,15 @@ class MatchController(
     private var connectionJob: Job? = null
     private var messageJob: Job? = null
     private var pingJob: Job? = null
+    private var reconnectJob: Job? = null
+    private var resumeId: String? = null
+    private var serverUrl = ""
 
-    fun start(url: String, token: String, mode: MatchMode) {
+    fun start(url: String, token: String, mode: MatchMode, resumeMatchId: String? = null) {
         stopJobs()
         this.token = token
+        serverUrl = url
+        resumeId = resumeMatchId
         local = null
         seq = 0
         predictions.clear()
@@ -138,11 +146,11 @@ class MatchController(
         connectionJob = scope.launch {
             client.connection.collect { c ->
                 when (c) {
-                    is ConnectionState.Failed -> fail(DuelError("connect_failed", c.reason))
+                    is ConnectionState.Failed -> reconnect(c.reason)
                     ConnectionState.Disconnected -> {
                         val phase = _state.value.phase
                         if (phase == DuelPhase.PLAYING || phase == DuelPhase.FOUND || phase == DuelPhase.SEARCHING) {
-                            fail(DuelError("connection_lost"))
+                            reconnect("Connection lost")
                         }
                     }
                     else -> Unit
@@ -168,7 +176,7 @@ class MatchController(
         val s = _state.value
         val cur = local ?: return
         val matchId = s.matchId ?: return
-        if (s.phase != DuelPhase.PLAYING || cur.gameOver) return
+        if (s.phase != DuelPhase.PLAYING || s.reconnecting || cur.gameOver) return
         val r = GameEngine.move(cur, direction)
         if (!r.events.moved) {
             _effects.tryEmit(GameEffect.NoMove(direction))
@@ -194,9 +202,30 @@ class MatchController(
             }
             is AuthOk -> {
                 onStats(msg.stats)
-                client.send(FindMatch(s.mode))
-                _state.update { it.copy(phase = DuelPhase.SEARCHING, searchStartedAt = now()) }
+                if (resumeId != null) client.send(ResumeMatch(checkNotNull(resumeId)))
+                else {
+                    client.send(FindMatch(s.mode))
+                    _state.update { it.copy(phase = DuelPhase.SEARCHING, searchStartedAt = now()) }
+                }
                 startPings()
+            }
+            is MatchRestored -> {
+                val g = msg.game
+                if (g.game != com.duel2048.shared.protocol.SavedGameType.TILES) return
+                val me = g.board ?: return
+                val opponent = g.opponentBoard ?: return
+                reconnectJob?.cancel(); reconnectJob = null
+                resumeId = null
+                local = me
+                seq = g.expectedSeq
+                predictions.clear()
+                version++
+                _state.value = s.copy(reconnecting = false,
+                    phase = if (g.completed) DuelPhase.OVER else if (g.started) DuelPhase.PLAYING else DuelPhase.FOUND,
+                    matchId = g.id, me = PlayerSide(info = g.you).with(me, BoardUiBuilder.fromState(me, version)),
+                    opponent = PlayerSide(info = g.opponent).with(opponent, BoardUiBuilder.fromState(opponent, version)),
+                    countdown = if (g.started) null else g.countdown, remainingMs = g.remainingMs,
+                    durationMs = g.durationMs, remainingAnchor = now(), result = g.duelResult, error = null)
             }
             is AuthFailed -> {
                 fail(DuelError("session_expired"))
@@ -290,6 +319,7 @@ class MatchController(
                 }
             }
             is ErrorMsg -> when (msg.code) {
+                "match_unavailable", "resume_available", "no_match" -> fail(DuelError("server", msg.message))
                 "version" -> fail(DuelError("version", msg.message))
                 "not_logged_in" -> {
                     fail(DuelError("not_logged_in"))
@@ -306,6 +336,24 @@ class MatchController(
         local = state
         version++
         _state.update { it.copy(me = it.me.with(state, BoardUiBuilder.fromState(state, version))) }
+    }
+
+    private fun reconnect(reason: String) {
+        if (reason == "session_replaced") { fail(DuelError("server", "This match was opened on another device.")); return }
+        if (_state.value.phase == DuelPhase.OVER || _state.value.phase == DuelPhase.IDLE) return
+        val id = _state.value.matchId ?: resumeId ?: run { fail(DuelError("connect_failed", reason)); return }
+        if (reconnectJob?.isActive == true) return
+        resumeId = id
+        _state.update { it.copy(reconnecting = true) }
+        reconnectJob = scope.launch {
+            repeat(8) {
+                delay(1000)
+                client.connect(serverUrl)
+                delay(4000)
+                if (!_state.value.reconnecting) return@launch
+            }
+            fail(DuelError("connection_lost"))
+        }
     }
 
     private fun startPings() {
@@ -332,6 +380,7 @@ class MatchController(
     }
 
     private fun stopJobs() {
+        reconnectJob?.cancel(); reconnectJob = null
         connectionJob?.cancel(); connectionJob = null
         messageJob?.cancel(); messageJob = null
         pingJob?.cancel(); pingJob = null

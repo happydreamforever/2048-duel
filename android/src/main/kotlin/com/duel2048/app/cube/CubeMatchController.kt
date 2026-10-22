@@ -35,6 +35,10 @@ import com.duel2048.shared.protocol.ServerMessage
 import com.duel2048.shared.protocol.StatsUpdated
 import com.duel2048.shared.protocol.Tick
 import com.duel2048.shared.protocol.Welcome
+import com.duel2048.shared.protocol.ResumeMatch
+import com.duel2048.shared.protocol.RequestMatchState
+import com.duel2048.shared.protocol.MatchRestored
+import com.duel2048.shared.cube.CubeScramble
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -46,6 +50,9 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 data class CubeDuelUiState(
+    val reconnecting: Boolean = false,
+    val positionVersion: Int = 0,
+    val opponentPlayed: List<String> = emptyList(),
     val phase: DuelPhase = DuelPhase.IDLE,
     val mode: MatchMode = MatchMode.PVP,
     /** Offline training on this device (no server). */
@@ -106,10 +113,15 @@ class CubeMatchController(
     private var connectionJob: Job? = null
     private var messageJob: Job? = null
     private var pingJob: Job? = null
+    private var reconnectJob: Job? = null
+    private var resumeId: String? = null
+    private var serverUrl = ""
 
-    fun start(url: String, token: String, mode: MatchMode) {
+    fun start(url: String, token: String, mode: MatchMode, resumeMatchId: String? = null) {
         stopJobs()
         this.token = token
+        serverUrl = url
+        resumeId = resumeMatchId
         local = null
         seq = 0
         _state.value = CubeDuelUiState(phase = DuelPhase.CONNECTING, mode = mode, searchStartedAt = now())
@@ -117,11 +129,11 @@ class CubeMatchController(
         connectionJob = scope.launch {
             client.connection.collect { c ->
                 when (c) {
-                    is ConnectionState.Failed -> fail(DuelError("connect_failed", c.reason))
+                    is ConnectionState.Failed -> reconnect(c.reason)
                     ConnectionState.Disconnected -> {
                         val phase = _state.value.phase
                         if (phase == DuelPhase.PLAYING || phase == DuelPhase.FOUND || phase == DuelPhase.SEARCHING) {
-                            fail(DuelError("connection_lost"))
+                            reconnect("Connection lost")
                         }
                     }
                     else -> Unit
@@ -147,7 +159,7 @@ class CubeMatchController(
         val s = _state.value
         val cur = local ?: return
         val matchId = s.matchId ?: return
-        if (s.phase != DuelPhase.PLAYING || s.solved) return
+        if (s.phase != DuelPhase.PLAYING || s.reconnecting || s.solved) return
         val next = cur.apply(move)
         local = next
         val moves = s.myMoves + 1
@@ -183,9 +195,30 @@ class CubeMatchController(
             }
             is AuthOk -> {
                 onStats(msg.stats)
-                client.send(FindMatch(s.mode, GameType.CUBE_SOLVE))
-                _state.update { it.copy(phase = DuelPhase.SEARCHING, searchStartedAt = now()) }
+                if (resumeId != null) client.send(ResumeMatch(checkNotNull(resumeId)))
+                else {
+                    client.send(FindMatch(s.mode, GameType.CUBE_SOLVE))
+                    _state.update { it.copy(phase = DuelPhase.SEARCHING, searchStartedAt = now()) }
+                }
                 startPings()
+            }
+            is MatchRestored -> {
+                val g = msg.game
+                if (g.game != com.duel2048.shared.protocol.SavedGameType.CUBE) return
+                val scramble = CubeScramble.notations(g.seed)
+                local = CubeState.SOLVED.applyAll((scramble + g.played).map { checkNotNull(CubeMove.parse(it)) })
+                reconnectJob?.cancel(); reconnectJob = null
+                resumeId = null
+                seq = g.expectedSeq
+                startedAt = now() - (g.durationMs - g.remainingMs)
+                _state.value = s.copy(reconnecting = false,
+                    phase = if (g.completed) DuelPhase.OVER else if (g.started) DuelPhase.PLAYING else DuelPhase.FOUND,
+                    matchId = g.id, me = g.you, opponent = g.opponent, scramble = scramble,
+                    scrambleSeed = g.seed, scrambleNonce = if (s.matchId == g.id) s.scrambleNonce else s.scrambleNonce + 1,
+                    positionVersion = s.positionVersion + 1, played = g.played, opponentPlayed = g.opponentPlayed,
+                    myMoves = g.played.size, oppMoves = g.opponentPlayed.size, solved = local!!.isSolved(),
+                    countdown = if (g.started) null else g.countdown, remainingMs = g.remainingMs,
+                    durationMs = g.durationMs, remainingAnchor = now(), result = g.cubeResult, error = null)
             }
             is AuthFailed -> {
                 fail(DuelError("session_expired"))
@@ -240,15 +273,16 @@ class CubeMatchController(
             }
             is CubeMoveAck -> {
                 if (msg.matchId != s.matchId) return
-                if (local?.fingerprint() != msg.fingerprint) {
-                    // Server rejected silently via fingerprint mismatch — wait for reject message.
+                if (msg.seq == seq - 1 && local?.fingerprint() != msg.fingerprint) {
+                    _state.update { it.copy(reconnecting = true) }
+                    client.send(RequestMatchState(msg.matchId))
                 }
-                _state.update { it.copy(myMoves = msg.moves) }
             }
             is CubeMoveRejected -> {
                 if (msg.matchId != s.matchId) return
                 seq = msg.expectedSeq
-                // Fingerprint resync would need full state from server; for now keep local.
+                _state.update { it.copy(reconnecting = true) }
+                client.send(RequestMatchState(msg.matchId))
             }
             is CubeOpponentProgress -> {
                 if (msg.matchId != s.matchId) return
@@ -257,6 +291,7 @@ class CubeMatchController(
                         oppMoves = msg.moves,
                         oppSolved = msg.solved,
                         oppLastMove = msg.move,
+                        opponentPlayed = if (msg.move.isBlank()) it.opponentPlayed else it.opponentPlayed + msg.move,
                         oppSerial = if (msg.move.isNotBlank()) it.oppSerial + 1 else it.oppSerial,
                     )
                 }
@@ -271,6 +306,7 @@ class CubeMatchController(
                 }
             }
             is ErrorMsg -> when (msg.code) {
+                "match_unavailable", "resume_available", "no_match" -> fail(DuelError("server", msg.message))
                 "version" -> fail(DuelError("version", msg.message))
                 "not_logged_in" -> {
                     fail(DuelError("not_logged_in"))
@@ -293,6 +329,24 @@ class CubeMatchController(
         }
     }
 
+    private fun reconnect(reason: String) {
+        if (reason == "session_replaced") { fail(DuelError("server", "This match was opened on another device.")); return }
+        if (_state.value.phase == DuelPhase.OVER || _state.value.phase == DuelPhase.IDLE) return
+        val id = _state.value.matchId ?: resumeId ?: run { fail(DuelError("connect_failed", reason)); return }
+        if (reconnectJob?.isActive == true) return
+        resumeId = id
+        _state.update { it.copy(reconnecting = true) }
+        reconnectJob = scope.launch {
+            repeat(8) {
+                delay(1000)
+                client.connect(serverUrl)
+                delay(4000)
+                if (!_state.value.reconnecting) return@launch
+            }
+            fail(DuelError("connection_lost"))
+        }
+    }
+
     private fun fail(error: DuelError) {
         stopJobs()
         client.disconnect()
@@ -307,6 +361,7 @@ class CubeMatchController(
     }
 
     private fun stopJobs() {
+        reconnectJob?.cancel(); reconnectJob = null
         connectionJob?.cancel(); connectionJob = null
         messageJob?.cancel(); messageJob = null
         pingJob?.cancel(); pingJob = null

@@ -1,5 +1,7 @@
 package com.duel2048.app.ui.screens
 
+import androidx.activity.compose.BackHandler
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -54,38 +56,24 @@ import com.duel2048.shared.social.ChatPhrases
 import com.duel2048.shared.social.Economy
 import kotlinx.coroutines.delay
 
-@Composable
-fun MoreGamesScreen(vm: MainViewModel) {
-    val palette = LocalPalette.current
-    Column(
-        Modifier.fillMaxSize().systemBarsPadding().verticalScroll(rememberScrollState()).padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Text(stringResource(R.string.more_games), style = MaterialTheme.typography.headlineMedium, color = palette.textPrimary, fontWeight = FontWeight.Black)
-        Text(stringResource(R.string.more_games_sub), color = palette.textSecondary)
-        HubGame.entries.forEach { game ->
-            NeonButton(game.title, subtitle = game.blurb, colors = game.colors, modifier = Modifier.fillMaxWidth()) {
-                vm.openGameModes(game)
-            }
-        }
-        TextButton(onClick = { vm.goHome() }) { Text(stringResource(R.string.back), color = palette.accent) }
-    }
-}
-
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 fun GameModesScreen(vm: MainViewModel, game: HubGame) {
     val palette = LocalPalette.current
-    var difficulty by remember(game) { mutableStateOf(if (game == HubGame.WORD) "4" else "easy") }
+    BackHandler { vm.goHome() }
+    var difficulty by remember(game) { mutableStateOf(if (game == HubGame.WORD) "4" else if (game == HubGame.MATH) "medium" else "normal") }
     Column(
         Modifier.fillMaxSize().systemBarsPadding().verticalScroll(rememberScrollState()).padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text(game.title, style = MaterialTheme.typography.headlineMedium, color = palette.textPrimary, fontWeight = FontWeight.Black)
+        TextButton(onClick = { vm.goHome() }) { Text(stringResource(R.string.back), color = palette.accent) }
+        Text(gameTitle(game), style = MaterialTheme.typography.headlineMedium, color = palette.textPrimary, fontWeight = FontWeight.Black)
+        Text(stringResource(R.string.product_mode_subtitle), color = palette.textSecondary)
         Text(stringResource(R.string.mode_cost, Economy.joinCost("pvp"), Economy.joinCost("bot")), color = palette.textSecondary)
-        if (game == HubGame.MATH || game == HubGame.WORD || game == HubGame.CUBE) {
+        if (game in HubGame.entries) {
             Text(stringResource(R.string.difficulty), color = palette.accent, fontWeight = FontWeight.Bold)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                val options = if (game == HubGame.WORD) listOf("4", "6") else if (game == HubGame.MATH) listOf("easy", "medium", "hard", "very_hard") else listOf("easy", "medium", "hard")
+            androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                val options = if (game == HubGame.WORD) listOf("4", "6") else if (game == HubGame.MATH) listOf("easy", "medium", "hard", "very_hard") else listOf("easy", "normal", "hard")
                 options.forEach { id ->
                     val on = id == difficulty
                     Text(
@@ -101,6 +89,7 @@ fun GameModesScreen(vm: MainViewModel, game: HubGame) {
                 }
             }
         }
+        if (game == HubGame.TILES) NeonButton(stringResource(R.string.product_solo), subtitle = stringResource(R.string.solo_zen), modifier = Modifier.fillMaxWidth()) { vm.openSolo() }
         NeonButton(stringResource(R.string.mode_pvp), subtitle = stringResource(R.string.mode_pvp_sub), modifier = Modifier.fillMaxWidth()) {
             vm.startHub(game, HubMode.PVP, difficulty)
         }
@@ -113,12 +102,12 @@ fun GameModesScreen(vm: MainViewModel, game: HubGame) {
         NeonButton(stringResource(R.string.mode_watch), subtitle = stringResource(R.string.mode_watch_sub), colors = listOf(Color(0xFF5C4A7A), Color(0xFF2A2140)), modifier = Modifier.fillMaxWidth()) {
             vm.startHub(game, HubMode.WATCH, difficulty)
         }
-        TextButton(onClick = { vm.openMoreGames() }) { Text(stringResource(R.string.back), color = palette.accent) }
     }
 }
 
 @Composable
 fun WatchScreen(vm: MainViewModel) {
+    BackHandler { vm.openCommunity() }
     val palette = LocalPalette.current
     val live by vm.liveGames.collectAsStateWithLifecycle()
     val focus by vm.watchFocus.collectAsStateWithLifecycle()
@@ -149,12 +138,13 @@ fun WatchScreen(vm: MainViewModel) {
                 )
             }
         }
-        TextButton(onClick = { vm.openMoreGames() }) { Text(stringResource(R.string.back), color = palette.accent) }
+        TextButton(onClick = { vm.openCommunity() }) { Text(stringResource(R.string.back), color = palette.accent) }
     }
 }
 
 @Composable
 fun MiniPlayScreen(vm: MainViewModel) {
+    BackHandler { vm.closeMini() }
     val palette = LocalPalette.current
     val mini by vm.mini.collectAsStateWithLifecycle()
     val state = mini
@@ -192,6 +182,8 @@ fun MiniPlayScreen(vm: MainViewModel) {
             if (state.guided) {
                 TextButton(onClick = { vm.miniHint() }) { Text(stringResource(R.string.hint), color = palette.accent) }
             }
+        } else if (state.status == "waiting") {
+            Text(stringResource(R.string.product_waiting), color = palette.textSecondary)
         } else {
             Text(
                 if (state.won) stringResource(R.string.you_win) else stringResource(R.string.mini_game_over),
@@ -200,6 +192,7 @@ fun MiniPlayScreen(vm: MainViewModel) {
                 fontSize = 28.sp,
             )
             if (state.solution.isNotBlank()) Text(stringResource(R.string.solution_line, state.solution), color = palette.gold)
+            NeonButton(stringResource(R.string.play_again), modifier = Modifier.fillMaxWidth()) { vm.playMiniAgain() }
         }
         TextButton(onClick = { vm.closeMini() }) { Text(stringResource(R.string.back), color = palette.accent) }
     }

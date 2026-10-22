@@ -72,7 +72,8 @@ class JsonDb(val file: File) : UserStore {
         val id = idByName[name.trim().lowercase()] ?: return AuthResult.Failed("bad_credentials", "Wrong name or password")
         val user = users[id] ?: return AuthResult.Failed("bad_credentials", "Wrong name or password")
         if (!Passwords.verify(password, user.salt, user.passwordHash)) return AuthResult.Failed("bad_credentials", "Wrong name or password")
-        val updated = user.copy(token = Passwords.newToken(), lastLoginAt = System.currentTimeMillis())
+        // A second device must not invalidate the first device's save-sync session.
+        val updated = user.copy(token = user.token ?: Passwords.newToken(), lastLoginAt = System.currentTimeMillis())
         replace(user, updated)
         saveLocked()
         AuthResult.Ok(updated)

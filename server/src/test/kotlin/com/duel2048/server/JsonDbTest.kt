@@ -30,6 +30,7 @@ class JsonDbTest {
         val login = db.login("ANN_01", "secret")
         assertIs<AuthResult.Ok>(login)
         val token = assertNotNull(login.user.token)
+        assertNotNull(db.authByToken(assertNotNull(reg.user.token)), "Signing in on another device must keep existing sync sessions valid")
         assertEquals(login.user.id, db.authByToken(token)?.id)
 
         db.updateStats(login.user.id) { it.copy(wins = it.wins + 1, matches = it.matches + 1, bestScore = 1234) }

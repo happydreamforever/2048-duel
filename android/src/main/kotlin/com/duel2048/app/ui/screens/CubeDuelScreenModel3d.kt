@@ -22,22 +22,32 @@ import com.duel2048.shared.cube.CubeMove
 
 /** Cube duel on the glb model renderer (the only cube engine). */
 @Composable
-internal fun CubeDuelModel3dRoute(vm: MainViewModel, cube: CubeDuelUiState) {
+internal fun CubeDuelModel3dRoute(vm: MainViewModel, cube: CubeDuelUiState, onLeave: () -> Unit = { vm.leaveCubeDuel() }) {
     val lifecycleOwner = LocalLifecycleOwner.current
 
     var mine by remember(cube.scrambleNonce) { mutableStateOf<RubiksCubeView?>(null) }
     var opp by remember(cube.scrambleNonce) { mutableStateOf<RubiksCubeView?>(null) }
 
-    LaunchedEffect(cube.scrambleNonce, cube.scramble, mine) {
-        mine?.let { CubeModelBridge.applyScrambleAnimated(it, cube.scramble) }
+    var renderedOpponent by remember(cube.scrambleNonce, cube.positionVersion, opp) { mutableStateOf(0) }
+    LaunchedEffect(cube.scrambleNonce, cube.positionVersion, mine) {
+        mine?.let {
+            if (cube.played.isNotEmpty() || cube.positionVersion > 0) it.restorePosition(cube.scramble + cube.played)
+            else CubeModelBridge.applyScrambleAnimated(it, cube.scramble)
+        }
     }
-    LaunchedEffect(cube.scrambleNonce, cube.scramble, opp) {
-        opp?.let { CubeModelBridge.applyScrambleAnimated(it, cube.scramble) }
+    LaunchedEffect(cube.scrambleNonce, cube.positionVersion, opp) {
+        opp?.let {
+            if (cube.opponentPlayed.isNotEmpty() || cube.positionVersion > 0) it.restorePosition(cube.scramble + cube.opponentPlayed)
+            else CubeModelBridge.applyScrambleAnimated(it, cube.scramble)
+            renderedOpponent = cube.opponentPlayed.size
+        }
     }
-    LaunchedEffect(cube.oppSerial, opp) {
+    LaunchedEffect(cube.opponentPlayed, opp) {
         val view = opp ?: return@LaunchedEffect
-        val move = CubeMove.parse(cube.oppLastMove) ?: return@LaunchedEffect
-        CubeModelBridge.applyMoveAnimated(view, move)
+        for (notation in cube.opponentPlayed.drop(renderedOpponent)) {
+            CubeMove.parse(notation)?.let { CubeModelBridge.applyMoveAnimated(view, it) }
+        }
+        renderedOpponent = cube.opponentPlayed.size
     }
 
     DisposableEffect(lifecycleOwner, mine, opp) {
@@ -58,7 +68,7 @@ internal fun CubeDuelModel3dRoute(vm: MainViewModel, cube: CubeDuelUiState) {
 
     CubeDuelOverlay(
         cube = cube,
-        onLeave = { vm.leaveCubeDuel() },
+        onLeave = onLeave,
         onGiveUp = { vm.revealCubeSolver() },
         onHint = { vm.cubeHint() },
         opponentView = {
@@ -84,7 +94,7 @@ internal fun CubeDuelModel3dRoute(vm: MainViewModel, cube: CubeDuelUiState) {
                 modifier = Modifier.fillMaxSize(),
                 update = { view ->
                     if (mine == null) mine = view
-                    val canTurn = cube.phase == DuelPhase.PLAYING && !cube.solved
+                    val canTurn = cube.phase == DuelPhase.PLAYING && !cube.solved && !cube.reconnecting
                     view.gesturesEnabled = canTurn
                     view.onMove = { move ->
                         if (canTurn && !view.animator.isBusy()) {

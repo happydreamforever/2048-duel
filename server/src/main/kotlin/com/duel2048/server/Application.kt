@@ -3,6 +3,10 @@ package com.duel2048.server
 import com.duel2048.server.db.JsonDb
 import com.duel2048.server.db.MySqlStore
 import com.duel2048.server.db.UserStore
+import com.duel2048.server.db.GameSaveStore
+import com.duel2048.server.db.SaveConflict
+import com.duel2048.shared.protocol.SavedGame
+import com.duel2048.shared.protocol.SavedGameList
 import kotlinx.coroutines.runBlocking
 import kotlin.system.exitProcess
 import com.duel2048.shared.protocol.AppRelease
@@ -40,6 +44,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.cancel
+import io.ktor.server.application.ApplicationStopped
 import org.slf4j.LoggerFactory
 import java.io.File
 import java.net.Inet4Address
@@ -93,10 +99,13 @@ fun Application.module(config: ServerConfig = ServerConfig.fromEnv(), db: UserSt
         allowMethod(HttpMethod.Post)
         allowHeader("Content-Type")
         allowHeader("X-Admin-Key")
+        allowHeader("Authorization")
     }
 
     val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-    val lobby = Lobby(config, appScope, db)
+    environment.monitor.subscribe(ApplicationStopped) { appScope.cancel(); db.close() }
+    val gameSaves = GameSaveStore(File(config.dataDir, "game-saves"))
+    val lobby = Lobby(config, appScope, db, gameSaves)
     val social = SocialService(config.dataDir, db, lobby)
     val adminKey = System.getenv("ADMIN_KEY")?.takeIf { it.isNotBlank() } ?: "duel-admin"
     appScope.launch { social.pollLoop() }
@@ -111,6 +120,30 @@ fun Application.module(config: ServerConfig = ServerConfig.fromEnv(), db: UserSt
             else call.respond(LocalFileContent(apk, ContentType.Application.OctetStream))
         }
         get("/stats") { call.respond(lobby.stats()) }
+        get("/games/saves") {
+            val token = call.request.headers["Authorization"]?.removePrefix("Bearer ").orEmpty()
+            val user = db.authByToken(token)
+            if (user == null) call.respond(HttpStatusCode.Unauthorized, "Sign in to sync games")
+            else call.respond(SavedGameList(gameSaves.list(user.id).map { save ->
+                if (save.mode == com.duel2048.shared.protocol.SavedGameMode.ONLINE)
+                    save.copy(resumable = save.completed || lobby.canResume(user.id, save.id)) else save
+            }))
+        }
+        post("/games/saves") {
+            val token = call.request.headers["Authorization"]?.removePrefix("Bearer ").orEmpty()
+            val user = db.authByToken(token)
+            if (user == null) { call.respond(HttpStatusCode.Unauthorized, "Sign in to sync games"); return@post }
+            val payload = call.receiveText()
+            if (payload.length > 512_000) { call.respond(HttpStatusCode.PayloadTooLarge); return@post }
+            try {
+                val game = Protocol.json.decodeFromString(SavedGame.serializer(), payload)
+                call.respond(gameSaves.put(user.id, game))
+            } catch (conflict: SaveConflict) {
+                call.respond(HttpStatusCode.Conflict, conflict.current)
+            } catch (invalid: IllegalArgumentException) {
+                call.respond(HttpStatusCode.BadRequest, invalid.message ?: "Invalid save")
+            }
+        }
         get("/leaderboard") {
             val limit = call.request.queryParameters["limit"]?.toIntOrNull()?.coerceIn(1, 100) ?: 50
             call.respond(db.leaderboard(limit))
@@ -158,11 +191,15 @@ fun Application.module(config: ServerConfig = ServerConfig.fromEnv(), db: UserSt
         }
         post("/social/mini/join") {
             val body = Protocol.json.decodeFromString(MiniJoinBody.serializer(), call.receiveText())
-            call.respond(social.joinMini(body.name, body.game, body.mode, body.difficulty))
+            val user = db.authByToken(body.token)
+            if (user == null) call.respond(HttpStatusCode.Unauthorized, "Sign in to play online")
+            else call.respond(social.joinMini(user.name, body.game, body.mode, body.difficulty))
         }
         post("/social/mini/answer") {
             val body = Protocol.json.decodeFromString(MiniAnswerBody.serializer(), call.receiveText())
-            val room = social.answer(body.roomId, body.name, body.answer)
+            val user = db.authByToken(body.token)
+            if (user == null) { call.respond(HttpStatusCode.Unauthorized, "Sign in to play online"); return@post }
+            val room = social.answer(body.roomId, user.name, body.answer)
             if (room == null) call.respond(HttpStatusCode.NotFound, "no room")
             else call.respond(room)
         }

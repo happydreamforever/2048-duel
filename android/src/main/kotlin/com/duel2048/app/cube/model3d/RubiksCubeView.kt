@@ -46,6 +46,11 @@ class RubiksCubeView(context: Context) : TextureView(context) {
     /** Opponent views render the same cube but accept orbit only, never turns. */
     var gesturesEnabled = true
 
+    fun restorePosition(notations: List<String>) {
+        animator.setPosition(notations)
+        dirty = true
+    }
+
     private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
 
     private sealed class Drag

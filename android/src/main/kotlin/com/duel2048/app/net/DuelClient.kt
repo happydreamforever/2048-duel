@@ -71,11 +71,11 @@ class DuelClient {
             }
 
             override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
-                webSocket.close(1000, null)
+                webSocket.close(code, null)
             }
 
             override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
-                if (gen == generation.get()) _connection.value = ConnectionState.Disconnected
+                if (gen == generation.get()) _connection.value = if (code == 4001) ConnectionState.Failed("session_replaced") else ConnectionState.Disconnected
             }
         })
     }
