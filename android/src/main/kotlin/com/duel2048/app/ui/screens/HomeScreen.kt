@@ -1,5 +1,12 @@
 package com.duel2048.app.ui.screens
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.ui.graphics.graphicsLayer
+import com.duel2048.app.ui.components.ShimmerTitle
+import com.duel2048.app.ui.theme.LocalLowEffects
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -47,7 +54,7 @@ private fun ProductShell(vm: MainViewModel, tab: ProductTab, subtitle: String, c
     BackHandler(enabled = tab != ProductTab.PLAY) { vm.goHome() }
     Column(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(top = 8.dp, bottom = 12.dp)) {
-            Text(stringResource(tab.title), style = MaterialTheme.typography.titleLarge, color = palette.textPrimary)
+            ShimmerTitle(stringResource(tab.title), fontSize = 18.sp, letterSpacing = 0.sp)
             Spacer(Modifier.height(4.dp))
             Text(subtitle, style = MaterialTheme.typography.bodySmall, color = palette.textSecondary)
         }
@@ -92,11 +99,17 @@ fun HomeScreen(vm: MainViewModel) {
 @Composable
 private fun GameLibraryCard(game: HubGame, onClick: () -> Unit) {
     val palette = LocalPalette.current
-    val shape = RoundedCornerShape(16.dp)
-    Row(Modifier.fillMaxWidth().clip(shape).background(palette.surface).border(1.dp, palette.surfaceBorder, shape)
-        .clickable(onClick = onClick).padding(14.dp), verticalAlignment = Alignment.CenterVertically,
+    val shape = RoundedCornerShape(20.dp)
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val lowEffects = LocalLowEffects.current
+    val scale by animateFloatAsState(if (pressed && !lowEffects) 0.98f else 1f, spring(), label = "game-card-press")
+    Row(Modifier.fillMaxWidth().graphicsLayer { scaleX = scale; scaleY = scale }.clip(shape)
+        .background(Brush.horizontalGradient(listOf(game.colors.first().copy(alpha = 0.22f), palette.surface)))
+        .border(1.dp, Brush.horizontalGradient(listOf(game.colors.first().copy(alpha = 0.55f), palette.surfaceBorder)), shape)
+        .clickable(interactionSource = interaction, indication = null, onClick = onClick).padding(14.dp), verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        Box(Modifier.size(44.dp).clip(RoundedCornerShape(12.dp)).background(Brush.linearGradient(game.colors)), contentAlignment = Alignment.Center) {
+        Box(Modifier.size(48.dp).clip(RoundedCornerShape(16.dp)).background(Brush.linearGradient(game.colors)), contentAlignment = Alignment.Center) {
             Text(when (game) { HubGame.TILES -> "2048"; HubGame.CUBE -> "3×3"; HubGame.MATH -> "±"; HubGame.WORD -> "Aa"; HubGame.WORD_PUZZLE -> "ABC" },
                 color = androidx.compose.ui.graphics.Color.White, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
         }

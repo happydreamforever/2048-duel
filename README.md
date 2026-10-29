@@ -27,8 +27,10 @@ so the game is always playable.
 ## Navigation and online state
 
 - **Play** offers five games: 2048, Cube, Math, Word Quiz, and Word Puzzle.
-- **Community** contains Watch rooms, chat, player search, updates, and rankings.
+- **Community** contains Watch rooms, player search, and rankings.
 - **Profile** contains account access, coins, the shop, settings, and feedback.
+
+The neon palette, animated ambient background, glowing gradient controls, and shimmer accents accompany the compact typography and new page structure.
 
 Every screen shares one compact floating top toolbar. Its navigation menu opens Play,
 Community, Watch, rankings, and Profile; notification and settings buttons remain in the
@@ -55,7 +57,7 @@ sessions have a 90-second reconnect window within the same server process. If th
 restarts, interrupted cube/2048 entries are refunded; minigame rooms restore their board,
 players, found words, and absolute timer from SQL. Back up the SQL database and DATA_DIR.
 
-Protocol version remains 7; update both server and APK to Android **1.5.0 (7)**.
+Protocol version remains 7; update both server and APK to Android **1.5.1 (8)**.
 
 ```powershell
 .\gradlew.bat :shared:test :server:test :android:assembleDebug
@@ -135,12 +137,12 @@ payment reference and review note. Approval credits the shared wallet once and w
 an audit entry. The app refreshes wallet balances automatically. No payment provider
 or invented monetary prices are configured.
 
-APK version: **1.5.0 (7)**. Release builds require the existing release signing key;
+APK version: **1.5.1 (8)**. Release builds require the existing release signing key;
 keep `keystore.properties` and the keystore private so updates retain their signature.
 
 ## Visual effects in the client
 
-- Calm page background with a faint gradient/grid; effects are kept inside game views.
+- Animated page background with gradient, drifting glow orbs, faint grid, and twinkling stars. Reduce effects disables ambient animation and control glows.
 - Keyed tile animation: slide tween, merge pop with glow flash, spring spawn, garbage "slam".
 - Particle bursts and shock rings on every merge, scaled by tile value and combo.
 - Floating score / combo / attack texts, board shake and colour flash on hits.

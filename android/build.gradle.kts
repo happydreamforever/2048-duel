@@ -24,8 +24,8 @@ android {
         applicationId = "com.duel2048.app"
         minSdk = libs.versions.minSdk.get().toInt()
         targetSdk = libs.versions.targetSdk.get().toInt()
-        versionCode = 7
-        versionName = "1.5.0"
+        versionCode = 8
+        versionName = "1.5.1"
         vectorDrawables { useSupportLibrary = true }
     }
 

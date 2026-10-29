@@ -1,6 +1,11 @@
 package com.duel2048.app.ui.screens
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.unit.sp
+import com.duel2048.app.ui.components.ShimmerTitle
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -56,10 +61,11 @@ internal fun AppChrome(vm: MainViewModel, screen: Screen, content: @Composable (
     }
     Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
         Surface(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp).zIndex(1f),
-            shape = RoundedCornerShape(20.dp), color = palette.bgTop, tonalElevation = 4.dp, shadowElevation = 6.dp) {
-            Row(Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            shape = RoundedCornerShape(20.dp), color = palette.bgTop.copy(alpha = 0.82f), tonalElevation = 0.dp, shadowElevation = 8.dp,
+            border = BorderStroke(1.dp, Brush.linearGradient(listOf(palette.accent.copy(alpha = 0.5f), palette.accent2.copy(alpha = 0.3f))))) {
+            Row(Modifier.fillMaxWidth().background(Brush.horizontalGradient(listOf(palette.accent2.copy(alpha = 0.12f), palette.accent.copy(alpha = 0.04f)))).heightIn(min = 56.dp).padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 Box {
-                    IconButton(onClick = { menu = true }) { Icon(Icons.Default.Menu, stringResource(R.string.app_navigation)) }
+                    IconButton(onClick = { menu = true }) { Icon(Icons.Default.Menu, stringResource(R.string.app_navigation), tint = palette.accent) }
                     DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                         if(navigatingLocked) DropdownMenuItem(text = { Text(stringResource(R.string.app_finish_navigation), style = MaterialTheme.typography.bodySmall) }, onClick = {}, enabled = false)
                         DropdownMenuItem(text = { Text(stringResource(R.string.product_play)) }, enabled = !navigatingLocked,
@@ -75,7 +81,7 @@ internal fun AppChrome(vm: MainViewModel, screen: Screen, content: @Composable (
                     }
                 }
                 Column(Modifier.weight(1f).padding(horizontal = 2.dp)) {
-                    Text("Duel", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    ShimmerTitle("Duel", fontSize = 15.sp, letterSpacing = 0.sp)
                     Text(title, style = MaterialTheme.typography.bodySmall, color = palette.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
                 if(chatRoom != null) IconButton(onClick = { sheet = "chat" }) {
@@ -83,10 +89,10 @@ internal fun AppChrome(vm: MainViewModel, screen: Screen, content: @Composable (
                 }
                 IconButton(onClick = { vm.updateSettings { it.copy(lastReadNoticeAt=notes.maxOfOrNull { note -> note.at } ?: seenNotice,lastNoticeServer=it.serverUrl) }; sheet = "notes" }) {
                     BadgedBox(badge = { if(notes.any { it.at > seenNotice }) Badge() }) {
-                        Icon(Icons.Default.Notifications, stringResource(R.string.app_notifications))
+                        Icon(Icons.Default.Notifications, stringResource(R.string.app_notifications), tint = palette.gold)
                     }
                 }
-                IconButton(onClick = { sheet = "settings" }) { Icon(Icons.Default.Settings, stringResource(R.string.settings)) }
+                IconButton(onClick = { sheet = "settings" }) { Icon(Icons.Default.Settings, stringResource(R.string.settings), tint = palette.accent2) }
             }
         }
         Box(Modifier.weight(1f).fillMaxWidth().clipToBounds()) { content() }

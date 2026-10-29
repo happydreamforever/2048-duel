@@ -1,5 +1,17 @@
 package com.duel2048.app.ui.screens
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import com.duel2048.app.ui.components.ShimmerTitle
+import com.duel2048.app.ui.theme.LocalLowEffects
 import androidx.activity.compose.BackHandler
 
 import androidx.compose.foundation.background
@@ -73,7 +85,7 @@ fun GameModesScreen(vm: MainViewModel, game: HubGame) {
     var difficulty by remember(game) { mutableStateOf(if(game in listOf(HubGame.WORD,HubGame.WORD_PUZZLE)) "4" else if(game==HubGame.MATH) "medium" else "normal") }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal=16.dp,vertical=12.dp), verticalArrangement=Arrangement.spacedBy(12.dp)) {
         TextButton(onClick={vm.goHome()}) { Icon(Icons.Default.ArrowBack,null);Spacer(Modifier.width(6.dp));Text(stringResource(R.string.product_play)) }
-        Text(gameTitle(game),style=MaterialTheme.typography.titleLarge,color=palette.textPrimary)
+        ShimmerTitle(gameTitle(game), fontSize = 20.sp, letterSpacing = 0.sp)
         Text(stringResource(R.string.product_mode_subtitle),style=MaterialTheme.typography.bodySmall,color=palette.textSecondary)
         GlassCard(Modifier.fillMaxWidth()) {
             Text(stringResource(R.string.difficulty),style=MaterialTheme.typography.titleSmall,color=palette.textPrimary)
@@ -88,27 +100,45 @@ fun GameModesScreen(vm: MainViewModel, game: HubGame) {
             }
         }
         ModeChoice(stringResource(R.string.mode_pvp),stringResource(R.string.mode_pvp_sub),Icons.Default.Person,stringResource(R.string.app_entry_coins,10),true) { vm.startHub(game,HubMode.PVP,difficulty) }
-        ModeChoice(stringResource(R.string.mode_bot),stringResource(R.string.mode_bot_sub),Icons.Default.PlayArrow,stringResource(R.string.app_entry_coins,5)) { vm.startHub(game,HubMode.BOT,difficulty) }
-        ModeChoice(stringResource(R.string.mode_train),stringResource(R.string.mode_train_sub),Icons.Default.Refresh,stringResource(R.string.app_free)) { vm.startHub(game,HubMode.TRAIN,difficulty) }
-        ModeChoice(stringResource(R.string.mode_watch),stringResource(R.string.mode_watch_sub),Icons.Default.Star,stringResource(R.string.app_live)) { vm.startHub(game,HubMode.WATCH,difficulty) }
+        ModeChoice(stringResource(R.string.mode_bot),stringResource(R.string.mode_bot_sub),Icons.Default.PlayArrow,stringResource(R.string.app_entry_coins,5),colors=listOf(Color(0xFF4A6FA5),Color(0xFF1B3A5C))) { vm.startHub(game,HubMode.BOT,difficulty) }
+        ModeChoice(stringResource(R.string.mode_train),stringResource(R.string.mode_train_sub),Icons.Default.Refresh,stringResource(R.string.app_free),colors=listOf(Color(0xFF1F9D6B),Color(0xFF0E6B8A))) { vm.startHub(game,HubMode.TRAIN,difficulty) }
+        ModeChoice(stringResource(R.string.mode_watch),stringResource(R.string.mode_watch_sub),Icons.Default.Star,stringResource(R.string.app_live),colors=listOf(Color(0xFF5C4A7A),Color(0xFF2A2140))) { vm.startHub(game,HubMode.WATCH,difficulty) }
         if(game==HubGame.TILES) TextButton(onClick={vm.openSolo()},modifier=Modifier.fillMaxWidth()) { Text(stringResource(R.string.product_solo)) }
         Text(stringResource(R.string.app_reward_coins,25),style=MaterialTheme.typography.bodySmall,color=palette.textSecondary)
     }
 }
 
 @Composable
-private fun ModeChoice(title:String,subtitle:String,icon:ImageVector,badge:String,primary:Boolean=false,onClick:()->Unit) {
-    val palette=LocalPalette.current
-    Surface(shape=RoundedCornerShape(16.dp),color=if(primary) palette.accent.copy(alpha=0.1f) else palette.surface,
-        border=BorderStroke(1.dp,if(primary) palette.accent.copy(alpha=0.45f) else palette.surfaceBorder),modifier=Modifier.fillMaxWidth()) {
-        Row(Modifier.clickable(onClick=onClick).padding(14.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)) {
-            Icon(icon,null,tint=palette.accent,modifier=Modifier.size(22.dp))
-            Column(Modifier.weight(1f)) {
-                Text(title,style=MaterialTheme.typography.titleSmall,color=palette.textPrimary)
-                Text(subtitle,style=MaterialTheme.typography.bodySmall,color=palette.textSecondary)
+private fun ModeChoice(title:String,subtitle:String,icon:ImageVector,badge:String,primary:Boolean=false,colors:List<Color>?=null,onClick:()->Unit) {
+    val palette = LocalPalette.current
+    val gradient = colors ?: listOf(palette.accent2, palette.accent)
+    val shape = RoundedCornerShape(18.dp)
+    val lowEffects = LocalLowEffects.current
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val scale by animateFloatAsState(if (pressed && !lowEffects) 0.97f else 1f, spring(), label = "mode-press")
+    Row(Modifier.fillMaxWidth().graphicsLayer { scaleX = scale; scaleY = scale }
+        .drawBehind {
+            if (!lowEffects) {
+                for (i in 1..3) {
+                    val pad = i * 3.dp.toPx()
+                    drawRoundRect(gradient.last().copy(alpha = (if (primary) 0.16f else 0.09f) / i),
+                        topLeft = Offset(-pad, -pad), size = Size(size.width + 2 * pad, size.height + 2 * pad),
+                        cornerRadius = CornerRadius(18.dp.toPx() + pad))
+                }
             }
-            Text(badge,style=MaterialTheme.typography.labelSmall,color=palette.accent)
         }
+        .clip(shape).background(Brush.horizontalGradient(gradient))
+        .border(1.dp, Color.White.copy(alpha = 0.22f), shape)
+        .clickable(interactionSource = interaction, indication = null, onClick = onClick).padding(14.dp),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Icon(icon, null, tint = Color.White, modifier = Modifier.size(22.dp))
+        Column(Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.titleSmall, color = Color.White)
+            Text(subtitle, style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.82f))
+        }
+        Text(badge, style = MaterialTheme.typography.labelSmall, color = Color.White,
+            modifier = Modifier.clip(RoundedCornerShape(10.dp)).background(Color.Black.copy(alpha = 0.24f)).padding(horizontal = 8.dp, vertical = 6.dp))
     }
 }
 

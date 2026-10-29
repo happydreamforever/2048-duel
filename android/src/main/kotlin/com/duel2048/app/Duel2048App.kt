@@ -69,7 +69,7 @@ fun Duel2048App(vm: MainViewModel) {
         DuelTheme(palette) {
             CompositionLocalProvider(LocalGameFx provides fx, LocalLowEffects provides settings.lowEffects) {
                 Box(Modifier.fillMaxSize()) {
-                    AmbientBackground(palette, animated = false)
+                    AmbientBackground(palette, animated = !settings.lowEffects)
                     AppChrome(vm, screen) {
                         AnimatedContent(
                             targetState = screen,

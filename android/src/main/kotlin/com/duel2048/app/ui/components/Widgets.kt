@@ -54,7 +54,7 @@ import kotlin.math.abs
 @Composable
 fun GlassCard(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
     val palette = LocalPalette.current
-    val shape = RoundedCornerShape(16.dp)
+    val shape = RoundedCornerShape(24.dp)
     Column(
         modifier
             .clip(shape)
@@ -77,13 +77,27 @@ fun NeonButton(
 ) {
     val palette = LocalPalette.current
     val gradient = colors ?: listOf(palette.accent2, palette.accent)
+    val lowEffects = LocalLowEffects.current
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     val scale by animateFloatAsState(if (pressed) 0.96f else 1f, spring(stiffness = Spring.StiffnessMedium), label = "press")
-    val shape = RoundedCornerShape(12.dp)
+    val shape = RoundedCornerShape(18.dp)
     Box(
         modifier
             .graphicsLayer { scaleX = scale; scaleY = scale; alpha = if (enabled) 1f else 0.5f }
+            .drawBehind {
+                if (!lowEffects && enabled) {
+                    for (i in 1..3) {
+                        val pad = i * 5.dp.toPx()
+                        drawRoundRect(
+                            gradient.last().copy(alpha = 0.16f / i),
+                            topLeft = Offset(-pad, -pad),
+                            size = Size(size.width + 2 * pad, size.height + 2 * pad),
+                            cornerRadius = CornerRadius(18.dp.toPx() + pad),
+                        )
+                    }
+                }
+            }
             .clip(shape)
             .background(Brush.horizontalGradient(gradient))
             .border(1.dp, Color.White.copy(alpha = 0.22f), shape)
