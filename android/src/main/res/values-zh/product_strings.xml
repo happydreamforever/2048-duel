@@ -16,7 +16,7 @@
     <string name="product_tiles_description">合成更大的方块，单人畅玩或与对手竞赛。</string>
     <string name="product_cube_description">转动外层与中间层，还原三阶魔方。</string>
     <string name="product_math_description">在倒计时内挑战心算能力。</string>
-    <string name="product_word_description">在时间耗尽前找到隐藏的单词。</string>
+    <string name="product_word_description">根据提示点击字母块，组成正确单词。</string>
     <string name="product_online">在线对局</string>
     <string name="product_solo">单人</string>
     <string name="product_moves_count">%1$d 步</string>

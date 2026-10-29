@@ -52,7 +52,7 @@ After a server restart, checkpoint files and finished results remain, but unfini
 cube/2048 matches are displayed as unavailable: live matches are not reconstructed yet.
 Math/word rooms do retain their puzzle and absolute timer across server restarts.
 
-This update uses **protocol version 6**. Rebuild and update the server and Android client
+This update uses **protocol version 7** (Android 1.3.0, version code 5). Rebuild and update the server and Android client
 together. See [the protocol reference](docs/PROTOCOL.md) for save APIs and reconnect messages.
 
 Windows validation (from the project folder, with JDK/Android SDK configured):
@@ -66,6 +66,31 @@ The debug APK is `android/build/outputs/apk/debug/android-debug.apk`.
 To check synchronization, save a cube after several face and middle-layer turns, reopen it
 from Saved games, then sign in on a second device and sync. Also test 2048, offline edits,
 conflict choices, and a brief network interruption during an online match.
+
+## Math and word datasets
+
+The APK contains only the small offline **training** catalog in
+`shared/src/main/resources/datasets/training/`: 12 math examples per difficulty and
+8 English words per length (4–8 letters). Training works without a server.
+
+Every real math/word match, including **vs Bot**, requires a connection. The server
+randomly selects from its full catalog in `server/src/main/resources/datasets/matches/`
+(80 math problems per difficulty and 24 words per length). Full match CSVs are packaged
+only in the server distribution. They are not included in the APK or downloaded as a dataset.
+Only the chosen problem, shuffled answer options or letter bank, clue, timer, and opaque
+puzzle ID are sent. The correct answer stays on the server until the match ends.
+
+Math uses four selectable answers and an explicit Submit button. Word puzzles use tappable
+letter tiles, an assembled-word preview, Undo, and Clear; repeated letters require distinct
+tiles. Word levels describe word length rather than grid dimensions. Each competitor has
+one submission; a wrong answer locks their input while the opponent continues. A server bot
+solves after half the time limit, so the player must answer before then. Training offers hints.
+The problem, option order, and partial word selection survive saving and reconnecting.
+
+Math CSV columns: `id,prompt,answer,option_1,option_2,option_3,option_4`.
+Word CSV columns: `word,clue`. Keep words uppercase and in the file matching their length.
+CSV fields containing commas must be quoted; embedded quotes are doubled. Rebuild the server
+after editing full datasets. Editing the training samples requires rebuilding the APK.
 
 ## Visual effects in the client
 

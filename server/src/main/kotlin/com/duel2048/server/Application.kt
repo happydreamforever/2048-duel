@@ -193,13 +193,14 @@ fun Application.module(config: ServerConfig = ServerConfig.fromEnv(), db: UserSt
             val body = Protocol.json.decodeFromString(MiniJoinBody.serializer(), call.receiveText())
             val user = db.authByToken(body.token)
             if (user == null) call.respond(HttpStatusCode.Unauthorized, "Sign in to play online")
-            else call.respond(social.joinMini(user.name, body.game, body.mode, body.difficulty))
+            else try { call.respond(social.joinMini(user.name, body.game, body.mode, body.difficulty)) }
+            catch (invalid: IllegalArgumentException) { call.respond(HttpStatusCode.BadRequest, invalid.message ?: "Invalid puzzle request") }
         }
         post("/social/mini/answer") {
             val body = Protocol.json.decodeFromString(MiniAnswerBody.serializer(), call.receiveText())
             val user = db.authByToken(body.token)
             if (user == null) { call.respond(HttpStatusCode.Unauthorized, "Sign in to play online"); return@post }
-            val room = social.answer(body.roomId, user.name, body.answer)
+            val room = social.answer(body.roomId, user.name, body.answer, body.selectedLetters)
             if (room == null) call.respond(HttpStatusCode.NotFound, "no room")
             else call.respond(room)
         }

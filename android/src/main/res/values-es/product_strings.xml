@@ -16,7 +16,7 @@
     <string name="product_tiles_description">Combina fichas. Juega en solitario o contra un rival.</string>
     <string name="product_cube_description">Resuelve un cubo 3×3 girando caras y capas centrales.</string>
     <string name="product_math_description">Pon a prueba tu cálculo mental contra el reloj.</string>
-    <string name="product_word_description">Encuentra la palabra oculta antes de que se acabe el tiempo.</string>
+    <string name="product_word_description">Usa la pista y las fichas para formar una palabra.</string>
     <string name="product_online">Partida en línea</string>
     <string name="product_solo">Solitario</string>
     <string name="product_moves_count">%1$d movimientos</string>

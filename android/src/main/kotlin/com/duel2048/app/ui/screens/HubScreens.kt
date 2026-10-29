@@ -73,7 +73,7 @@ fun GameModesScreen(vm: MainViewModel, game: HubGame) {
         if (game in HubGame.entries) {
             Text(stringResource(R.string.difficulty), color = palette.accent, fontWeight = FontWeight.Bold)
             androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                val options = if (game == HubGame.WORD) listOf("4", "6") else if (game == HubGame.MATH) listOf("easy", "medium", "hard", "very_hard") else listOf("easy", "normal", "hard")
+                val options = if (game == HubGame.WORD) com.duel2048.shared.social.Puzzles.wordLengths.map(Int::toString) else if (game == HubGame.MATH) listOf("easy", "medium", "hard", "very_hard") else listOf("easy", "normal", "hard")
                 options.forEach { id ->
                     val on = id == difficulty
                     Text(
@@ -154,34 +154,17 @@ fun MiniPlayScreen(vm: MainViewModel) {
         }
         return
     }
-    var typed by remember(state.prompt, state.grid) { mutableStateOf("") }
     Column(
         Modifier.fillMaxSize().systemBarsPadding().verticalScroll(rememberScrollState()).padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text(state.title, color = palette.accent, fontWeight = FontWeight.Black, fontSize = 22.sp)
+        Text(gameTitle(if (state.game == com.duel2048.shared.protocol.SavedGameType.WORD) HubGame.WORD else HubGame.MATH), color = palette.accent, fontWeight = FontWeight.Black, fontSize = 22.sp)
         Text(stringResource(R.string.vs_name, state.opponent), color = palette.textSecondary)
         Text("${state.secondsLeft}s", color = palette.gold, fontWeight = FontWeight.Black, fontSize = 32.sp)
-        if (state.grid.isNotEmpty()) {
-            state.grid.forEach { row ->
-                Text(row.toCharArray().joinToString("  "), color = palette.textPrimary, fontWeight = FontWeight.Black, fontSize = 22.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
-            }
-        } else {
-            Text(state.prompt, color = palette.textPrimary, fontWeight = FontWeight.Black, fontSize = 28.sp)
-        }
+        Text(state.prompt, color = palette.textPrimary, fontWeight = FontWeight.Black, fontSize = if (state.grid.isEmpty()) 28.sp else 22.sp)
         if (state.hint.isNotBlank()) Text(stringResource(R.string.hint_line, state.hint), color = palette.accent)
         if (state.status == "playing") {
-            OutlinedTextField(
-                value = typed,
-                onValueChange = { typed = it },
-                modifier = Modifier.fillMaxWidth(),
-                keyboardOptions = KeyboardOptions(keyboardType = if (state.grid.isEmpty()) KeyboardType.Number else KeyboardType.Text),
-                singleLine = true,
-            )
-            NeonButton(stringResource(R.string.submit_answer), modifier = Modifier.fillMaxWidth()) { vm.submitMini(typed) }
-            if (state.guided) {
-                TextButton(onClick = { vm.miniHint() }) { Text(stringResource(R.string.hint), color = palette.accent) }
-            }
+            PuzzleAnswerControls(vm, state)
         } else if (state.status == "waiting") {
             Text(stringResource(R.string.product_waiting), color = palette.textSecondary)
         } else {
@@ -312,7 +295,6 @@ private fun difficultyLabel(id: String): String = when (id) {
     "medium", "normal" -> stringResource(R.string.medium)
     "hard" -> stringResource(R.string.hard)
     "very_hard" -> stringResource(R.string.very_hard)
-    "4" -> "4×4"
-    "6" -> "6×6"
+    "4", "5", "6", "7", "8" -> stringResource(R.string.puzzle_word_length, id)
     else -> id
 }

@@ -4,7 +4,9 @@ JSON over a single WebSocket (`/ws`). Every message has a `type` discriminator.
 Types are defined once in `shared/.../protocol/Messages.kt` and serialized with
 kotlinx.serialization on both ends.
 
-Protocol version 6 adds account saves and authoritative match reconnection. It supports the outer face turns and the three middle slices
+Protocol version 7 adds server-selected puzzle questions, multiple-choice math answers,
+and word answers assembled from letter tile indices. It retains account saves and
+authoritative match reconnection, outer face turns, and the three middle slices
 (`M`, `E`, `S`), including inverse (`'`) and double (`2`) variants. A solved cube
 has uniform faces in any orientation, since middle slices move the centers.
 Rebuild and update both the server and Android app together; older versions
@@ -117,3 +119,27 @@ closes its old socket with code **4001** (`session_replaced`); that device must 
 Math/word room creation and answers require `token` in the request body. The server uses
 the authenticated account name, verifies room membership on answers, and persists room
 content, participants, results, and the absolute start timestamp in `social.json`.
+
+### Dataset puzzle matches
+
+`POST /social/mini/join` accepts `game` (`math` or `word`), `mode` (`pvp` or `bot`),
+`difficulty`, and `token`. Math difficulties are `easy`, `medium`, `hard`, `very_hard`;
+word difficulties are lengths `4`, `5`, `6`, `7`, `8`. Unknown levels return 400. Training
+is local and uses only the small APK catalog; the join endpoint does not accept `train`.
+
+`MiniRoomView` contains the chosen `prompt`, `grid` (shuffled word letters), `choices`
+(four shuffled math answers), `puzzleId`, and per-player `answered` flag. The solution
+is empty until `status=over`. Word puzzle IDs never encode their answer. Both competitors
+receive the same problem and choice order, which are checkpointed unchanged.
+
+`POST /social/mini/answer` accepts `{roomId,token,name,answer,selectedLetters}`. The server
+ignores the supplied player name and authenticates the token. Math answers must match a
+displayed choice. Word answers are reconstructed from `selectedLetters` (zero-based indices
+into concatenated `grid` strings); duplicate or out-of-range indices, and incomplete words,
+are not accepted as submissions. The supplied `answer` text is ignored for word puzzles.
+An incorrect valid submission locks that player out; both incorrect submissions end a PvP
+match without a winner. Bot matches are server-owned and the bot solves halfway through
+the time limit. Polling restores the question, choices, timer, and answered state after reconnect.
+
+`SavedGame` additionally persists `choices`, `puzzleId`, `puzzleMode`, and `selectedLetters`.
+Clients never need the full match catalog. The server sends individual questions only.

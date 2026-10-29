@@ -16,7 +16,7 @@
     <string name="product_tiles_description">Build bigger tiles. Play solo or race an opponent.</string>
     <string name="product_cube_description">Solve a 3×3 cube with face and middle-layer turns.</string>
     <string name="product_math_description">Challenge your mental math against the clock.</string>
-    <string name="product_word_description">Find the hidden word before time runs out.</string>
+    <string name="product_word_description">Use the clue and letter tiles to build a word.</string>
     <string name="product_online">Online match</string>
     <string name="product_solo">Solo</string>
     <string name="product_moves_count">%1$d moves</string>

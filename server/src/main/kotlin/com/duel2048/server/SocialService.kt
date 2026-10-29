@@ -8,6 +8,7 @@ import com.duel2048.shared.social.LiveGame
 import com.duel2048.shared.social.MiniRoomView
 import com.duel2048.shared.social.PlayerPresence
 import com.duel2048.shared.social.Puzzles
+import com.duel2048.shared.social.PuzzleCatalog
 import com.duel2048.shared.social.WalletView
 import kotlinx.coroutines.delay
 import kotlinx.serialization.Serializable
@@ -34,6 +35,7 @@ class SocialService(
     private var state = SocialFile()
     private var seenNote = 0L
     private val rooms = ConcurrentHashMap<String, MiniRoom>()
+    private val puzzles = PuzzleCatalog("/datasets/matches")
 
     init {
         file.parentFile?.mkdirs()
@@ -126,6 +128,8 @@ class SocialService(
     fun joinMini(name: String, game: String, mode: String, difficulty: String): MiniRoomView {
         synchronized(lock) {
         require(game == "math" || game == "word") { "Unknown game" }
+        require(mode in listOf("pvp", "bot", "watch")) { "Training is played locally" }
+        require(if (game == "math") difficulty in Puzzles.mathLevels else difficulty.toIntOrNull() in Puzzles.wordLengths) { "Unknown difficulty" }
         val who = name.ifBlank { "Player" }
         if (mode == "watch") {
             val live = rooms.values.firstOrNull { it.game == game && it.status == "playing" }
@@ -161,15 +165,23 @@ class SocialService(
         view
     }
 
-    fun answer(roomId: String, name: String, answer: String): MiniRoomView? {
+    fun answer(roomId: String, name: String, answer: String, selectedLetters: List<Int> = emptyList()): MiniRoomView? {
         synchronized(lock) {
         val room = rooms[roomId] ?: return null
         if (name != room.host && name != room.opponent) return null
         room.view(name)
         if (room.status != "playing") { saveRooms(); return room.view(name) }
-        if (answer.trim().equals(room.solution, ignoreCase = true)) {
+        if (name in room.incorrectPlayers) return room.view(name)
+        val submitted = if (room.game == "word") Puzzles.selectedWord(room.grid, selectedLetters) ?: return room.view(name)
+            else answer.trim().takeIf { it in room.choices } ?: return room.view(name)
+        if (room.game == "word" && selectedLetters.size != room.solution.length) return room.view(name)
+        if (submitted.equals(room.solution, ignoreCase = true)) {
             room.status = "over"
             room.winner = name
+        } else {
+            room.incorrectPlayers.add(name)
+            if (room.mode == "bot") room.winner = room.opponent
+            if (room.mode != "pvp" || room.host in room.incorrectPlayers && room.opponent in room.incorrectPlayers) room.status = "over"
         }
         saveRooms()
         return room.view(name)
@@ -206,7 +218,7 @@ class SocialService(
         } finally { java.nio.file.Files.deleteIfExists(tmp) }
     }
 
-    private class MiniRoom(
+    private inner class MiniRoom(
         val id: String,
         val game: String,
         val mode: String,
@@ -223,21 +235,29 @@ class SocialService(
         val solution: String
         val grid: List<String>
         val seconds: Int
+        val choices: List<String>
+        val puzzleId: String
+        val incorrectPlayers = saved?.incorrectPlayers.orEmpty().toMutableSet()
 
         init {
             if (saved != null) {
                 grid = saved.grid; solution = saved.solution; prompt = saved.prompt; seconds = saved.seconds
+                choices = if (game == "math" && saved.choices.isEmpty()) Puzzles.choicesFor(saved.solution) else saved.choices
+                puzzleId = saved.puzzleId
             } else if (game == "word") {
-                val size = if (difficulty == "6") 6 else 4
-                val (g, word, secs) = Puzzles.word(size, Random.Default)
-                grid = g
-                solution = word
-                prompt = "Find the word"
-                seconds = secs
+                val word = puzzles.word(difficulty.toInt(), Random.Default)
+                grid = word.grid
+                solution = word.answer
+                prompt = word.prompt
+                seconds = word.seconds
+                choices = emptyList()
+                puzzleId = word.id
             } else {
-                val (text, answer) = Puzzles.math(difficulty, Random.Default)
-                prompt = text
-                solution = answer
+                val problem = puzzles.math(difficulty, Random.Default)
+                prompt = problem.prompt
+                solution = problem.answer
+                choices = problem.choices
+                puzzleId = problem.id
                 grid = emptyList()
                 seconds = when (difficulty) {
                     "very_hard" -> 90
@@ -249,11 +269,15 @@ class SocialService(
         }
 
         fun checkpoint() = MiniRoomState(id, game, mode, difficulty, host, opponent, status, winner,
-            prompt, solution, grid, seconds, startedAt)
+            prompt, solution, grid, seconds, startedAt, choices, puzzleId, incorrectPlayers.toList())
 
         fun view(you: String): MiniRoomView {
             val remaining = if (startedAt > 0) (seconds - (System.currentTimeMillis() - startedAt) / 1000).toInt().coerceAtLeast(0) else seconds
             if (status == "playing" && remaining == 0) status = "over"
+            if (status == "playing" && mode == "bot" && remaining <= seconds / 2) {
+                status = "over"
+                winner = opponent
+            }
             return MiniRoomView(
             roomId = id,
             game = game,
@@ -267,6 +291,9 @@ class SocialService(
             solution = if (status == "over") solution else "",
             grid = grid,
             seconds = remaining,
+            choices = choices,
+            puzzleId = puzzleId,
+            answered = you in incorrectPlayers,
         )
         }
 
@@ -289,4 +316,5 @@ private data class SocialFile(
 @Serializable
 private data class MiniRoomState(val id: String, val game: String, val mode: String, val difficulty: String,
     val host: String, val opponent: String, val status: String, val winner: String?, val prompt: String,
-    val solution: String, val grid: List<String>, val seconds: Int, val startedAt: Long)
+    val solution: String, val grid: List<String>, val seconds: Int, val startedAt: Long,
+    val choices: List<String> = emptyList(), val puzzleId: String = "", val incorrectPlayers: List<String> = emptyList())

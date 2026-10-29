@@ -1,0 +1,10 @@
+<resources>
+    <string name="puzzle_letters_help">Tap letters in order to build the word. Each tile can be used once.</string>
+    <string name="puzzle_undo">Undo</string>
+    <string name="puzzle_clear">Clear</string>
+    <string name="puzzle_choose_answer">Choose one answer, then submit.</string>
+    <string name="puzzle_submit_failed">Could not submit. Check your connection and try again.</string>
+    <string name="puzzle_wrong_wait">Incorrect answer. Waiting for the other player…</string>
+    <string name="puzzle_sending">Submitting…</string>
+    <string name="puzzle_word_length">%1$s letters</string>
+</resources>

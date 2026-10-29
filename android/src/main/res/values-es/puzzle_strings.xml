@@ -1,0 +1,10 @@
+<resources>
+    <string name="puzzle_letters_help">Toca las letras en orden para formar la palabra. Cada ficha se puede usar una vez.</string>
+    <string name="puzzle_undo">Deshacer</string>
+    <string name="puzzle_clear">Borrar</string>
+    <string name="puzzle_choose_answer">Elige una respuesta y envíala.</string>
+    <string name="puzzle_submit_failed">No se pudo enviar. Revisa la conexión e inténtalo de nuevo.</string>
+    <string name="puzzle_wrong_wait">Respuesta incorrecta. Esperando al otro jugador…</string>
+    <string name="puzzle_sending">Enviando…</string>
+    <string name="puzzle_word_length">%1$s letras</string>
+</resources>

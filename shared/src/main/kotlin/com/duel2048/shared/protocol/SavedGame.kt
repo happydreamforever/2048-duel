@@ -42,6 +42,10 @@ data class SavedGame(
     val duelResult: MatchOver? = null,
     val cubeResult: CubeMatchOver? = null,
     val resumable: Boolean = true,
+    val choices: List<String> = emptyList(),
+    val selectedLetters: List<Int> = emptyList(),
+    val puzzleId: String = "",
+    val puzzleMode: String = "",
 ) {
     fun validate() {
         require(id.matches(Regex("[A-Za-z0-9_-]{1,100}"))) { "Invalid save id" }
@@ -57,6 +61,10 @@ data class SavedGame(
         if (game == SavedGameType.TILES) require(board != null && (mode == SavedGameMode.SOLO || opponentBoard != null)) { "Board state is missing" }
         require(prompt.length <= 1000 && solution.length <= 1000 && roomId.length <= 100) { "Puzzle is too large" }
         require(grid.size <= 8 && grid.all { it.length <= 16 }) { "Invalid word grid" }
+        require(choices.size <= 4 && choices.all { it.length <= 100 } && choices.distinct().size == choices.size) { "Invalid answer choices" }
+        require(puzzleId.length <= 100) { "Invalid puzzle id" }
+        require(puzzleMode in listOf("", "train", "bot", "pvp")) { "Invalid puzzle mode" }
+        require(selectedLetters.size <= 16 && selectedLetters.distinct().size == selectedLetters.size && selectedLetters.all { it in 0 until grid.sumOf(String::length) }) { "Invalid selected letters" }
     }
 }
 

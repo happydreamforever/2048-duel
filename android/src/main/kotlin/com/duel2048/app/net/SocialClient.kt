@@ -56,8 +56,8 @@ class SocialClient {
             MiniRoomView.serializer(),
         )
 
-    suspend fun answerMini(ws: String, roomId: String, name: String, answer: String, token: String = ""): Result<MiniRoomView> =
-        post(ws, "/social/mini/answer", Protocol.json.encodeToString(MiniAnswerBody.serializer(), MiniAnswerBody(roomId, name, answer, token)), MiniRoomView.serializer())
+    suspend fun answerMini(ws: String, roomId: String, name: String, answer: String, token: String = "", selectedLetters: List<Int> = emptyList()): Result<MiniRoomView> =
+        post(ws, "/social/mini/answer", Protocol.json.encodeToString(MiniAnswerBody.serializer(), MiniAnswerBody(roomId, name, answer, token, selectedLetters)), MiniRoomView.serializer())
 
     private suspend fun <T> get(ws: String, path: String, serializer: kotlinx.serialization.KSerializer<T>): Result<T> =
         withContext(Dispatchers.IO) {

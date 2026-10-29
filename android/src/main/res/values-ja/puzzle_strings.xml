@@ -1,0 +1,10 @@
+<resources>
+    <string name="puzzle_letters_help">文字を順にタップして単語を作ります。各タイルは一度だけ使えます。</string>
+    <string name="puzzle_undo">一文字戻す</string>
+    <string name="puzzle_clear">クリア</string>
+    <string name="puzzle_choose_answer">答えを一つ選んで送信してください。</string>
+    <string name="puzzle_submit_failed">送信できませんでした。接続を確認して再試行してください。</string>
+    <string name="puzzle_wrong_wait">不正解です。相手の回答を待っています…</string>
+    <string name="puzzle_sending">送信中…</string>
+    <string name="puzzle_word_length">%1$s文字</string>
+</resources>
