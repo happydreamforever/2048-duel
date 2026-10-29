@@ -47,6 +47,7 @@ data class LiveGame(
     val scoreA: Int,
     val playerB: String,
     val scoreB: Int,
+    val demo: Boolean = false,
 )
 
 @Serializable
@@ -94,3 +95,7 @@ data class MiniRoomView(
     val score: Int = 0,
     val opponentScore: Int = 0,
 )
+
+@Serializable data class CoinPurchase(val id: String, val coins: Int, val status: String, val createdAt: Long)
+@Serializable data class CoinPurchaseBody(val token: String, val id: String, val coins: Int)
+@Serializable data class WatchFrame(val room: LiveGame, val sequence: Long, val serverTime: Long, val demo: Boolean = false, val grid: List<String> = emptyList(), val selected: List<Int> = emptyList(), val event: String = "score", val seconds: Int = 120)

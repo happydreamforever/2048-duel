@@ -195,10 +195,10 @@ fun DuelScreen(vm: MainViewModel) {
         AlertDialog(
             onDismissRequest = { confirmLeave = false },
             containerColor = palette.bgTop,
-            title = { Text(stringResource(if (duel.training) R.string.product_save_exit else R.string.leave_title), color = palette.textPrimary) },
-            text = { Text(stringResource(if (duel.training) R.string.product_saves_subtitle else R.string.leave_text), color = palette.textSecondary) },
+            title = { Text(stringResource(if (duel.training) R.string.practice_leave_title else R.string.leave_title), color = palette.textPrimary) },
+            text = { Text(stringResource(if (duel.training) R.string.practice_leave_text else R.string.leave_text), color = palette.textSecondary) },
             confirmButton = {
-                TextButton(onClick = { confirmLeave = false; vm.leaveMatch() }) { Text(stringResource(if (duel.training) R.string.product_save_exit else R.string.leave), color = palette.danger) }
+                TextButton(onClick = { confirmLeave = false; vm.leaveMatch() }) { Text(stringResource(R.string.leave), color = palette.danger) }
             },
             dismissButton = { TextButton(onClick = { confirmLeave = false }) { Text(stringResource(R.string.stay), color = palette.accent) } },
         )

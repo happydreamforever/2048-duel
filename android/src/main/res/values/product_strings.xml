@@ -46,7 +46,7 @@
     <string name="product_progress">Your progress</string>
     <string name="product_settings_hint">Appearance, sound, language, and connection.</string>
     <string name="product_help_hint">Send feedback or report a problem.</string>
-    <string name="product_logout_hint">Saved games stay with this account. Unsynced games remain on this device for this account.</string>
+    <string name="product_logout_hint">Your account, coins, and online results stay on the server.</string>
     <string name="product_reconnecting">Reconnecting… Your progress will be restored.</string>
     <string name="product_save_exit">Save and exit</string>
     <string name="product_leave_match">Leave this match?</string>

@@ -8,6 +8,7 @@ class WordGridTest {
     private val grid = listOf("CATS", "XXXX", "BIRD", "FISH")
 
     @Test fun `paths allow horizontal vertical turns and reverse but no diagonals wrapping or reuse`() {
+        assertEquals("CAT", WordGrid.selectedWord(grid, listOf(0, 1, 2)))
         assertEquals("CATS", WordGrid.selectedWord(grid, listOf(0, 1, 2, 3)))
         assertEquals("STAC", WordGrid.selectedWord(grid, listOf(3, 2, 1, 0)))
         assertEquals("CXBI", WordGrid.selectedWord(grid, listOf(0, 4, 8, 9)))

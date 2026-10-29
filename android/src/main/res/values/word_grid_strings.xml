@@ -2,9 +2,11 @@
 <resources>
     <string name="word_grid_title">Word Puzzle</string>
     <string name="word_grid_description">Find words in a 4×4, 6×6, or 8×8 letter grid.</string>
-    <string name="word_grid_help">Connect letters horizontally or vertically. No diagonals or repeated cells. Submit 4–8 letter words; each new word scores one point per letter. Tap the last tile to undo.</string>
+    <string name="word_grid_help">Connect letters horizontally or vertically. No diagonals or repeated cells. Submit 3–8 letter words; each new word scores one point per letter. Tap the last tile to undo.</string>
     <string name="word_grid_score">You: %1$d · Opponent: %2$d</string>
     <string name="word_grid_found">Found: %1$s</string>
     <string name="word_grid_invalid">Word already found or not in this round’s dictionary. Try another word.</string>
     <string name="word_grid_draw">Draw</string>
+    <string name="practice_leave_title">Leave practice?</string>
+    <string name="practice_leave_text">This practice round will end. Online matches synchronize automatically.</string>
 </resources>

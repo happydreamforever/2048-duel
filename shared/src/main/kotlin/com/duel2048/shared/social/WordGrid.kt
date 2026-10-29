@@ -42,7 +42,7 @@ object WordGrid {
 
     /** Used for the bot and end-of-round review; dictionaries and solutions stay on the server. */
     fun findPath(grid: List<String>, word: String): List<Int>? {
-        if (grid.size !in sizes || grid.any { it.length != grid.size } || word.length !in 4..8) return null
+        if (grid.size !in sizes || grid.any { it.length != grid.size } || word.length !in 3..8) return null
         val size = grid.size
         val path = mutableListOf<Int>()
         fun visit(cell: Int, offset: Int): Boolean {

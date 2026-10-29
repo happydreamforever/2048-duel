@@ -22,60 +22,40 @@ so the game is always playable.
 |---|---|
 | `shared/` | Deterministic game engine (SplitMix64 RNG, attack energy, garbage tiles), heuristic bot, and the WebSocket message types. Used by both sides, so the client predicts moves instantly and the server verifies them. |
 | `server/` | Ktor server: accounts and match history in MySQL (HikariCP + JDBC), FIFO matchmaking with bot fallback, authoritative match loop, countdown/timer, `/stats` and `/leaderboard` endpoints. |
-| `android/` | Jetpack Compose client with Play, Saved games, Community, and Profile pages, online matches, offline training, and solo play. |
+| `android/` | Jetpack Compose client with Play, Community, and Profile pages, online matches, offline training, and solo play. |
 
-## Navigation and saved games
+## Navigation and online state
 
-- **Play** contains the four games, mode selection, and a Continue card for recent progress.
-- **Saved games** contains ongoing and finished games, sync status, deletion, and explicit choices when two devices change the same save.
-- **Community** contains live games, chat, player search, updates, and rankings.
-- **Profile** contains account access, progress, the shop, settings, and feedback. Signed-out games can be copied into the signed-in account with **Back up signed-out games to this account**.
+- **Play** offers five games: 2048, Cube, Math, Word Quiz, and Word Puzzle.
+- **Community** contains Watch rooms, chat, player search, updates, and rankings.
+- **Profile** contains account access, coins, the shop, settings, and feedback.
 
-Solo, training, and local bot games save on the device automatically. Signed-in clients
-sync pending changes every five seconds and refresh when opening Play or Saved games.
-Offline changes remain queued. Each save belongs to one server/account; switching accounts
-does not expose the previous account's games. A revision conflict asks the player which
-version to keep instead of silently discarding progress.
+Saved-game browsing and local progress backups have been removed. Online matches use
+server-owned checkpoints to keep players synchronized. A brief connection interruption
+can automatically resume the same match without another entry fee. Online cube/2048
+sessions have a 90-second reconnect window within the same server process. If that server
+restarts, interrupted cube/2048 entries are refunded; minigame rooms restore their board,
+players, found words, and absolute timer from SQL. Back up the SQL database and DATA_DIR.
 
-The server stores atomic, versioned account checkpoints in `DATA_DIR/game-saves/`,
-alongside `social.json` for math/word rooms. These files are required even when accounts
-use MySQL; preserve the complete data directory when upgrading or backing up the server.
-Cube checkpoints include the scramble seed and both move histories; 2048 checkpoints
-include both complete boards, RNG state, attack energy, and counters. Local timers pause
-when using **Save and exit**. Online match timers continue during disconnection.
-
-An interrupted online cube/2048 match can reconnect for up to **90 seconds** while the
-same server process is running. The client restores the authoritative position and move
-sequence, including moves whose acknowledgment was lost. Taking over a match on another
-device closes the previous connection. Accepted moves are written before acknowledgment.
-After a server restart, checkpoint files and finished results remain, but unfinished
-cube/2048 matches are displayed as unavailable: live matches are not reconstructed yet.
-Math/word rooms do retain their puzzle and absolute timer across server restarts.
-
-This update uses **protocol version 7** (Android 1.3.0, version code 5). Rebuild and update the server and Android client
-together. See [the protocol reference](docs/PROTOCOL.md) for save APIs and reconnect messages.
-
-Windows validation (from the project folder, with JDK/Android SDK configured):
+Protocol version remains 7; update both server and APK to Android **1.4.0 (6)**.
 
 ```powershell
-.\gradlew.bat :shared:test :server:test :android:testDebugUnitTest :android:assembleDebug
+.\gradlew.bat :shared:test :server:test :android:assembleDebug
 .\gradlew.bat -Pduel2048.serverOnly :server:installDist
 ```
 
-The debug APK is `android/build/outputs/apk/debug/android-debug.apk`.
-To check synchronization, save a cube after several face and middle-layer turns, reopen it
-from Saved games, then sign in on a second device and sync. Also test 2048, offline edits,
-conflict choices, and a brief network interruption during an online match.
+Debug APK: `android/build/outputs/apk/debug/android-debug.apk`.
+For signed releases, keep your existing keystore configured and run `.\gradlew.bat :android:assembleRelease`.
 
 ## Math and word datasets
 
 The APK contains only the small offline **training** catalog in
 `shared/src/main/resources/datasets/training/`: 12 math examples per difficulty and
-8 English words per length (4–8 letters). Training works without a server.
+8 English words per length (48 total) (3–8 letters). Training works without a server.
 
 Every real math/word match, including **vs Bot**, requires a connection. The server
 randomly selects from its full catalog in `server/src/main/resources/datasets/matches/`
-(80 math problems per difficulty and 24 words per length). Full match CSVs are packaged
+(80 math problems per difficulty and 24 words per length (144 total)). Full match CSVs are packaged
 only in the server distribution. They are not included in the APK or downloaded as a dataset.
 Only the chosen problem, shuffled answer options or letter bank, clue, timer, and opaque
 puzzle ID are sent. The correct answer stays on the server until the match ends.
@@ -86,7 +66,7 @@ tiles. Quiz levels describe word length rather than grid dimensions. Each compet
 one submission; a wrong answer locks their input while the opponent continues. A server bot
 solves after half the time limit, so the player must answer before then. Training offers hints.
 **Word Puzzle** is a separate timed competition with 4×4, 6×6, or 8×8 grids. Tap
-consecutive horizontal or vertical neighbors to make 4–8 letter dictionary words.
+consecutive horizontal or vertical neighbors to make 3–8 letter dictionary words.
 Diagonals, wrapping across row edges, and reusing a cell within a word are forbidden.
 Selected cells show their order; tap the last cell or Undo to backtrack, or Clear to restart.
 Each distinct valid word earns one point per letter per player. Both PvP players use the
@@ -105,6 +85,40 @@ Math CSV columns: `id,prompt,answer,option_1,option_2,option_3,option_4`.
 Word CSV columns: `word,clue`. Keep words uppercase and in the file matching their length.
 CSV fields containing commas must be quoted; embedded quotes are doubled. Rebuild the server
 after editing full datasets. Editing the training samples requires rebuilding the APK.
+
+## Online synchronization, Watch demos, and coins
+
+The client no longer offers Saved games, Continue, or importing device saves. Online
+players reconnect automatically; match state and timers are owned by the game server.
+MySQL/MariaDB deployments write online checkpoints, all five competition room types,
+wallets, entries, rewards, and purchase requests into the same SQL database used by admin.
+Apply the admin migrations with `npm run db:migrate` and refresh datasets with `npm run db:seed`.
+The game also creates the compatible runtime tables on startup. Existing file-based
+wallet balances are imported only when a SQL wallet does not already exist.
+`DB=json` remains a local development mode; its records do not appear in the SQL admin.
+
+Open **Community → Watch** (or Watch within any game), select **Demo_A vs Demo_B**,
+and look for **DEMO ROOM** and the changing **server signal** number. These clearly
+marked mock rooms are streamed over `/social/watch/{id}` every second. They never
+charge entry fees or pay rewards. Each competition has a demo so Watch can be tested
+with one phone. Live score updates use the same WebSocket channel.
+
+New accounts start with 100 coins. The server charges 10 coins per player when a PvP
+room starts, or 5 for an online Bot match. Queueing, cancelling a search, and reconnecting
+are free. Winners receive 25 coins in PvP or 12 against an online Bot; draws refund the
+entry fee. Duplicate requests and repeated result polling cannot repeat fees or payouts.
+Interrupted 2048/Cube rooms are refunded after a server restart. Offline practice has
+no server coin rewards. Client-submitted wallet deltas are no longer accepted.
+
+In **Profile → Coin shop**, players request a pack of 50, 200, or 500 coins. These are
+manual purchase requests, not a payment checkout. An admin owner verifies payment
+externally and approves or rejects the request under **Coin purchases**, recording a
+payment reference and review note. Approval credits the shared wallet once and writes
+an audit entry. The app refreshes wallet balances automatically. No payment provider
+or invented monetary prices are configured.
+
+APK version: **1.4.0 (6)**. Release builds require the existing release signing key;
+keep `keystore.properties` and the keystore private so updates retain their signature.
 
 ## Visual effects in the client
 

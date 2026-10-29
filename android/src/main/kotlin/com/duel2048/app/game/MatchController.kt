@@ -319,7 +319,7 @@ class MatchController(
                 }
             }
             is ErrorMsg -> when (msg.code) {
-                "match_unavailable", "resume_available", "no_match" -> fail(DuelError("server", msg.message))
+                "need_coins", "match_unavailable", "resume_available", "no_match" -> fail(DuelError("server", msg.message))
                 "version" -> fail(DuelError("version", msg.message))
                 "not_logged_in" -> {
                     fail(DuelError("not_logged_in"))

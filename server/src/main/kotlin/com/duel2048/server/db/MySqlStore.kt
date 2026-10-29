@@ -46,6 +46,8 @@ class MySqlStore(jdbcUrl: String, user: String, password: String) : UserStore {
         log.info("connected to $jdbcUrl, schema ready")
     }
 
+    fun <T> connection(block: (Connection) -> T): T = pool.connection.use(block)
+
     private suspend fun <T> db(block: (Connection) -> T): T = withContext(Dispatchers.IO) { pool.connection.use(block) }
 
     override suspend fun userCount(): Int = db { c ->

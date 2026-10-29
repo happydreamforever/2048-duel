@@ -96,7 +96,7 @@ internal fun CubeDuelOverlay(
             }
         }
         TextButton(onClick = onLeave, modifier = Modifier.align(Alignment.End)) {
-            Text(stringResource(if (cube.training) R.string.product_save_exit else R.string.leave), color = palette.danger)
+            Text(stringResource(R.string.leave), color = palette.danger)
         }
     }
 }

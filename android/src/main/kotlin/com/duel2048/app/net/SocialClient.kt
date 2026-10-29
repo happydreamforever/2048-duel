@@ -34,7 +34,7 @@ class SocialClient {
     suspend fun live(ws: String): Result<List<LiveGame>> = get(ws, "/social/live", ListSerializer(LiveGame.serializer()))
     suspend fun chat(ws: String, room: String, since: Long): Result<List<ChatLine>> =
         get(ws, "/social/chat?room=$room&since=$since", ListSerializer(ChatLine.serializer()))
-    suspend fun wallet(ws: String, token: String): Result<WalletView> = get(ws, "/social/wallet?token=$token", WalletView.serializer())
+    suspend fun wallet(ws: String, token: String): Result<WalletView> = get(ws, "/social/wallet", WalletView.serializer(),token)
 
     suspend fun sendChat(ws: String, name: String, text: String, room: String): Result<ChatLine> =
         post(ws, "/social/chat", Protocol.json.encodeToString(ChatBody.serializer(), ChatBody(name = name, text = text, room = room)), ChatLine.serializer())
@@ -42,8 +42,8 @@ class SocialClient {
     suspend fun report(ws: String, name: String, text: String, game: String): Result<Unit> =
         postUnit(ws, "/social/report", Protocol.json.encodeToString(ReportBody.serializer(), ReportBody(name = name, text = text, game = game)))
 
-    suspend fun applyWallet(ws: String, token: String, scoreDelta: Int, coinDelta: Int): Result<WalletView> =
-        post(ws, "/social/wallet", Protocol.json.encodeToString(WalletBody.serializer(), WalletBody(token, scoreDelta, coinDelta)), WalletView.serializer())
+    suspend fun purchaseCoins(ws: String, token: String, id: String, coins: Int): Result<com.duel2048.shared.social.CoinPurchase> =
+        post(ws,"/social/coins/purchases",Protocol.json.encodeToString(com.duel2048.shared.social.CoinPurchaseBody.serializer(),com.duel2048.shared.social.CoinPurchaseBody(token,id,coins)),com.duel2048.shared.social.CoinPurchase.serializer())
 
     suspend fun mini(ws: String, roomId: String, name: String, token: String = ""): Result<MiniRoomView> =
         get(ws, "/social/mini/$roomId?name=${java.net.URLEncoder.encode(name, "UTF-8")}", MiniRoomView.serializer(), token)
@@ -64,7 +64,7 @@ class SocialClient {
             runCatching {
                 val url = LeaderboardClient.httpBase(ws) + path
                 http.newCall(Request.Builder().url(url).apply { if (token.isNotBlank()) header("Authorization", "Bearer $token") }.build()).execute().use { response ->
-                    if (!response.isSuccessful) error("HTTP ${response.code}")
+                    if (!response.isSuccessful) error(response.body?.string()?.take(300) ?: "HTTP ${response.code}")
                     Protocol.json.decodeFromString(serializer, response.body?.string().orEmpty())
                 }
             }
@@ -76,7 +76,7 @@ class SocialClient {
                 val url = LeaderboardClient.httpBase(ws) + path
                 val req = Request.Builder().url(url).post(payload.toRequestBody(jsonType)).build()
                 http.newCall(req).execute().use { response ->
-                    if (!response.isSuccessful) error("HTTP ${response.code}")
+                    if (!response.isSuccessful) error(response.body?.string()?.take(300) ?: "HTTP ${response.code}")
                     Protocol.json.decodeFromString(serializer, response.body?.string().orEmpty())
                 }
             }
@@ -87,7 +87,7 @@ class SocialClient {
             val url = LeaderboardClient.httpBase(ws) + path
             val req = Request.Builder().url(url).post(payload.toRequestBody(jsonType)).build()
             http.newCall(req).execute().use { response ->
-                if (!response.isSuccessful) error("HTTP ${response.code}")
+                if (!response.isSuccessful) error(response.body?.string()?.take(300) ?: "HTTP ${response.code}")
             }
         }
     }

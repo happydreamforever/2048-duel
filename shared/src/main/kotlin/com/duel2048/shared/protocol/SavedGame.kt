@@ -64,7 +64,7 @@ data class SavedGame(
         require(prompt.length <= 1000 && solution.length <= 1000 && roomId.length <= 100) { "Puzzle is too large" }
         require(grid.size <= 8 && grid.all { it.length <= 16 }) { "Invalid word grid" }
         require(choices.size <= 4 && choices.all { it.length <= 100 } && choices.distinct().size == choices.size) { "Invalid answer choices" }
-        require(foundWords.size <= 500 && foundWords.distinct().size == foundWords.size && foundWords.all { it.matches(Regex("[A-Z]{4,8}")) }) { "Invalid found words" }
+        require(foundWords.size <= 500 && foundWords.distinct().size == foundWords.size && foundWords.all { it.matches(Regex("[A-Z]{3,8}")) }) { "Invalid found words" }
         if (game == SavedGameType.WORD_PUZZLE) {
             require(grid.size in WordGrid.sizes && grid.all { it.length == grid.size && it.all { c -> c in 'A'..'Z' } }) { "Invalid puzzle grid" }
             require(selectedLetters.isEmpty() || WordGrid.selectedWord(grid, selectedLetters) != null) { "Invalid puzzle path" }

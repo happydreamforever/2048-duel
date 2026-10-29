@@ -5,6 +5,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -117,17 +118,48 @@ fun WatchScreen(vm: MainViewModel) {
             delay(2000)
         }
     }
-    Column(Modifier.fillMaxSize().systemBarsPadding().padding(24.dp)) {
+    Column(Modifier.fillMaxSize().systemBarsPadding().verticalScroll(rememberScrollState()).padding(24.dp)) {
         Text(stringResource(R.string.mode_watch), style = MaterialTheme.typography.headlineMedium, color = palette.textPrimary, fontWeight = FontWeight.Black)
         Spacer(Modifier.height(8.dp))
         if (live.isEmpty()) {
             Text(stringResource(R.string.watch_empty), color = palette.textSecondary)
         } else {
-            val shown = focus?.let { id -> live.find { it.id == id } } ?: live.first()
+            val chosen = focus?.let { id -> live.find { it.id == id } } ?: live.first()
+            val settings by vm.settings.collectAsStateWithLifecycle()
+            var frame by remember(chosen.id) { mutableStateOf<com.duel2048.shared.social.WatchFrame?>(null) }
+            var watchStatus by remember(chosen.id) { mutableStateOf("Connecting to live stream…") }
+            LaunchedEffect(chosen.id,settings.serverUrl) {
+                while(true) {
+                    try {
+                        com.duel2048.app.net.WatchClient().frames(settings.serverUrl,chosen.id).collect {
+                            frame=it; watchStatus="Live · server signal #${it.sequence} · ${it.event}"
+                        }
+                    } catch(e:kotlinx.coroutines.CancellationException) { throw e }
+                    catch(e:Exception) { watchStatus="Connection interrupted. Reconnecting…" }
+                    delay(2000)
+                }
+            }
+            val shown = frame?.room ?: chosen
             GlassCard(Modifier.fillMaxWidth()) {
+                if(shown.demo) Text("DEMO ROOM · simulated players · no entry fee or rewards",color=palette.gold)
+                Text(watchStatus,color=palette.accent)
                 Text(shown.game.uppercase(), color = palette.accent, fontWeight = FontWeight.Black)
                 Text("${shown.playerA}  ${shown.scoreA}", color = palette.textPrimary, fontSize = 22.sp, fontWeight = FontWeight.Bold)
                 Text("${shown.playerB}  ${shown.scoreB}", color = palette.textSecondary, fontSize = 22.sp)
+            }
+            frame?.let { snapshot ->
+                if(snapshot.grid.isNotEmpty()) {
+                    Text("${snapshot.seconds}s · ${snapshot.serverTime}",color=palette.textSecondary)
+                    snapshot.grid.forEachIndexed { row, letters ->
+                        Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(4.dp)) {
+                            letters.forEachIndexed { col,letter ->
+                                Box(Modifier.weight(1f).aspectRatio(1f).background(if(row*snapshot.grid.size+col in snapshot.selected) palette.accent.copy(alpha=0.35f) else palette.surface),contentAlignment=Alignment.Center) {
+                                    Text(letter.toString(),color=palette.textPrimary,fontWeight=FontWeight.Bold,fontSize=22.sp)
+                                }
+                            }
+                        }
+                    }
+                }
             }
             Spacer(Modifier.height(12.dp))
             live.forEach { game ->
@@ -250,9 +282,12 @@ fun ChatSheet(vm: MainViewModel, onDismiss: () -> Unit) {
 @Composable
 fun ShopSheet(vm: MainViewModel, onDismiss: () -> Unit) {
     val palette = LocalPalette.current
+    val purchaseMessage by vm.purchaseMessage.collectAsStateWithLifecycle()
     ModalBottomSheet(onDismissRequest = onDismiss, containerColor = palette.bgTop) {
         Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text(stringResource(R.string.coin_shop), color = palette.gold, fontWeight = FontWeight.Black)
+            Text("Choose a coin pack to request a purchase. An admin confirms payment before coins are added.", color = palette.textSecondary)
+            if(purchaseMessage.isNotBlank()) Text(purchaseMessage,color=palette.accent)
             listOf(50, 200, 500).forEach { pack ->
                 NeonButton(stringResource(R.string.buy_coins, pack), modifier = Modifier.fillMaxWidth(), colors = listOf(Color(0xFFB8860B), Color(0xFF7A4B00))) {
                     vm.buyCoins(pack)
@@ -299,6 +334,6 @@ private fun difficultyLabel(id: String): String = when (id) {
     "medium", "normal" -> stringResource(R.string.medium)
     "hard" -> stringResource(R.string.hard)
     "very_hard" -> stringResource(R.string.very_hard)
-    "4", "5", "6", "7", "8" -> stringResource(R.string.puzzle_word_length, id)
+    "3", "4", "5", "6", "7", "8" -> stringResource(R.string.puzzle_word_length, id)
     else -> id
 }

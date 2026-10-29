@@ -2,7 +2,7 @@
 <resources>
     <string name="word_grid_title">Rompecabezas de palabras</string>
     <string name="word_grid_description">Encuentra palabras en una cuadrícula de 4×4, 6×6 u 8×8.</string>
-    <string name="word_grid_help">Conecta letras horizontal o verticalmente, sin diagonales ni casillas repetidas. Envía palabras de 4–8 letras; cada palabra nueva suma un punto por letra. Toca la última casilla para deshacer.</string>
+    <string name="word_grid_help">Conecta letras horizontal o verticalmente, sin diagonales ni casillas repetidas. Envía palabras de 3–8 letras; cada palabra nueva suma un punto por letra. Toca la última casilla para deshacer.</string>
     <string name="word_grid_score">Tú: %1$d · Rival: %2$d</string>
     <string name="word_grid_found">Encontradas: %1$s</string>
     <string name="word_grid_invalid">Palabra ya encontrada o ausente del diccionario de esta ronda. Prueba otra.</string>

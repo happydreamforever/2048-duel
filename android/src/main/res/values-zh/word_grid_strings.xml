@@ -2,7 +2,7 @@
 <resources>
     <string name="word_grid_title">单词谜题</string>
     <string name="word_grid_description">在 4×4、6×6 或 8×8 字母方格中寻找单词。</string>
-    <string name="word_grid_help">横向或纵向连接字母，不能斜连或重复使用同一格。提交 4–8 个字母的单词，每个新单词按字母数计分。点击最后一格可撤销。</string>
+    <string name="word_grid_help">横向或纵向连接字母，不能斜连或重复使用同一格。提交 3–8 个字母的单词，每个新单词按字母数计分。点击最后一格可撤销。</string>
     <string name="word_grid_score">你：%1$d · 对手：%2$d</string>
     <string name="word_grid_found">已找到：%1$s</string>
     <string name="word_grid_invalid">单词已找到或不在本轮词典中，请尝试其他单词。</string>

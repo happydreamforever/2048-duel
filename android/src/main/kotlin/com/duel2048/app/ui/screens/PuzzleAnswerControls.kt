@@ -101,7 +101,7 @@ internal fun PuzzleAnswerControls(vm: MainViewModel, state: MiniUi) {
         if (state.answerFailed) Text(stringResource(R.string.puzzle_submit_failed), color = palette.danger)
         if (state.answered) Text(stringResource(R.string.puzzle_wrong_wait), color = palette.gold)
         else Button(onClick = { vm.submitMini(selectedAnswer) }, modifier = Modifier.fillMaxWidth(),
-            enabled = enabled && if (gridGame) state.selectedLetters.size in 4..8 else if (wordGame) state.selectedLetters.size == expectedLetters else selectedAnswer in state.choices) {
+            enabled = enabled && if (gridGame) state.selectedLetters.size in 3..8 else if (wordGame) state.selectedLetters.size == expectedLetters else selectedAnswer in state.choices) {
             Text(stringResource(if (state.submitting) R.string.puzzle_sending else R.string.submit_answer))
         }
         if (state.guided && !gridGame) TextButton(onClick = { vm.miniHint() }, enabled = enabled) {

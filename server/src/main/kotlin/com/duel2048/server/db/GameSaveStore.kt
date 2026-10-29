@@ -17,7 +17,7 @@ import java.security.MessageDigest
 class SaveConflict(val current: SavedGame) : IllegalStateException("A newer save already exists")
 
 /** Account-isolated atomic checkpoints, independent of the account database backend. */
-class GameSaveStore(private val directory: File, private val now: () -> Long = System::currentTimeMillis) {
+class GameSaveStore(private val directory: File, private val now: () -> Long = System::currentTimeMillis, private val sql: MySqlStore? = null) {
     private val mutex = Mutex()
 
     private fun file(userId: String): File {
@@ -25,8 +25,14 @@ class GameSaveStore(private val directory: File, private val now: () -> Long = S
         return File(directory, "$key.json")
     }
 
-    private fun read(userId: String): List<SavedGame> = file(userId).let {
+    private fun read(userId: String): List<SavedGame> {
+        if(sql!=null) return sql.connection { c -> c.prepareStatement("SELECT payload FROM game_saves WHERE user_id=?").use { ps ->
+            ps.setString(1,userId);ps.executeQuery().use { rs -> buildList { while(rs.next()) add(Protocol.json.decodeFromString(SavedGame.serializer(),rs.getString(1))) } }
+        } }
+        return file(userId).let {
         if (it.isFile) Protocol.json.decodeFromString(SavedGameList.serializer(), it.readText()).games else emptyList()
+    }
+
     }
 
     suspend fun list(userId: String): List<SavedGame> = withContext(Dispatchers.IO) {
@@ -46,6 +52,13 @@ class GameSaveStore(private val directory: File, private val now: () -> Long = S
             }
             require(current != null || games.size < 500) { "Save limit reached" }
             val saved = game.copy(revision = if (authoritative) game.revision else game.revision + 1, updatedAt = now())
+            if(sql!=null) {
+                sql.connection { c -> c.prepareStatement("INSERT INTO game_saves(user_id,save_id,revision,game,mode,completed,deleted,payload,updated_at) VALUES (?,?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE revision=VALUES(revision),completed=VALUES(completed),deleted=VALUES(deleted),payload=VALUES(payload),updated_at=VALUES(updated_at)").use { ps ->
+                    val args=listOf(userId,saved.id,saved.revision,saved.game.name,saved.mode.name,saved.completed,saved.deleted,Protocol.json.encodeToString(SavedGame.serializer(),saved),saved.updatedAt)
+                    args.forEachIndexed { i,v -> ps.setObject(i+1,v) };ps.executeUpdate()
+                } }
+                return@withLock saved
+            }
             directory.mkdirs()
             val destination = file(userId).toPath()
             val temporary = Files.createTempFile(directory.toPath(), "checkpoint-", ".tmp")

@@ -46,7 +46,7 @@
     <string name="product_progress">Tu progreso</string>
     <string name="product_settings_hint">Apariencia, sonido, idioma y conexión.</string>
     <string name="product_help_hint">Envía comentarios o informa de un problema.</string>
-    <string name="product_logout_hint">Las partidas siguen vinculadas a esta cuenta. Las pendientes de sincronizar se conservan aquí para esta cuenta.</string>
+    <string name="product_logout_hint">Tu cuenta, monedas y resultados en línea permanecen en el servidor.</string>
     <string name="product_reconnecting">Reconectando… Se restaurará tu progreso.</string>
     <string name="product_save_exit">Guardar y salir</string>
     <string name="product_leave_match">¿Abandonar la partida?</string>

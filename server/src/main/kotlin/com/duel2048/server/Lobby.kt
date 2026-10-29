@@ -64,7 +64,8 @@ import java.util.concurrent.atomic.AtomicInteger
  * always playable.
  */
 class Lobby(private val config: ServerConfig, private val scope: CoroutineScope, private val db: UserStore,
-    private val gameSaves: GameSaveStore = GameSaveStore(java.io.File(config.dataDir, "game-saves"))) {
+    private val gameSaves: GameSaveStore = GameSaveStore(java.io.File(config.dataDir, "game-saves")),
+    val economy: com.duel2048.server.db.CompetitionStore = com.duel2048.server.db.CompetitionStore(db, config.dataDir)) {
 
     private val log = LoggerFactory.getLogger("Lobby")
     private val players = ConcurrentHashMap<String, PlayerSession>()
@@ -132,7 +133,8 @@ class Lobby(private val config: ServerConfig, private val scope: CoroutineScope,
             is FindMatch -> if (s.userId == null) {
                 s.send(ErrorMsg("not_logged_in", "Log in first"))
             } else if ((players.values + detached.values).any { it !== s && it.userId == s.userId && (it.match != null || it.cubeMatch != null) }) {
-                s.send(ErrorMsg("resume_available", "You have an active match. Continue it from Saved games."))
+                val old=(players.values+detached.values).first { it!==s && it.userId==s.userId && (it.match!=null || it.cubeMatch!=null) }
+                resume(s,old.match?.id ?: checkNotNull(old.cubeMatch).id)
             } else if (msg.game == GameType.CUBE_SOLVE) {
                 findCubeMatch(s, msg.mode)
             } else {
@@ -273,6 +275,18 @@ class Lobby(private val config: ServerConfig, private val scope: CoroutineScope,
         }
     }
 
+    private fun enterCompetition(id: String, game: String, a: PlayerSession, b: PlayerSession?): Boolean {
+        return try {
+            economy.enter(id,game,if(b==null) "bot" else "pvp",listOfNotNull(a.userId,b?.userId))
+            economy.checkpoint(id,game,if(b==null) "bot" else "pvp","playing",a.name,b?.name ?: "Bot",0,0,null,"{}")
+            true
+        } catch (e: IllegalArgumentException) {
+            a.send(ErrorMsg("need_coins", "Not enough coins to enter this competition"))
+            b?.send(ErrorMsg("need_coins", "A player has insufficient coins; please queue again"))
+            false
+        }
+    }
+
     private suspend fun startMatch(a: PlayerSession, b: PlayerSession?) {
         val seed = ThreadLocalRandom.current().nextLong()
         val p1 = Participant(a.info, a, bot = null)
@@ -288,7 +302,12 @@ class Lobby(private val config: ServerConfig, private val scope: CoroutineScope,
         }
         val id = "m" + UUID.randomUUID().toString().substring(0, 8)
         val startedAt = System.currentTimeMillis()
+        if (!enterCompetition(id, "2048", a, b)) return
         val match = Match(id, p1, p2, seed, config, scope, onCheckpoint = checkpointWriter(a, b)) { finished, over ->
+            economy.settle(id, listOfNotNull(a,b).firstOrNull { it.id == over.winnerId }?.userId, over.winnerId == null)
+            economy.checkpoint(id, "2048", if(b==null) "bot" else "pvp", "over", a.name, p2.info.name,
+                over.results.firstOrNull { it.playerId==a.id }?.score ?: 0, over.results.firstOrNull { it.playerId==p2.info.id }?.score ?: 0,
+                listOf(p1,p2).firstOrNull { it.info.id==over.winnerId }?.info?.name, "{}")
             clearMatch(finished.id)
             matches.remove(finished.id)
             if (a.match === finished) a.match = null
@@ -333,7 +352,12 @@ class Lobby(private val config: ServerConfig, private val scope: CoroutineScope,
         }
         val id = "c" + UUID.randomUUID().toString().substring(0, 8)
         val startedAt = System.currentTimeMillis()
+        if (!enterCompetition(id, "cube", a, b)) return
         val match = CubeMatch(id, p1, p2, seed, scramble, config, scope, onCheckpoint = checkpointWriter(a, b)) { finished, over ->
+            economy.settle(id, listOfNotNull(a,b).firstOrNull { it.id == over.winnerId }?.userId, over.winnerId == null)
+            economy.checkpoint(id, "cube", if(b==null) "bot" else "pvp", "over", a.name, p2.info.name,
+                over.results.firstOrNull { it.playerId==a.id }?.moves ?: 0, over.results.firstOrNull { it.playerId==p2.info.id }?.moves ?: 0,
+                listOf(p1,p2).firstOrNull { it.info.id==over.winnerId }?.info?.name, "{}")
             clearMatch(finished.id)
             cubeMatches.remove(finished.id)
             if (a.cubeMatch === finished) a.cubeMatch = null
@@ -431,7 +455,13 @@ class Lobby(private val config: ServerConfig, private val scope: CoroutineScope,
         val owners = listOfNotNull(a, b).mapNotNull { s -> s.userId?.let { s.id to it } }.toMap()
         return { playerId, game -> owners[playerId]?.let { userId ->
             // Finish an accepted checkpoint even if the socket closes during the disk write.
-            withContext(NonCancellable) { gameSaves.put(userId, game, authoritative = true) }
+            withContext(NonCancellable) {
+                gameSaves.put(userId, game, authoritative = true)
+                if(playerId==a.id) economy.checkpoint(game.id,if(game.game==com.duel2048.shared.protocol.SavedGameType.CUBE) "cube" else "2048",
+                    if(b==null) "bot" else "pvp",if(game.completed) "over" else "playing",a.name,b?.name ?: game.opponentName,
+                    game.board?.score ?: game.played.size,game.opponentBoard?.score ?: game.opponentPlayed.size,null,
+                    Protocol.json.encodeToString(SavedGame.serializer(),game))
+            }
         }; Unit }
     }
 

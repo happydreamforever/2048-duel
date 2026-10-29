@@ -30,6 +30,8 @@ class PuzzleApiTest {
         }
         assertEquals(HttpStatusCode.OK, mathResponse.status)
         val math = Protocol.json.decodeFromString(MiniRoomView.serializer(), mathResponse.bodyAsText())
+        val afterMath = client.get("/social/wallet") { header(HttpHeaders.Authorization,"Bearer ${alice.token}") }
+        assertEquals(95,Protocol.json.decodeFromString(WalletView.serializer(),afterMath.bodyAsText()).coins)
         assertEquals("Alice", math.you)
         assertEquals(4, math.choices.size)
         assertEquals("", math.solution)
@@ -50,6 +52,12 @@ class PuzzleApiTest {
         assertEquals(HttpStatusCode.OK, answer.status)
         val over = Protocol.json.decodeFromString(MiniRoomView.serializer(), answer.bodyAsText())
         assertEquals("Alice", over.winner)
+        val afterWin=client.get("/social/wallet") { header(HttpHeaders.Authorization,"Bearer ${alice.token}") }
+        assertEquals(102,Protocol.json.decodeFromString(WalletView.serializer(),afterWin.bodyAsText()).coins)
+        assertEquals(HttpStatusCode.Gone, client.post("/social/wallet") {
+            contentType(ContentType.Application.Json)
+            setBody(Protocol.json.encodeToString(WalletBody.serializer(),WalletBody(alice.token!!,999999,999999)))
+        }.status)
         assertEquals(solution, over.solution)
         val gridResponse = client.post("/social/mini/join") {
             contentType(ContentType.Application.Json)

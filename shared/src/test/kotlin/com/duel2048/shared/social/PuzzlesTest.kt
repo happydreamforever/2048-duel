@@ -77,6 +77,6 @@ class PuzzlesTest {
         assertNull(Puzzles::class.java.getResourceAsStream("/datasets/matches/math/easy.csv"))
         assertNull(Puzzles::class.java.getResourceAsStream("/datasets/matches/words/4.csv"))
         assertEquals(48, Puzzles.mathLevels.sumOf { Puzzles.mathEntries(it).size })
-        assertEquals(40, Puzzles.wordLengths.sumOf { Puzzles.wordEntries(it).size })
+        assertEquals(48, Puzzles.wordLengths.sumOf { Puzzles.wordEntries(it).size })
     }
 }

@@ -46,7 +46,7 @@
     <string name="product_progress">个人进度</string>
     <string name="product_settings_hint">外观、声音、语言和连接。</string>
     <string name="product_help_hint">发送反馈或报告问题。</string>
-    <string name="product_logout_hint">存档仍归此账号所有，未同步的存档也会按账号保留在此设备上。</string>
+    <string name="product_logout_hint">账户、金币和在线比赛结果会保留在服务器上。</string>
     <string name="product_reconnecting">正在重新连接… 将恢复游戏进度。</string>
     <string name="product_save_exit">保存并退出</string>
     <string name="product_leave_match">退出这场对局？</string>

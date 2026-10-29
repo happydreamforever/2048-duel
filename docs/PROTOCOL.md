@@ -94,7 +94,7 @@ without extra round-trips. `GameState.syncKey()` is the comparison used for pred
 ### Save synchronization
 
 `Authorization: Bearer <account token>` is required for both save endpoints. Each save has
-an immutable `id`, `game` (`TILES`, `CUBE`, `MATH`, `WORD`), and `mode` (`SOLO`, `TRAINING`,
+an immutable `id`, `game` (`TILES`, `CUBE`, `MATH`, `WORD`, `WORD_PUZZLE`), and `mode` (`SOLO`, `TRAINING`,
 `BOT`, `ONLINE`). Send revision `0` to create a save; later updates must send the last
 accepted revision. The server increments it and sets `updatedAt`. A stale revision returns
 HTTP **409** with the current checkpoint so the client can ask which version to retain.
@@ -143,3 +143,22 @@ the time limit. Polling restores the question, choices, timer, and answered stat
 
 `SavedGame` additionally persists `choices`, `puzzleId`, `puzzleMode`, and `selectedLetters`.
 Clients never need the full match catalog. The server sends individual questions only.
+
+
+### Competition updates (Android 1.4.0)
+
+The product no longer browses or resumes local saves. Online 2048/Cube reconnects use
+authoritative server checkpoints automatically. `WORD` / `word` identifies Word Quiz;
+`WORD_PUZZLE` / `word_puzzle` identifies the orthogonal grid competition. Word dictionaries
+now cover lengths 3–8. Clients submit cell indices; the server checks adjacency, dictionary
+membership, and per-player duplicate words. Diagonals and reused cells are forbidden.
+
+`GET /social/watch/{id}` upgrades to WebSocket and pushes `WatchFrame` once per second:
+`room`, `sequence`, `serverTime`, `demo`, `grid`, `selected`, `event`, `seconds`. IDs starting
+with `demo-` are clearly marked simulations and have no wallet entries or payouts.
+
+`GET /social/wallet` accepts Bearer authentication. `POST /social/wallet` is retired (410);
+clients cannot supply coin or score deltas. The server debits room entry on match start
+and settles winners/draws idempotently. `POST /social/coins/purchases` accepts `token`,
+`id` (client-generated request UUID), and `coins` (50, 200, or 500), returning a pending
+`CoinPurchase`. Only administrative payment approval credits its balance.

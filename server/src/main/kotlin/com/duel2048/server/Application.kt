@@ -18,6 +18,7 @@ import com.duel2048.shared.social.MiniJoinBody
 import com.duel2048.shared.social.NotifyBody
 import com.duel2048.shared.social.ReportBody
 import com.duel2048.shared.social.WalletBody
+import io.ktor.websocket.Frame
 import io.ktor.http.ContentType
 import io.ktor.http.HttpMethod
 import io.ktor.http.HttpStatusCode
@@ -104,8 +105,9 @@ fun Application.module(config: ServerConfig = ServerConfig.fromEnv(), db: UserSt
 
     val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     environment.monitor.subscribe(ApplicationStopped) { appScope.cancel(); db.close() }
-    val gameSaves = GameSaveStore(File(config.dataDir, "game-saves"))
+    val gameSaves = GameSaveStore(File(config.dataDir, "game-saves"),sql=db as? MySqlStore)
     val lobby = Lobby(config, appScope, db, gameSaves)
+    lobby.economy.recoverInterruptedMatches()
     val social = SocialService(config.dataDir, db, lobby)
     val adminKey = System.getenv("ADMIN_KEY")?.takeIf { it.isNotBlank() } ?: "duel-admin"
     appScope.launch { social.pollLoop() }
@@ -160,7 +162,7 @@ fun Application.module(config: ServerConfig = ServerConfig.fromEnv(), db: UserSt
             call.respond(social.chatSince(room, since))
         }
         get("/social/wallet") {
-            val token = call.request.queryParameters["token"].orEmpty()
+            val token = call.request.headers["Authorization"]?.removePrefix("Bearer ") ?: call.request.queryParameters["token"].orEmpty()
             val wallet = social.wallet(token)
             if (wallet == null) call.respond(HttpStatusCode.Unauthorized, "bad token")
             else call.respond(wallet)
@@ -185,17 +187,19 @@ fun Application.module(config: ServerConfig = ServerConfig.fromEnv(), db: UserSt
             if (line == null) call.respond(HttpStatusCode.BadRequest, "phrase not allowed")
             else call.respond(line)
         }
-        post("/social/wallet") {
-            val body = Protocol.json.decodeFromString(WalletBody.serializer(), call.receiveText())
-            val wallet = social.applyWallet(body.token, body.scoreDelta, body.coinDelta)
-            if (wallet == null) call.respond(HttpStatusCode.Unauthorized, "bad token")
-            else call.respond(wallet)
+        post("/social/wallet") { call.respond(HttpStatusCode.Gone,"Wallet changes are server-owned") }
+        post("/social/coins/purchases") {
+            val body = Protocol.json.decodeFromString(com.duel2048.shared.social.CoinPurchaseBody.serializer(),call.receiveText())
+            try {
+                val order = social.purchase(body.token,body.id,body.coins)
+                if(order==null) call.respond(HttpStatusCode.Unauthorized,"Sign in to buy coins") else call.respond(order)
+            } catch(e:IllegalArgumentException) { call.respond(HttpStatusCode.BadRequest,e.message ?: "Invalid purchase") }
         }
         post("/social/mini/join") {
             val body = Protocol.json.decodeFromString(MiniJoinBody.serializer(), call.receiveText())
             val user = db.authByToken(body.token)
             if (user == null) call.respond(HttpStatusCode.Unauthorized, "Sign in to play online")
-            else try { call.respond(social.joinMini(user.name, body.game, body.mode, body.difficulty)) }
+            else try { call.respond(social.joinMini(user.name, body.game, body.mode, body.difficulty, user.id)) }
             catch (invalid: IllegalArgumentException) { call.respond(HttpStatusCode.BadRequest, invalid.message ?: "Invalid puzzle request") }
         }
         post("/social/mini/answer") {
@@ -214,6 +218,14 @@ fun Application.module(config: ServerConfig = ServerConfig.fromEnv(), db: UserSt
             }
             val body = Protocol.json.decodeFromString(NotifyBody.serializer(), call.receiveText())
             call.respond(social.addNote(body.text))
+        }
+        webSocket("/social/watch/{id}") {
+            val id=call.parameters["id"].orEmpty()
+            while(true) {
+                val snapshot=social.watchFrame(id) ?: break
+                send(Frame.Text(Protocol.json.encodeToString(com.duel2048.shared.social.WatchFrame.serializer(),snapshot)))
+                kotlinx.coroutines.delay(1000)
+            }
         }
         webSocket(Protocol.WS_PATH) { lobby.handleSession(this) }
     }

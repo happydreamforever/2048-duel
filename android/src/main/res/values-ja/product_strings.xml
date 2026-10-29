@@ -46,7 +46,7 @@
     <string name="product_progress">進行状況</string>
     <string name="product_settings_hint">外観、サウンド、言語、接続。</string>
     <string name="product_help_hint">ご意見や不具合の報告。</string>
-    <string name="product_logout_hint">保存データはこのアカウントに残ります。未同期のデータもこの端末でアカウントごとに保持されます。</string>
+    <string name="product_logout_hint">アカウント、コイン、オンライン対戦の結果はサーバーに保存されます。</string>
     <string name="product_reconnecting">再接続中… 進行状況を復元します。</string>
     <string name="product_save_exit">保存して終了</string>
     <string name="product_leave_match">対戦から退出しますか？</string>
