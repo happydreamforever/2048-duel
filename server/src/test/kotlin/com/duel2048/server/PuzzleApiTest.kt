@@ -51,6 +51,38 @@ class PuzzleApiTest {
         val over = Protocol.json.decodeFromString(MiniRoomView.serializer(), answer.bodyAsText())
         assertEquals("Alice", over.winner)
         assertEquals(solution, over.solution)
+        val gridResponse = client.post("/social/mini/join") {
+            contentType(ContentType.Application.Json)
+            setBody(Protocol.json.encodeToString(MiniJoinBody.serializer(), MiniJoinBody(alice.token!!, "spoof", "word_puzzle", "bot", "4")))
+        }
+        assertEquals(HttpStatusCode.OK, gridResponse.status)
+        val grid = Protocol.json.decodeFromString(MiniRoomView.serializer(), gridResponse.bodyAsText())
+        assertEquals(4, grid.grid.size)
+        assertEquals("", grid.solution)
+        val dictionary = WordGrid.dictionary(PuzzleCatalog("/datasets/matches"))
+        val gridWord = dictionary.first { WordGrid.findPath(grid.grid, it) != null }
+        val gridPath = WordGrid.findPath(grid.grid, gridWord)!!
+        val gridAnswer = client.post("/social/mini/answer") {
+            contentType(ContentType.Application.Json)
+            setBody(Protocol.json.encodeToString(MiniAnswerBody.serializer(), MiniAnswerBody(grid.roomId, "spoof", "ignored", alice.token!!, gridPath)))
+        }
+        val scored = Protocol.json.decodeFromString(MiniRoomView.serializer(), gridAnswer.bodyAsText())
+        assertEquals("Alice", scored.you)
+        assertEquals(gridWord.length, scored.score)
+        assertEquals(listOf(gridWord), scored.foundWords)
+        assertEquals("playing", scored.status)
+        assertEquals("", scored.solution)
+        val privatePoll = client.get("/social/mini/${grid.roomId}?name=spoof") {
+            header(HttpHeaders.Authorization, "Bearer ${alice.token}")
+        }
+        assertEquals(listOf(gridWord), Protocol.json.decodeFromString(MiniRoomView.serializer(), privatePoll.bodyAsText()).foundWords)
+        val publicPoll = client.get("/social/mini/${grid.roomId}?name=Alice")
+        assertTrue(Protocol.json.decodeFromString(MiniRoomView.serializer(), publicPoll.bodyAsText()).foundWords.isEmpty())
+        val badGrid = client.post("/social/mini/join") {
+            contentType(ContentType.Application.Json)
+            setBody(Protocol.json.encodeToString(MiniJoinBody.serializer(), MiniJoinBody(alice.token!!, "Alice", "word_puzzle", "bot", "5")))
+        }
+        assertEquals(HttpStatusCode.BadRequest, badGrid.status)
         val invalid = client.post("/social/mini/join") {
             contentType(ContentType.Application.Json)
             setBody(Protocol.json.encodeToString(MiniJoinBody.serializer(), MiniJoinBody(alice.token!!, "Alice", "word", "bot", "90")))

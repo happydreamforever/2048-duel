@@ -128,14 +128,14 @@ private fun GameLibraryCard(game: HubGame, onClick: () -> Unit) {
         .clickable(onClick = onClick).padding(16.dp), verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(16.dp)) {
         Box(Modifier.size(62.dp).clip(RoundedCornerShape(16.dp)).background(Brush.linearGradient(game.colors)), contentAlignment = Alignment.Center) {
-            Text(when (game) { HubGame.TILES -> "2048"; HubGame.CUBE -> "3×3"; HubGame.MATH -> "±"; HubGame.WORD -> "Aa" },
+            Text(when (game) { HubGame.TILES -> "2048"; HubGame.CUBE -> "3×3"; HubGame.MATH -> "±"; HubGame.WORD -> "Aa"; HubGame.WORD_PUZZLE -> "ABC" },
                 color = androidx.compose.ui.graphics.Color.White, fontSize = 21.sp, fontWeight = FontWeight.Black)
         }
         Column(Modifier.weight(1f)) {
             Text(gameTitle(game), color = palette.textPrimary, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             Text(stringResource(when (game) {
                 HubGame.TILES -> R.string.product_tiles_description; HubGame.CUBE -> R.string.product_cube_description
-                HubGame.MATH -> R.string.product_math_description; HubGame.WORD -> R.string.product_word_description
+                HubGame.MATH -> R.string.product_math_description; HubGame.WORD -> R.string.product_word_description; HubGame.WORD_PUZZLE -> R.string.word_grid_description
             }), color = palette.textSecondary, style = MaterialTheme.typography.bodySmall)
         }
         Icon(Icons.Default.ArrowForward, null, tint = palette.textSecondary)
@@ -145,13 +145,14 @@ private fun GameLibraryCard(game: HubGame, onClick: () -> Unit) {
 @Composable
 internal fun gameTitle(game: HubGame): String = savedGameTitle(when (game) {
     HubGame.TILES -> SavedGameType.TILES; HubGame.CUBE -> SavedGameType.CUBE
-    HubGame.MATH -> SavedGameType.MATH; HubGame.WORD -> SavedGameType.WORD
+    HubGame.MATH -> SavedGameType.MATH; HubGame.WORD -> SavedGameType.WORD; HubGame.WORD_PUZZLE -> SavedGameType.WORD_PUZZLE
 })
 
 @Composable
 private fun savedGameTitle(game: SavedGameType): String = when (game) {
     SavedGameType.TILES -> "2048"; SavedGameType.CUBE -> stringResource(R.string.product_cube)
     SavedGameType.MATH -> stringResource(R.string.product_math); SavedGameType.WORD -> stringResource(R.string.product_word)
+    SavedGameType.WORD_PUZZLE -> stringResource(R.string.word_grid_title)
 }
 
 @Composable

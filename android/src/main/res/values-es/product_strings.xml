@@ -12,7 +12,7 @@
     <string name="product_games">Tus juegos</string>
     <string name="product_cube">Cubo</string>
     <string name="product_math">Matemáticas</string>
-    <string name="product_word">Palabras</string>
+    <string name="product_word">Cuestionario de palabras</string>
     <string name="product_tiles_description">Combina fichas. Juega en solitario o contra un rival.</string>
     <string name="product_cube_description">Resuelve un cubo 3×3 girando caras y capas centrales.</string>
     <string name="product_math_description">Pon a prueba tu cálculo mental contra el reloj.</string>

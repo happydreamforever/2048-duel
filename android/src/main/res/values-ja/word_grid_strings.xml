@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="word_grid_title">単語パズル</string>
+    <string name="word_grid_description">4×4、6×6、8×8 の文字グリッドで単語を探そう。</string>
+    <string name="word_grid_help">上下左右につなげます。斜めや同じマスの再使用はできません。4–8文字の単語を送り、新しい単語は文字数分の得点になります。最後のマスをタップすると戻せます。</string>
+    <string name="word_grid_score">あなた: %1$d · 相手: %2$d</string>
+    <string name="word_grid_found">発見: %1$s</string>
+    <string name="word_grid_invalid">発見済み、または今回の辞書にない単語です。別の単語を探してください。</string>
+    <string name="word_grid_draw">引き分け</string>
+</resources>

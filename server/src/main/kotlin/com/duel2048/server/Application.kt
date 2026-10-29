@@ -168,9 +168,11 @@ fun Application.module(config: ServerConfig = ServerConfig.fromEnv(), db: UserSt
         get("/social/mini/{id}") {
             val id = call.parameters["id"].orEmpty()
             val name = call.request.queryParameters["name"].orEmpty()
-            val room = social.mini(id, name)
+            val token = call.request.headers["Authorization"]?.removePrefix("Bearer ").orEmpty()
+            val user = db.authByToken(token)
+            val room = social.mini(id, user?.name ?: name)
             if (room == null) call.respond(HttpStatusCode.NotFound, "no room")
-            else call.respond(room)
+            else call.respond(if (room.game == "word_puzzle" && user == null) room.copy(foundWords = emptyList()) else room)
         }
         post("/social/report") {
             val body = Protocol.json.decodeFromString(ReportBody.serializer(), call.receiveText())

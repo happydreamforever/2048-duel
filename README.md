@@ -1,6 +1,6 @@
 # 2048 Duel
 
-An Android game hub for **2048, Cube, Math, and Word puzzles**, with an authoritative Kotlin server.
+An Android game hub for **2048, Cube, Math, Word Quiz, and Word Puzzle**, with an authoritative Kotlin server.
 
 Both players get the same seeded board. Merges charge an **attack meter**; every
 12 energy launches a **garbage tile** onto the opponent's board. Garbage slides but never
@@ -80,11 +80,25 @@ only in the server distribution. They are not included in the APK or downloaded 
 Only the chosen problem, shuffled answer options or letter bank, clue, timer, and opaque
 puzzle ID are sent. The correct answer stays on the server until the match ends.
 
-Math uses four selectable answers and an explicit Submit button. Word puzzles use tappable
+Math uses four selectable answers and an explicit Submit button. Word Quiz uses tappable
 letter tiles, an assembled-word preview, Undo, and Clear; repeated letters require distinct
-tiles. Word levels describe word length rather than grid dimensions. Each competitor has
+tiles. Quiz levels describe word length rather than grid dimensions. Each competitor has
 one submission; a wrong answer locks their input while the opponent continues. A server bot
 solves after half the time limit, so the player must answer before then. Training offers hints.
+**Word Puzzle** is a separate timed competition with 4×4, 6×6, or 8×8 grids. Tap
+consecutive horizontal or vertical neighbors to make 4–8 letter dictionary words.
+Diagonals, wrapping across row edges, and reusing a cell within a word are forbidden.
+Selected cells show their order; tap the last cell or Undo to backtrack, or Clear to restart.
+Each distinct valid word earns one point per letter per player. Both PvP players use the
+same board, may independently find the same words, and compete for the highest score
+at the end of a 120-second round; equal scores draw. Invalid and duplicate submissions
+have no penalty and award no points. Bot opponents find a limited set of valid words
+over time. Training uses the small offline dictionary; both PvP and Bot use the full
+server-only CSV dictionary. Grids, timers, participants, and found words survive server
+restarts. Players see their own found words and both scores, while the list of possible
+words is revealed only when the round ends. Existing `word` rooms and `WORD` saves
+remain Word Quiz; grid games use `word_puzzle` and `WORD_PUZZLE`.
+
 The problem, option order, and partial word selection survive saving and reconnecting.
 
 Math CSV columns: `id,prompt,answer,option_1,option_2,option_3,option_4`.

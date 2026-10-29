@@ -61,7 +61,7 @@ import kotlinx.coroutines.delay
 fun GameModesScreen(vm: MainViewModel, game: HubGame) {
     val palette = LocalPalette.current
     BackHandler { vm.goHome() }
-    var difficulty by remember(game) { mutableStateOf(if (game == HubGame.WORD) "4" else if (game == HubGame.MATH) "medium" else "normal") }
+    var difficulty by remember(game) { mutableStateOf(if (game in listOf(HubGame.WORD, HubGame.WORD_PUZZLE)) "4" else if (game == HubGame.MATH) "medium" else "normal") }
     Column(
         Modifier.fillMaxSize().systemBarsPadding().verticalScroll(rememberScrollState()).padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -73,11 +73,11 @@ fun GameModesScreen(vm: MainViewModel, game: HubGame) {
         if (game in HubGame.entries) {
             Text(stringResource(R.string.difficulty), color = palette.accent, fontWeight = FontWeight.Bold)
             androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                val options = if (game == HubGame.WORD) com.duel2048.shared.social.Puzzles.wordLengths.map(Int::toString) else if (game == HubGame.MATH) listOf("easy", "medium", "hard", "very_hard") else listOf("easy", "normal", "hard")
+                val options = if (game == HubGame.WORD_PUZZLE) com.duel2048.shared.social.WordGrid.sizes.map(Int::toString) else if (game == HubGame.WORD) com.duel2048.shared.social.Puzzles.wordLengths.map(Int::toString) else if (game == HubGame.MATH) listOf("easy", "medium", "hard", "very_hard") else listOf("easy", "normal", "hard")
                 options.forEach { id ->
                     val on = id == difficulty
                     Text(
-                        difficultyLabel(id),
+                        if (game == HubGame.WORD_PUZZLE) "$id × $id" else difficultyLabel(id),
                         modifier = Modifier
                             .clip(RoundedCornerShape(12.dp))
                             .background(if (on) palette.accent else palette.surface)
@@ -158,10 +158,14 @@ fun MiniPlayScreen(vm: MainViewModel) {
         Modifier.fillMaxSize().systemBarsPadding().verticalScroll(rememberScrollState()).padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text(gameTitle(if (state.game == com.duel2048.shared.protocol.SavedGameType.WORD) HubGame.WORD else HubGame.MATH), color = palette.accent, fontWeight = FontWeight.Black, fontSize = 22.sp)
+        Text(gameTitle(if (state.game == com.duel2048.shared.protocol.SavedGameType.WORD_PUZZLE) HubGame.WORD_PUZZLE else if (state.game == com.duel2048.shared.protocol.SavedGameType.WORD) HubGame.WORD else HubGame.MATH), color = palette.accent, fontWeight = FontWeight.Black, fontSize = 22.sp)
         Text(stringResource(R.string.vs_name, state.opponent), color = palette.textSecondary)
         Text("${state.secondsLeft}s", color = palette.gold, fontWeight = FontWeight.Black, fontSize = 32.sp)
         Text(state.prompt, color = palette.textPrimary, fontWeight = FontWeight.Black, fontSize = if (state.grid.isEmpty()) 28.sp else 22.sp)
+        if (state.game == com.duel2048.shared.protocol.SavedGameType.WORD_PUZZLE) {
+            Text(stringResource(R.string.word_grid_score, state.score, state.opponentScore), color = palette.gold, fontWeight = FontWeight.Bold)
+            if (state.foundWords.isNotEmpty()) Text(stringResource(R.string.word_grid_found, state.foundWords.joinToString(", ")), color = palette.success)
+        }
         if (state.hint.isNotBlank()) Text(stringResource(R.string.hint_line, state.hint), color = palette.accent)
         if (state.status == "playing") {
             PuzzleAnswerControls(vm, state)
@@ -169,7 +173,7 @@ fun MiniPlayScreen(vm: MainViewModel) {
             Text(stringResource(R.string.product_waiting), color = palette.textSecondary)
         } else {
             Text(
-                if (state.won) stringResource(R.string.you_win) else stringResource(R.string.mini_game_over),
+                if (state.game == com.duel2048.shared.protocol.SavedGameType.WORD_PUZZLE && state.mode != "train" && state.score == state.opponentScore) stringResource(R.string.word_grid_draw) else if (state.won) stringResource(R.string.you_win) else stringResource(R.string.mini_game_over),
                 color = if (state.won) palette.success else palette.danger,
                 fontWeight = FontWeight.Black,
                 fontSize = 28.sp,

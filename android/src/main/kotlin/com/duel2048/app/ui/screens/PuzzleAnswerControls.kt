@@ -1,6 +1,14 @@
 package com.duel2048.app.ui.screens
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import com.duel2048.shared.social.WordGrid
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -23,15 +31,41 @@ internal fun PuzzleAnswerControls(vm: MainViewModel, state: MiniUi) {
     val palette = LocalPalette.current
     val enabled = !state.submitting && !state.answered
     var selectedAnswer by rememberSaveable(state.saveId) { mutableStateOf("") }
-    val wordGame = state.game == SavedGameType.WORD
-    val expectedLetters = if (state.grid.size == 1) state.grid.first().length else state.difficulty.toIntOrNull() ?: 4
+    val gridGame = state.game == SavedGameType.WORD_PUZZLE
+    val wordGame = state.game == SavedGameType.WORD || gridGame
+    val expectedLetters = if (gridGame) 8 else if (state.grid.size == 1) state.grid.first().length else state.difficulty.toIntOrNull() ?: 4
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         if (wordGame) {
-            val assembled = Puzzles.selectedWord(state.grid, state.selectedLetters).orEmpty()
-            Text(stringResource(R.string.puzzle_letters_help), color = palette.textSecondary)
-            Text((assembled.toList().map { it.toString() } + List((expectedLetters - assembled.length).coerceAtLeast(0)) { "_" }).joinToString(" "),
+            val assembled = (if (gridGame) WordGrid.selectedWord(state.grid, state.selectedLetters) else Puzzles.selectedWord(state.grid, state.selectedLetters)).orEmpty()
+            Text(stringResource(if (gridGame) R.string.word_grid_help else R.string.puzzle_letters_help), color = palette.textSecondary)
+            Text(if (gridGame) assembled.ifEmpty { "—" } else (assembled.toList().map { it.toString() } + List((expectedLetters - assembled.length).coerceAtLeast(0)) { "_" }).joinToString(" "),
                 color = palette.accent, fontSize = 28.sp, fontWeight = FontWeight.Bold)
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (gridGame) {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    state.grid.forEachIndexed { row, letters ->
+                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            letters.forEachIndexed { col, letter ->
+                                val index = row * state.grid.size + col
+                                val order = state.selectedLetters.indexOf(index)
+                                val last = state.selectedLetters.lastOrNull() == index
+                                val canSelect = enabled && (last || WordGrid.selectedWord(state.grid, state.selectedLetters + index) != null)
+                                val shape = RoundedCornerShape(6.dp)
+                                Box(Modifier.weight(1f).aspectRatio(1f).clip(shape)
+                                    .background(if (order >= 0) palette.accent.copy(alpha = 0.28f) else palette.surface)
+                                    .border(if (last) 2.dp else 1.dp, if (order >= 0) palette.accent else palette.surfaceBorder, shape)
+                                    .clickable(enabled = canSelect) { if (last) vm.undoMiniLetter() else vm.selectMiniLetter(index) }
+                                    .semantics { contentDescription = "${letter}, row ${row + 1}, column ${col + 1}" + if (order >= 0) ", selected ${order + 1}" else "" },
+                                    contentAlignment = Alignment.Center) {
+                                    Text(letter.toString(), color = if (canSelect || order >= 0) palette.textPrimary else palette.textSecondary,
+                                        fontSize = if (state.grid.size == 8) 17.sp else 22.sp, fontWeight = FontWeight.Bold)
+                                    if (order >= 0) Text("${order + 1}", color = palette.accent, fontSize = 9.sp,
+                                        modifier = Modifier.align(Alignment.TopEnd).padding(end = 2.dp))
+                                }
+                            }
+                        }
+                    }
+                }
+            } else FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 state.grid.joinToString("").forEachIndexed { index, letter ->
                     val used = index in state.selectedLetters
                     OutlinedButton(onClick = { vm.selectMiniLetter(index) },
@@ -63,13 +97,14 @@ internal fun PuzzleAnswerControls(vm: MainViewModel, state: MiniUi) {
                 }
             }
         }
+        if (state.invalidWord) Text(stringResource(R.string.word_grid_invalid), color = palette.danger)
         if (state.answerFailed) Text(stringResource(R.string.puzzle_submit_failed), color = palette.danger)
         if (state.answered) Text(stringResource(R.string.puzzle_wrong_wait), color = palette.gold)
         else Button(onClick = { vm.submitMini(selectedAnswer) }, modifier = Modifier.fillMaxWidth(),
-            enabled = enabled && if (wordGame) state.selectedLetters.size == expectedLetters else selectedAnswer in state.choices) {
+            enabled = enabled && if (gridGame) state.selectedLetters.size in 4..8 else if (wordGame) state.selectedLetters.size == expectedLetters else selectedAnswer in state.choices) {
             Text(stringResource(if (state.submitting) R.string.puzzle_sending else R.string.submit_answer))
         }
-        if (state.guided) TextButton(onClick = { vm.miniHint() }, enabled = enabled) {
+        if (state.guided && !gridGame) TextButton(onClick = { vm.miniHint() }, enabled = enabled) {
             Text(stringResource(R.string.hint))
         }
     }

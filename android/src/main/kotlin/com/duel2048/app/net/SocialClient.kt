@@ -45,8 +45,8 @@ class SocialClient {
     suspend fun applyWallet(ws: String, token: String, scoreDelta: Int, coinDelta: Int): Result<WalletView> =
         post(ws, "/social/wallet", Protocol.json.encodeToString(WalletBody.serializer(), WalletBody(token, scoreDelta, coinDelta)), WalletView.serializer())
 
-    suspend fun mini(ws: String, roomId: String, name: String): Result<MiniRoomView> =
-        get(ws, "/social/mini/$roomId?name=${java.net.URLEncoder.encode(name, "UTF-8")}", MiniRoomView.serializer())
+    suspend fun mini(ws: String, roomId: String, name: String, token: String = ""): Result<MiniRoomView> =
+        get(ws, "/social/mini/$roomId?name=${java.net.URLEncoder.encode(name, "UTF-8")}", MiniRoomView.serializer(), token)
 
     suspend fun joinMini(ws: String, name: String, game: String, mode: String, difficulty: String, token: String = ""): Result<MiniRoomView> =
         post(
@@ -59,11 +59,11 @@ class SocialClient {
     suspend fun answerMini(ws: String, roomId: String, name: String, answer: String, token: String = "", selectedLetters: List<Int> = emptyList()): Result<MiniRoomView> =
         post(ws, "/social/mini/answer", Protocol.json.encodeToString(MiniAnswerBody.serializer(), MiniAnswerBody(roomId, name, answer, token, selectedLetters)), MiniRoomView.serializer())
 
-    private suspend fun <T> get(ws: String, path: String, serializer: kotlinx.serialization.KSerializer<T>): Result<T> =
+    private suspend fun <T> get(ws: String, path: String, serializer: kotlinx.serialization.KSerializer<T>, token: String = ""): Result<T> =
         withContext(Dispatchers.IO) {
             runCatching {
                 val url = LeaderboardClient.httpBase(ws) + path
-                http.newCall(Request.Builder().url(url).build()).execute().use { response ->
+                http.newCall(Request.Builder().url(url).apply { if (token.isNotBlank()) header("Authorization", "Bearer $token") }.build()).execute().use { response ->
                     if (!response.isSuccessful) error("HTTP ${response.code}")
                     Protocol.json.decodeFromString(serializer, response.body?.string().orEmpty())
                 }

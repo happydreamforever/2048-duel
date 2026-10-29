@@ -30,6 +30,7 @@ import com.duel2048.shared.social.ChatLine
 import com.duel2048.shared.social.Economy
 import com.duel2048.shared.social.LiveGame
 import com.duel2048.shared.social.PlayerPresence
+import com.duel2048.shared.social.WordGrid
 import com.duel2048.shared.social.Puzzles
 import androidx.compose.ui.graphics.Color
 import com.duel2048.shared.cube.CubeMove
@@ -78,7 +79,8 @@ enum class HubGame(val title: String, val blurb: String) {
     TILES("2048", "Merge, build, and outplay"),
     CUBE("Cube", "3D cube, same scramble"),
     MATH("Math", "Beat the clock"),
-    WORD("Word puzzle", "Find the hidden word"),
+    WORD("Word Quiz", "Solve the clue using letter tiles"),
+    WORD_PUZZLE("Word Puzzle", "Find words in a letter grid"),
     ;
 
     val colors: List<Color>
@@ -86,6 +88,7 @@ enum class HubGame(val title: String, val blurb: String) {
             TILES -> listOf(Color(0xFF007F9E), Color(0xFF06455B))
             CUBE -> listOf(Color(0xFF6B4EFF), Color(0xFF2D1B69))
             MATH -> listOf(Color(0xFFB8860B), Color(0xFF7A4B00))
+            WORD_PUZZLE -> listOf(Color(0xFFB04C84), Color(0xFF543986))
             WORD -> listOf(Color(0xFF1F9D6B), Color(0xFF0E6B8A))
         }
 }
@@ -111,6 +114,10 @@ data class MiniUi(
     val answered: Boolean = false,
     val submitting: Boolean = false,
     val answerFailed: Boolean = false,
+    val foundWords: List<String> = emptyList(),
+    val score: Int = 0,
+    val opponentScore: Int = 0,
+    val invalidWord: Boolean = false,
 )
 
 data class LoginUiState(val busy: Boolean = false, val error: DuelError? = null)
@@ -572,12 +579,12 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 miniJob?.cancel()
                 miniSolution = saved.solution
                 miniRoom = saved.roomId
-                _mini.value = MiniUi(if (saved.game == SavedGameType.WORD) "Word puzzle" else "Math", saved.opponentName,
+                _mini.value = MiniUi(if (saved.game == SavedGameType.WORD_PUZZLE) "Word Puzzle" else if (saved.game == SavedGameType.WORD) "Word Quiz" else "Math", saved.opponentName,
                     saved.prompt, saved.grid, (saved.remainingMs / 1000).toInt(), if (saved.roomId.isEmpty()) "playing" else "waiting", guided = saved.guided,
                     mode = saved.puzzleMode.ifBlank { if (saved.roomId.isNotEmpty()) "pvp" else "train" },
                     saveId = saved.id, game = saved.game, difficulty = saved.difficulty,
                     choices = saved.choices.ifEmpty { if (saved.game == SavedGameType.MATH && saved.solution.isNotBlank()) Puzzles.choicesFor(saved.solution) else emptyList() },
-                    puzzleId = saved.puzzleId, selectedLetters = saved.selectedLetters)
+                    puzzleId = saved.puzzleId, selectedLetters = saved.selectedLetters, foundWords = saved.foundWords, score = WordGrid.score(saved.foundWords))
                 _screen.value = Screen.MiniPlay
                 startMiniTimer()
             }
@@ -622,7 +629,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             social.live(settings.value.serverUrl).onSuccess { games ->
                 val filtered = watchGame?.let { g ->
-                    val key = if (g == HubGame.WORD) "word" else if (g == HubGame.MATH) "math" else if (g == HubGame.TILES) "2048" else "cube"
+                    val key = if (g == HubGame.WORD_PUZZLE) "word_puzzle" else if (g == HubGame.WORD) "word" else if (g == HubGame.MATH) "math" else if (g == HubGame.TILES) "2048" else "cube"
                     games.filter { it.game == key || (key == "cube" && it.game == "cube") }
                 } ?: games
                 _liveGames.value = filtered
@@ -670,7 +677,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun submitMini(answer: String) {
         val s = _mini.value ?: return
         if (s.status != "playing" || s.submitting || s.answered) return
-        val submitted = if (s.game == SavedGameType.WORD) Puzzles.selectedWord(s.grid, s.selectedLetters) ?: return
+        val submitted = if (s.game == SavedGameType.WORD_PUZZLE) WordGrid.selectedWord(s.grid, s.selectedLetters)?.takeIf { it.length >= 4 } ?: return
+            else if (s.game == SavedGameType.WORD) Puzzles.selectedWord(s.grid, s.selectedLetters) ?: return
             else answer.takeIf { it in s.choices } ?: return
         if (s.game == SavedGameType.WORD && s.selectedLetters.size != (if (s.grid.size == 1) s.grid.first().length else s.difficulty.toIntOrNull() ?: 4)) return
         _mini.value = s.copy(submitting = true, answerFailed = false)
@@ -678,15 +686,25 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             if (miniRoom.isNotBlank()) {
                 val name = settings.value.accountName.ifBlank { "Player" }
                 val room = social.answerMini(settings.value.serverUrl, miniRoom, name,
-                    if (s.game == SavedGameType.WORD) "" else submitted, settings.value.authToken, s.selectedLetters).getOrNull()
+                    if (s.game in listOf(SavedGameType.WORD, SavedGameType.WORD_PUZZLE)) "" else submitted, settings.value.authToken, s.selectedLetters).getOrNull()
                 val latest = _mini.value ?: return@launch
                 if (latest.saveId != s.saveId) return@launch
                 if (room == null) { _mini.value = latest.copy(submitting = false, answerFailed = true); return@launch }
                 if (latest.status == "over" && room.status != "over") return@launch
                 val won = room.winner == name
                 _mini.value = latest.copy(status = room.status, won = won, solution = room.solution,
-                    answered = room.answered, submitting = false)
+                    answered = room.answered, submitting = false,
+                    foundWords = room.foundWords, score = room.score, opponentScore = room.opponentScore,
+                    selectedLetters = if (s.game == SavedGameType.WORD_PUZZLE) emptyList() else latest.selectedLetters,
+                    invalidWord = s.game == SavedGameType.WORD_PUZZLE && (submitted !in room.foundWords || submitted in s.foundWords))
                 if (room.status == "over") rewardOnce("mini-$miniRoom", s.mode, won)
+            } else if (s.game == SavedGameType.WORD_PUZZLE) {
+                val latest = _mini.value ?: return@launch
+                if (latest.saveId != s.saveId || latest.status != "playing") return@launch
+                val valid = Puzzles.isGridWord(submitted) && submitted !in latest.foundWords
+                val found = if (valid) latest.foundWords + submitted else latest.foundWords
+                _mini.value = latest.copy(foundWords = found, score = WordGrid.score(found),
+                    selectedLetters = emptyList(), submitting = false, invalidWord = !valid)
             } else {
                 val won = submitted.equals(miniSolution, ignoreCase = true)
                 _mini.value = s.copy(status = "over", won = won, solution = miniSolution, secondsLeft = 0, submitting = false)
@@ -697,17 +715,18 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     fun selectMiniLetter(index: Int) {
         val s = _mini.value ?: return
-        if (s.game != SavedGameType.WORD || s.status != "playing" || s.submitting || s.answered) return
-        val length = if (s.grid.size == 1) s.grid.first().length else s.difficulty.toIntOrNull() ?: 4
+        if (s.game !in listOf(SavedGameType.WORD, SavedGameType.WORD_PUZZLE) || s.status != "playing" || s.submitting || s.answered) return
+        val length = if (s.game == SavedGameType.WORD_PUZZLE) 8 else if (s.grid.size == 1) s.grid.first().length else s.difficulty.toIntOrNull() ?: 4
         if (s.selectedLetters.size >= length) return
         if (index !in 0 until s.grid.sumOf(String::length) || index in s.selectedLetters) return
-        _mini.value = s.copy(selectedLetters = s.selectedLetters + index)
+        if (s.game == SavedGameType.WORD_PUZZLE && WordGrid.selectedWord(s.grid, s.selectedLetters + index) == null) return
+        _mini.value = s.copy(selectedLetters = s.selectedLetters + index, invalidWord = false)
     }
 
     fun undoMiniLetter(clear: Boolean = false) {
         val s = _mini.value ?: return
         if (s.status != "playing" || s.submitting || s.answered) return
-        _mini.value = s.copy(selectedLetters = if (clear) emptyList() else s.selectedLetters.dropLast(1))
+        _mini.value = s.copy(selectedLetters = if (clear) emptyList() else s.selectedLetters.dropLast(1), invalidWord = false)
     }
 
     fun miniHint() {
@@ -757,7 +776,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             miniRoom = ""
             miniSolution = ""
             if (mode != HubMode.TRAIN) {
-                val joined = social.joinMini(settings.value.serverUrl, name, if (game == HubGame.WORD) "word" else "math", modeId, difficulty, settings.value.authToken).getOrNull()
+                val joined = social.joinMini(settings.value.serverUrl, name, if (game == HubGame.WORD_PUZZLE) "word_puzzle" else if (game == HubGame.WORD) "word" else "math", modeId, difficulty, settings.value.authToken).getOrNull()
                 if (joined != null && joined.roomId.isNotBlank()) {
                     miniRoom = joined.roomId
                     prompt = joined.prompt
@@ -773,7 +792,13 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 }
             }
             if (mode == HubMode.TRAIN) {
-                if (game == HubGame.WORD) {
+                if (game == HubGame.WORD_PUZZLE) {
+                    grid = Puzzles.wordGrid(difficulty.toInt())
+                    prompt = "Find words by connecting letters horizontally or vertically."
+                    puzzleId = UUID.randomUUID().toString()
+                    seconds = WordGrid.seconds
+                    opponent = "Training"
+                } else if (game == HubGame.WORD) {
                     val built = Puzzles.word(difficulty.toInt())
                     grid = built.grid
                     miniSolution = built.answer
@@ -795,7 +820,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 }
             }
             _mini.value = MiniUi(game.title, opponent, prompt, grid, seconds, initialStatus, guided = guided, mode = modeId,
-                game = if (game == HubGame.WORD) SavedGameType.WORD else SavedGameType.MATH, difficulty = difficulty,
+                game = if (game == HubGame.WORD_PUZZLE) SavedGameType.WORD_PUZZLE else if (game == HubGame.WORD) SavedGameType.WORD else SavedGameType.MATH, difficulty = difficulty,
                 choices = choices, puzzleId = puzzleId)
             _screen.value = Screen.MiniPlay
             startMiniTimer()
@@ -807,7 +832,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         completed = s.status == "over", remainingMs = s.secondsLeft.coerceAtLeast(0) * 1000L,
         durationMs = 300_000, prompt = s.prompt, grid = s.grid, solution = miniSolution, roomId = miniRoom,
         opponentName = s.opponent, guided = s.guided, difficulty = s.difficulty,
-        choices = s.choices, puzzleId = s.puzzleId, selectedLetters = s.selectedLetters, puzzleMode = s.mode)
+        choices = s.choices, puzzleId = s.puzzleId, selectedLetters = s.selectedLetters, puzzleMode = s.mode, foundWords = s.foundWords)
 
     private fun startMiniTimer() {
         miniJob = viewModelScope.launch {
@@ -816,12 +841,13 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                     val current = _mini.value ?: return@launch
                     if (miniRoom.isNotBlank()) {
                         val name = settings.value.accountName
-                        social.mini(settings.value.serverUrl, miniRoom, name).onSuccess { room ->
+                        social.mini(settings.value.serverUrl, miniRoom, name, settings.value.authToken).onSuccess { room ->
                             val latest = _mini.value ?: return@onSuccess
                             if (latest.saveId != current.saveId || latest.status == "over" && room.status != "over") return@onSuccess
                             _mini.value = latest.copy(secondsLeft = room.seconds, status = room.status,
                                 opponent = room.opponent, solution = room.solution, won = room.winner == name,
-                                choices = room.choices, puzzleId = room.puzzleId, answered = room.answered)
+                                choices = room.choices, puzzleId = room.puzzleId, answered = room.answered,
+                                foundWords = room.foundWords, score = room.score, opponentScore = room.opponentScore)
                             if (room.status == "over") rewardOnce("mini-$miniRoom", current.mode, room.winner == name)
                         }
                     } else {
@@ -831,15 +857,17 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 val cur = _mini.value ?: return@launch
                 if (cur.status == "playing") {
-                    _mini.value = cur.copy(status = "over", won = false, solution = miniSolution, secondsLeft = 0)
-                    rewardOnce("mini-${cur.saveId}", cur.mode, false)
+                    val won = cur.game == SavedGameType.WORD_PUZZLE && cur.score > 0
+                    val solution = if (cur.game == SavedGameType.WORD_PUZZLE) Puzzles.gridSolutions(cur.grid).joinToString(", ") else miniSolution
+                    _mini.value = cur.copy(status = "over", won = won, solution = solution, secondsLeft = 0)
+                    rewardOnce("mini-${cur.saveId}", cur.mode, won)
                 }
             }
     }
 
     fun playMiniAgain() {
         val current = _mini.value ?: return
-        startMini(if (current.game == SavedGameType.WORD) HubGame.WORD else HubGame.MATH,
+        startMini(if (current.game == SavedGameType.WORD_PUZZLE) HubGame.WORD_PUZZLE else if (current.game == SavedGameType.WORD) HubGame.WORD else HubGame.MATH,
             if (current.mode == "pvp") HubMode.PVP else if (current.guided) HubMode.TRAIN else HubMode.BOT, current.difficulty)
     }
 

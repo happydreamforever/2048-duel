@@ -12,7 +12,7 @@
     <string name="product_games">ゲーム一覧</string>
     <string name="product_cube">キューブ</string>
     <string name="product_math">計算</string>
-    <string name="product_word">単語パズル</string>
+    <string name="product_word">単語クイズ</string>
     <string name="product_tiles_description">大きなタイルを作ろう。ソロでも対戦でも。</string>
     <string name="product_cube_description">面と中央の層を回して3×3キューブを完成。</string>
     <string name="product_math_description">制限時間内に暗算に挑戦。</string>

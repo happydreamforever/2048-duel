@@ -52,6 +52,10 @@ object Puzzles {
     val mathLevels = listOf("easy", "medium", "hard", "very_hard")
     val wordLengths = (4..8).toList()
     private val training = PuzzleCatalog("/datasets/training")
+    private val gridDictionary by lazy { WordGrid.dictionary(training) }
+    fun wordGrid(size: Int, random: Random = Random.Default) = WordGrid.generate(size, gridDictionary, random)
+    fun isGridWord(word: String) = word in gridDictionary
+    fun gridSolutions(grid: List<String>) = gridDictionary.filter { WordGrid.findPath(grid, it) != null }.sorted()
     fun mathEntries(level: String) = training.mathEntries(level)
     fun wordEntries(length: Int) = training.wordEntries(length)
     fun math(level: String, random: Random = Random.Default) = training.math(level, random)

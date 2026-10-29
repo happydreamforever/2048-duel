@@ -12,7 +12,7 @@
     <string name="product_games">游戏列表</string>
     <string name="product_cube">魔方</string>
     <string name="product_math">数学</string>
-    <string name="product_word">单词谜题</string>
+    <string name="product_word">单词测验</string>
     <string name="product_tiles_description">合成更大的方块，单人畅玩或与对手竞赛。</string>
     <string name="product_cube_description">转动外层与中间层，还原三阶魔方。</string>
     <string name="product_math_description">在倒计时内挑战心算能力。</string>

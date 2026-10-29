@@ -90,4 +90,7 @@ data class MiniRoomView(
     val choices: List<String> = emptyList(),
     val puzzleId: String = "",
     val answered: Boolean = false,
+    val foundWords: List<String> = emptyList(),
+    val score: Int = 0,
+    val opponentScore: Int = 0,
 )

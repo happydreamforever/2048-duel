@@ -3,6 +3,8 @@ package com.duel2048.server
 import com.duel2048.server.db.JsonDb
 import com.duel2048.shared.social.*
 import kotlinx.coroutines.*
+import com.duel2048.shared.protocol.Protocol
+import kotlinx.serialization.json.*
 import java.io.File
 import java.nio.file.Files
 import kotlin.test.*
@@ -87,6 +89,84 @@ class PuzzleMatchTest {
         assertEquals("Bot", over.winner)
         assertFailsWith<IllegalArgumentException> { service().joinMini("Alice", "math", "train", "easy") }
         assertFailsWith<IllegalArgumentException> { service().joinMini("Alice", "word", "bot", "99") }
+    }
+
+    @Test
+    fun `grid competitors share boards and earn persisted independent scores without duplicate rewards`() = fixture { service ->
+        for (size in WordGrid.sizes) {
+            val first = service().joinMini("Alice", "word_puzzle", "pvp", size.toString())
+            val second = service().joinMini("Bobby", "word_puzzle", "pvp", size.toString())
+            assertEquals(first.roomId, second.roomId)
+            assertEquals(first.grid, second.grid)
+            assertEquals(first.puzzleId, second.puzzleId)
+            assertEquals(size, first.grid.size)
+            assertEquals("", second.solution)
+            assertTrue(second.seconds in 119..120)
+            assertTrue(second.choices.isEmpty())
+            val word = WordGrid.dictionary(catalog).first { WordGrid.findPath(first.grid, it) != null }
+            val path = WordGrid.findPath(first.grid, word)!!
+            assertEquals(0, service().answer(first.roomId, "Alice", word)!!.score)
+            assertEquals(0, service().answer(first.roomId, "Alice", "", listOf(0, size + 1))!!.score)
+            assertEquals(0, service().answer(first.roomId, "Alice", "", listOf(size - 1, size))!!.score)
+            assertEquals(0, service().answer(first.roomId, "Alice", "", listOf(0, 1, 0))!!.score)
+            val accepted = service().answer(first.roomId, "Alice", "ignored", path)!!
+            assertEquals("playing", accepted.status)
+            assertEquals(word.length, accepted.score)
+            assertEquals(listOf(word), accepted.foundWords)
+            assertFalse(accepted.answered)
+            assertEquals("", accepted.solution)
+            assertEquals(word.length, service().answer(first.roomId, "Alice", "", path)!!.score)
+            assertEquals(word.length, service().mini(first.roomId, "Alice")!!.score)
+            val bob = service().answer(first.roomId, "Bobby", "", path)!!
+            assertEquals(word.length, bob.score)
+            assertEquals(word.length, bob.opponentScore)
+            assertNull(service().answer(first.roomId, "Outsider", "", path))
+        }
+        assertFailsWith<IllegalArgumentException> { service().joinMini("Alice", "word_puzzle", "bot", "5") }
+    }
+
+    @Test
+    fun `grid timer resolves score winner draws and bot without early quiz termination`() {
+        val dir = Files.createTempDirectory("grid-expiry").toFile()
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        try {
+            val db = JsonDb(File(dir, "users.json")).load()
+            val lobby = Lobby(ServerConfig.fromEnv(mapOf("DB" to "json", "DATA_DIR" to dir.path)), scope, db)
+            fun service() = SocialService(dir.path, db, lobby)
+            fun elapse(roomId: String, millis: Long) {
+                val file = File(dir, "social.json")
+                val root = Protocol.json.parseToJsonElement(file.readText()).jsonObject
+                val rooms = root["rooms"]!!.jsonArray.map { value ->
+                    if (value.jsonObject["id"]!!.jsonPrimitive.content != roomId) value else
+                        JsonObject(value.jsonObject + ("startedAt" to JsonPrimitive(System.currentTimeMillis() - millis)))
+                }
+                file.writeText(JsonObject(root + ("rooms" to JsonArray(rooms))).toString())
+            }
+            val first = service().joinMini("Alice", "word_puzzle", "pvp", "4")
+            service().joinMini("Bobby", "word_puzzle", "pvp", "4")
+            val word = WordGrid.dictionary(catalog).first { WordGrid.findPath(first.grid, it) != null }
+            val path = WordGrid.findPath(first.grid, word)!!
+            service().answer(first.roomId, "Alice", "", path)
+            elapse(first.roomId, 121_000)
+            val ended = service().mini(first.roomId, "Alice")!!
+            assertEquals("over", ended.status)
+            assertEquals("Alice", ended.winner)
+            assertTrue(word in ended.solution)
+            assertEquals(ended.score, service().answer(first.roomId, "Bobby", "", path)!!.opponentScore)
+            assertEquals("Alice", service().mini(first.roomId, "Alice")!!.winner)
+            val draw = service().joinMini("Alice", "word_puzzle", "pvp", "6")
+            service().joinMini("Bobby", "word_puzzle", "pvp", "6")
+            elapse(draw.roomId, 121_000)
+            assertNull(service().mini(draw.roomId, "Alice")!!.winner)
+            val bot = service().joinMini("Alice", "word_puzzle", "bot", "8")
+            elapse(bot.roomId, 65_000)
+            val middle = service().mini(bot.roomId, "Alice")!!
+            assertEquals("playing", middle.status)
+            assertTrue(middle.opponentScore > 0)
+            assertEquals("", middle.solution)
+            elapse(bot.roomId, 121_000)
+            assertEquals("Bot", service().mini(bot.roomId, "Alice")!!.winner)
+        } finally { scope.cancel(); dir.deleteRecursively() }
     }
 
     private fun fixture(test: (() -> SocialService) -> Unit) {

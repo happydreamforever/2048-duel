@@ -7,6 +7,7 @@ import com.duel2048.shared.social.ChatLine
 import com.duel2048.shared.social.LiveGame
 import com.duel2048.shared.social.MiniRoomView
 import com.duel2048.shared.social.PlayerPresence
+import com.duel2048.shared.social.WordGrid
 import com.duel2048.shared.social.Puzzles
 import com.duel2048.shared.social.PuzzleCatalog
 import com.duel2048.shared.social.WalletView
@@ -36,6 +37,7 @@ class SocialService(
     private var seenNote = 0L
     private val rooms = ConcurrentHashMap<String, MiniRoom>()
     private val puzzles = PuzzleCatalog("/datasets/matches")
+    private val dictionary by lazy { WordGrid.dictionary(puzzles) }
 
     init {
         file.parentFile?.mkdirs()
@@ -127,9 +129,9 @@ class SocialService(
 
     fun joinMini(name: String, game: String, mode: String, difficulty: String): MiniRoomView {
         synchronized(lock) {
-        require(game == "math" || game == "word") { "Unknown game" }
+        require(game in listOf("math", "word", "word_puzzle")) { "Unknown game" }
         require(mode in listOf("pvp", "bot", "watch")) { "Training is played locally" }
-        require(if (game == "math") difficulty in Puzzles.mathLevels else difficulty.toIntOrNull() in Puzzles.wordLengths) { "Unknown difficulty" }
+        require(if (game == "math") difficulty in Puzzles.mathLevels else if (game == "word_puzzle") difficulty.toIntOrNull() in WordGrid.sizes else difficulty.toIntOrNull() in Puzzles.wordLengths) { "Unknown difficulty" }
         val who = name.ifBlank { "Player" }
         if (mode == "watch") {
             val live = rooms.values.firstOrNull { it.game == game && it.status == "playing" }
@@ -171,6 +173,14 @@ class SocialService(
         if (name != room.host && name != room.opponent) return null
         room.view(name)
         if (room.status != "playing") { saveRooms(); return room.view(name) }
+        if (room.game == "word_puzzle") {
+            val word = WordGrid.selectedWord(room.grid, selectedLetters) ?: return room.view(name)
+            if (word in dictionary) {
+                val found = room.foundWords.getOrPut(name) { mutableSetOf() }
+                if (found.add(word)) saveRooms()
+            }
+            return room.view(name)
+        }
         if (name in room.incorrectPlayers) return room.view(name)
         val submitted = if (room.game == "word") Puzzles.selectedWord(room.grid, selectedLetters) ?: return room.view(name)
             else answer.trim().takeIf { it in room.choices } ?: return room.view(name)
@@ -238,12 +248,20 @@ class SocialService(
         val choices: List<String>
         val puzzleId: String
         val incorrectPlayers = saved?.incorrectPlayers.orEmpty().toMutableSet()
+        val foundWords = saved?.foundWords.orEmpty().mapValues { it.value.toMutableSet() }.toMutableMap()
 
         init {
             if (saved != null) {
                 grid = saved.grid; solution = saved.solution; prompt = saved.prompt; seconds = saved.seconds
                 choices = if (game == "math" && saved.choices.isEmpty()) Puzzles.choicesFor(saved.solution) else saved.choices
                 puzzleId = saved.puzzleId
+            } else if (game == "word_puzzle") {
+                grid = WordGrid.generate(difficulty.toInt(), dictionary)
+                solution = ""
+                prompt = "Find words by connecting letters horizontally or vertically."
+                seconds = WordGrid.seconds
+                choices = emptyList()
+                puzzleId = UUID.randomUUID().toString()
             } else if (game == "word") {
                 val word = puzzles.word(difficulty.toInt(), Random.Default)
                 grid = word.grid
@@ -268,13 +286,24 @@ class SocialService(
             }
         }
 
+        private val possibleWords by lazy { dictionary.filter { WordGrid.findPath(grid, it) != null }.sorted() }
+
         fun checkpoint() = MiniRoomState(id, game, mode, difficulty, host, opponent, status, winner,
-            prompt, solution, grid, seconds, startedAt, choices, puzzleId, incorrectPlayers.toList())
+            prompt, solution, grid, seconds, startedAt, choices, puzzleId, incorrectPlayers.toList(), foundWords.mapValues { it.value.toList() })
 
         fun view(you: String): MiniRoomView {
             val remaining = if (startedAt > 0) (seconds - (System.currentTimeMillis() - startedAt) / 1000).toInt().coerceAtLeast(0) else seconds
+            if (game == "word_puzzle" && status == "playing") {
+                if (mode == "bot") foundWords[opponent] = possibleWords.take(minOf((possibleWords.size / 2).coerceAtLeast(1), ((seconds - remaining) / 20).coerceAtLeast(0))).toMutableSet()
+                if (remaining == 0) {
+                    status = "over"
+                    val hostScore = WordGrid.score(foundWords[host].orEmpty())
+                    val otherScore = WordGrid.score(foundWords[opponent].orEmpty())
+                    winner = when { hostScore > otherScore -> host; otherScore > hostScore -> opponent; else -> null }
+                }
+            }
             if (status == "playing" && remaining == 0) status = "over"
-            if (status == "playing" && mode == "bot" && remaining <= seconds / 2) {
+            if (status == "playing" && game != "word_puzzle" && mode == "bot" && remaining <= seconds / 2) {
                 status = "over"
                 winner = opponent
             }
@@ -288,16 +317,19 @@ class SocialService(
             you = you,
             opponent = (if (you == opponent) host else opponent).ifBlank { "waiting" },
             winner = winner,
-            solution = if (status == "over") solution else "",
+            solution = if (status == "over") { if (game == "word_puzzle") possibleWords.joinToString(", ") else solution } else "",
             grid = grid,
             seconds = remaining,
             choices = choices,
             puzzleId = puzzleId,
             answered = you in incorrectPlayers,
+            foundWords = foundWords[you].orEmpty().toList().sorted(),
+            score = WordGrid.score(foundWords[you].orEmpty()),
+            opponentScore = WordGrid.score(foundWords[if (you == opponent) host else opponent].orEmpty()),
         )
         }
 
-        fun live() = LiveGame(id, game, host, 0, opponent.ifBlank { "…" }, spectators)
+        fun live() = LiveGame(id, game, host, WordGrid.score(foundWords[host].orEmpty()), opponent.ifBlank { "…" }, WordGrid.score(foundWords[opponent].orEmpty()))
     }
 }
 
@@ -317,4 +349,4 @@ private data class SocialFile(
 private data class MiniRoomState(val id: String, val game: String, val mode: String, val difficulty: String,
     val host: String, val opponent: String, val status: String, val winner: String?, val prompt: String,
     val solution: String, val grid: List<String>, val seconds: Int, val startedAt: Long,
-    val choices: List<String> = emptyList(), val puzzleId: String = "", val incorrectPlayers: List<String> = emptyList())
+    val choices: List<String> = emptyList(), val puzzleId: String = "", val incorrectPlayers: List<String> = emptyList(), val foundWords: Map<String, List<String>> = emptyMap())
