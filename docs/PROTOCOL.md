@@ -181,3 +181,34 @@ The client exposes this as Settings → Help and support, separate from competit
 `GET /social/notifications?since=0` includes published SQL announcements and server notices.
 The client refreshes the current list and stores its read timestamp per server; editing or
 publishing an older draft can therefore make a notification unread again.
+
+
+### Specific-opponent invitations (Android 1.6.0)
+
+All invitation endpoints use `Authorization: Bearer <token>` and derive the actor from it.
+
+- `GET /social/challenges`: the actor’s incoming/outgoing invitations only.
+- `POST /social/challenges`: `ChallengeCreateBody(opponent, game, difficulty, requestId)`;
+  `requestId` is a canonical UUID used for request idempotency. Games are `2048`, `cube`,
+  `math`, `word`, and `word_puzzle`. Names are matched case-insensitively to real accounts.
+- `POST /social/challenges/{id}/{action}`: `accept`, `decline`, `cancel`, or minigame `ready`.
+  Only the invited player can accept/decline; accepted invitations can be cancelled by
+  either participant before the room starts. Both must join before entry fees are debited.
+
+`ChallengeView` contains names, game, difficulty, status, expiry, actor-relative `incoming`,
+`youReady`, `opponentReady`, and a room ID once started. States are pending, accepted,
+playing, declined, cancelled, expired, or completed. Responses never expose account tokens.
+
+For 2048/Cube, send `FindMatch(mode=PVP, game, challengeId)` after acceptance. Both invited
+accounts must connect. `Queued.botFallbackMs=0` indicates private waiting; there is no Bot
+fallback. Wrong accounts, wrong game types, and changing authenticated identity while
+waiting are rejected. `CancelFindMatch` cancels private waiting, and disconnect releases
+its seat. Accepted/playing engine invitations expire on server restart because those
+live engines use the existing interrupted-match refund policy.
+
+For Math/Word Quiz/Word Puzzle, each participant calls `ready`. Once both are ready the
+server creates one private room, charges the pair atomically using the existing ledger,
+and runs a three-second countdown before exposing the puzzle or accepting answers.
+Clients then poll the room normally. Private rooms are excluded from public Watch, and
+private room data requires an authenticated participant even if a name is supplied in
+query parameters. Idempotent joins and reconnects never repeat entry fees.

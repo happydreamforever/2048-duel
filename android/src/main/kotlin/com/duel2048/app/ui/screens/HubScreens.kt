@@ -100,6 +100,7 @@ fun GameModesScreen(vm: MainViewModel, game: HubGame) {
             }
         }
         ModeChoice(stringResource(R.string.mode_pvp),stringResource(R.string.mode_pvp_sub),Icons.Default.Person,stringResource(R.string.app_entry_coins,10),true) { vm.startHub(game,HubMode.PVP,difficulty) }
+        ModeChoice(stringResource(R.string.challenge_specific),stringResource(R.string.challenge_specific_hint),Icons.Default.Person,stringResource(R.string.app_entry_coins,10),colors=game.colors) { vm.openChallenges(game,difficulty) }
         ModeChoice(stringResource(R.string.mode_bot),stringResource(R.string.mode_bot_sub),Icons.Default.PlayArrow,stringResource(R.string.app_entry_coins,5),colors=listOf(Color(0xFF4A6FA5),Color(0xFF1B3A5C))) { vm.startHub(game,HubMode.BOT,difficulty) }
         ModeChoice(stringResource(R.string.mode_train),stringResource(R.string.mode_train_sub),Icons.Default.Refresh,stringResource(R.string.app_free),colors=listOf(Color(0xFF1F9D6B),Color(0xFF0E6B8A))) { vm.startHub(game,HubMode.TRAIN,difficulty) }
         ModeChoice(stringResource(R.string.mode_watch),stringResource(R.string.mode_watch_sub),Icons.Default.Star,stringResource(R.string.app_live),colors=listOf(Color(0xFF5C4A7A),Color(0xFF2A2140))) { vm.startHub(game,HubMode.WATCH,difficulty) }
@@ -238,7 +239,7 @@ fun MiniPlayScreen(vm: MainViewModel) {
         if (state.status == "playing") {
             PuzzleAnswerControls(vm, state)
         } else if (state.status == "waiting") {
-            Text(stringResource(R.string.product_waiting), color = palette.textSecondary)
+            Text(stringResource(if(state.opponent!="waiting") R.string.challenge_starting else R.string.product_waiting), color = palette.textSecondary)
         } else {
             Text(
                 if (state.game == com.duel2048.shared.protocol.SavedGameType.WORD_PUZZLE && state.mode != "train" && state.score == state.opponentScore) stringResource(R.string.word_grid_draw) else if (state.won) stringResource(R.string.you_win) else stringResource(R.string.mini_game_over),
@@ -377,7 +378,7 @@ fun ReportSheet(vm: MainViewModel, onDismiss: () -> Unit) {
 }
 
 @Composable
-private fun difficultyLabel(id: String): String = when (id) {
+internal fun difficultyLabel(id: String): String = when (id) {
     "easy" -> stringResource(R.string.easy)
     "medium", "normal" -> stringResource(R.string.medium)
     "hard" -> stringResource(R.string.hard)

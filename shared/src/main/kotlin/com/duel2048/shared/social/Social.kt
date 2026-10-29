@@ -99,3 +99,12 @@ data class MiniRoomView(
 @Serializable data class CoinPurchase(val id: String, val coins: Int, val status: String, val createdAt: Long)
 @Serializable data class CoinPurchaseBody(val token: String, val id: String, val coins: Int)
 @Serializable data class WatchFrame(val room: LiveGame, val sequence: Long, val serverTime: Long, val demo: Boolean = false, val grid: List<String> = emptyList(), val selected: List<Int> = emptyList(), val event: String = "score", val seconds: Int = 120)
+
+@Serializable
+data class ChallengeCreateBody(val opponent: String, val game: String, val difficulty: String, val requestId: String)
+@Serializable
+data class ChallengeView(
+    val id: String, val from: String, val to: String, val game: String, val difficulty: String,
+    val status: String, val expiresAt: Long, val incoming: Boolean,
+    val youReady: Boolean = false, val opponentReady: Boolean = false, val roomId: String = "",
+)

@@ -51,3 +51,9 @@ CREATE TABLE IF NOT EXISTS announcements (
  status ENUM('draft','published','archived') NOT NULL DEFAULT 'draft',
  published_at BIGINT NULL,created_at BIGINT NOT NULL,updated_at BIGINT NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS pvp_challenges (
+ id VARCHAR(36) PRIMARY KEY,from_user_id VARCHAR(16) NOT NULL,to_user_id VARCHAR(16) NOT NULL,
+ status VARCHAR(16) NOT NULL,payload LONGTEXT NOT NULL,expires_at BIGINT NOT NULL,updated_at BIGINT NOT NULL,
+ KEY idx_challenge_target(to_user_id,status),KEY idx_challenge_sender(from_user_id,status),KEY idx_challenge_expiry(expires_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

@@ -1,0 +1,31 @@
+<resources>
+    <string name="challenge_title">邀请</string>
+    <string name="challenge_specific">与指定玩家对战</string>
+    <string name="challenge_specific_hint">选择对手并发送私人邀请。</string>
+    <string name="challenge_your_name">你的玩家名：%1$s</string>
+    <string name="challenge_rules">邀请对方并等待接受，然后双方点击加入比赛。仅双方加入后各扣除 10 金币。邀请两分钟后过期，不会自动匹配机器人。</string>
+    <string name="challenge_player_name">对手账户名</string>
+    <string name="challenge_name_hint">输入准确的玩家名，对方可从顶部栏的邀请中回复。</string>
+    <string name="challenge_selected_level">已选难度：%1$s</string>
+    <string name="challenge_send">发送邀请</string>
+    <string name="challenge_empty">暂无邀请。</string>
+    <string name="challenge_from">来自 %1$s</string>
+    <string name="challenge_to">发给 %1$s</string>
+    <string name="challenge_pending">等待接受</string>
+    <string name="challenge_accepted">已接受，双方需加入</string>
+    <string name="challenge_playing">比赛进行中</string>
+    <string name="challenge_declined">已拒绝</string>
+    <string name="challenge_cancelled">已取消</string>
+    <string name="challenge_expired">已过期</string>
+    <string name="challenge_completed">已结束</string>
+    <string name="challenge_expires">%1$d 秒后过期</string>
+    <string name="challenge_waiting_player">等待 %1$s 加入</string>
+    <string name="challenge_accept">接受</string>
+    <string name="challenge_decline">拒绝</string>
+    <string name="challenge_cancel">取消邀请</string>
+    <string name="challenge_join">加入比赛</string>
+    <string name="challenge_return">返回比赛</string>
+    <string name="challenge_rematch">再次邀请</string>
+    <string name="challenge_refresh">刷新邀请</string>
+    <string name="challenge_starting">比赛即将开始…</string>
+</resources>

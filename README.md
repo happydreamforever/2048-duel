@@ -57,7 +57,7 @@ sessions have a 90-second reconnect window within the same server process. If th
 restarts, interrupted cube/2048 entries are refunded; minigame rooms restore their board,
 players, found words, and absolute timer from SQL. Back up the SQL database and DATA_DIR.
 
-Protocol version remains 7; update both server and APK to Android **1.5.1 (8)**.
+Protocol version remains 7; update both server and APK to Android **1.6.0 (9)**.
 
 ```powershell
 .\gradlew.bat :shared:test :server:test :android:assembleDebug
@@ -66,6 +66,32 @@ Protocol version remains 7; update both server and APK to Android **1.5.1 (8)**.
 
 Debug APK: `android/build/outputs/apk/debug/android-debug.apk`.
 For signed releases, keep your existing keystore configured and run `.\gradlew.bat :android:assembleRelease`.
+
+## Play a specific player
+
+All five games support private PvP invitations. In a game’s mode selector choose
+**Play a specific player**, enter the exact opponent account name, and send the invitation.
+The **Invitations** button in the floating top bar shows incoming invitations and accepted
+matches waiting for you. You can also choose a game and invite directly from that page.
+The invitation screen displays your own account name so another player can find you.
+
+The invited player accepts or declines. After acceptance **both players tap Join match**.
+The room starts only for that pair; strangers, public queues, and Bot fallback cannot fill
+its seats. Each player pays the existing 10-coin PvP entry fee only when both join. Pending
+and accepted invitations expire after two minutes and can be cancelled before starting.
+A short private minigame countdown hides the question until play starts. Both competitors
+receive the same board/question and level, and normal PvP chat and rewards apply.
+
+Private competitions are omitted from public Watch listings, and private minigame payloads
+require a participant’s token. Reconnecting resumes the same active 2048/Cube match without
+another fee. **Play again** prepares another invitation to the same opponent instead of
+queueing against a random player. Accepted or active 2048/Cube invitations expire safely after a
+server restart; active minigame rooms retain their state and timer. New invitations may be
+sent after the interrupted match has been refunded by the existing recovery flow.
+
+Production invitations persist in the shared SQL database in `pvp_challenges`, created by
+the updated game server. `DB=json` uses an atomic local file for development. Update the
+APK and game server together; this feature does not require an admin-client update.
 
 ## Math and word datasets
 
@@ -137,7 +163,7 @@ payment reference and review note. Approval credits the shared wallet once and w
 an audit entry. The app refreshes wallet balances automatically. No payment provider
 or invented monetary prices are configured.
 
-APK version: **1.5.1 (8)**. Release builds require the existing release signing key;
+APK version: **1.6.0 (9)**. Release builds require the existing release signing key;
 keep `keystore.properties` and the keystore private so updates retain their signature.
 
 ## Visual effects in the client

@@ -1,0 +1,31 @@
+<resources>
+    <string name="challenge_title">Invitations</string>
+    <string name="challenge_specific">Play a specific player</string>
+    <string name="challenge_specific_hint">Choose an opponent and send a private invitation.</string>
+    <string name="challenge_your_name">Your player name: %1$s</string>
+    <string name="challenge_rules">Invite a player, wait for acceptance, then both tap Join match. Each player pays 10 coins only when both join. Invitations expire in two minutes. There is no Bot fallback.</string>
+    <string name="challenge_player_name">Opponent account name</string>
+    <string name="challenge_name_hint">Enter the exact player name. They can respond from Invitations in the top bar.</string>
+    <string name="challenge_selected_level">Selected level: %1$s</string>
+    <string name="challenge_send">Send invitation</string>
+    <string name="challenge_empty">No invitations yet.</string>
+    <string name="challenge_from">From %1$s</string>
+    <string name="challenge_to">To %1$s</string>
+    <string name="challenge_pending">Waiting for acceptance</string>
+    <string name="challenge_accepted">Accepted · both players must join</string>
+    <string name="challenge_playing">Match in progress</string>
+    <string name="challenge_declined">Declined</string>
+    <string name="challenge_cancelled">Cancelled</string>
+    <string name="challenge_expired">Expired</string>
+    <string name="challenge_completed">Finished</string>
+    <string name="challenge_expires">Expires in %1$d seconds</string>
+    <string name="challenge_waiting_player">Waiting for %1$s to join</string>
+    <string name="challenge_accept">Accept</string>
+    <string name="challenge_decline">Decline</string>
+    <string name="challenge_cancel">Cancel invitation</string>
+    <string name="challenge_join">Join match</string>
+    <string name="challenge_return">Return to match</string>
+    <string name="challenge_rematch">Invite again</string>
+    <string name="challenge_refresh">Refresh invitations</string>
+    <string name="challenge_starting">Match starting…</string>
+</resources>

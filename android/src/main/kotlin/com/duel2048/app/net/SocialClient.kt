@@ -45,6 +45,13 @@ class SocialClient {
     suspend fun purchaseCoins(ws: String, token: String, id: String, coins: Int): Result<com.duel2048.shared.social.CoinPurchase> =
         post(ws,"/social/coins/purchases",Protocol.json.encodeToString(com.duel2048.shared.social.CoinPurchaseBody.serializer(),com.duel2048.shared.social.CoinPurchaseBody(token,id,coins)),com.duel2048.shared.social.CoinPurchase.serializer())
 
+    suspend fun challenges(ws: String, token: String): Result<List<com.duel2048.shared.social.ChallengeView>> =
+        get(ws,"/social/challenges",ListSerializer(com.duel2048.shared.social.ChallengeView.serializer()),token)
+    suspend fun createChallenge(ws:String,token:String,body:com.duel2048.shared.social.ChallengeCreateBody):Result<com.duel2048.shared.social.ChallengeView> =
+        post(ws,"/social/challenges",Protocol.json.encodeToString(com.duel2048.shared.social.ChallengeCreateBody.serializer(),body),com.duel2048.shared.social.ChallengeView.serializer(),token)
+    suspend fun challengeAction(ws:String,token:String,id:String,action:String):Result<com.duel2048.shared.social.ChallengeView> =
+        post(ws,"/social/challenges/$id/$action","{}",com.duel2048.shared.social.ChallengeView.serializer(),token)
+
     suspend fun mini(ws: String, roomId: String, name: String, token: String = ""): Result<MiniRoomView> =
         get(ws, "/social/mini/$roomId?name=${java.net.URLEncoder.encode(name, "UTF-8")}", MiniRoomView.serializer(), token)
 
@@ -70,11 +77,11 @@ class SocialClient {
             }
         }
 
-    private suspend fun <T> post(ws: String, path: String, payload: String, serializer: kotlinx.serialization.KSerializer<T>): Result<T> =
+    private suspend fun <T> post(ws: String, path: String, payload: String, serializer: kotlinx.serialization.KSerializer<T>, token: String = ""): Result<T> =
         withContext(Dispatchers.IO) {
             runCatching {
                 val url = LeaderboardClient.httpBase(ws) + path
-                val req = Request.Builder().url(url).post(payload.toRequestBody(jsonType)).build()
+                val req = Request.Builder().url(url).apply { if(token.isNotBlank()) header("Authorization","Bearer $token") }.post(payload.toRequestBody(jsonType)).build()
                 http.newCall(req).execute().use { response ->
                     if (!response.isSuccessful) error(response.body?.string()?.take(300) ?: "HTTP ${response.code}")
                     Protocol.json.decodeFromString(serializer, response.body?.string().orEmpty())

@@ -18,6 +18,8 @@ class PlayerSession(var id: String, private val ws: DefaultWebSocketServerSessio
     @Volatile var cubeMatch: CubeMatch? = null
     /** Account id once logged in; online play requires it. */
     @Volatile var userId: String? = null
+    @Volatile var publicQueued = false
+    @Volatile var privateChallengeId: String? = null
 
     private val outbox = Channel<ServerMessage>(Channel.UNLIMITED)
 

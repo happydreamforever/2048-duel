@@ -33,6 +33,8 @@ internal fun AppChrome(vm: MainViewModel, screen: Screen, content: @Composable (
     val palette = LocalPalette.current
     val settings by vm.settings.collectAsStateWithLifecycle()
     val notes by vm.notes.collectAsStateWithLifecycle()
+    val challenges by vm.challenges.collectAsStateWithLifecycle()
+    val joining by vm.joiningChallenge.collectAsStateWithLifecycle()
     val session by vm.session.collectAsStateWithLifecycle()
     val duel by session.state.collectAsStateWithLifecycle()
     val cube by vm.cubeUiState.collectAsStateWithLifecycle()
@@ -45,6 +47,7 @@ internal fun AppChrome(vm: MainViewModel, screen: Screen, content: @Composable (
         Screen.Duel -> duel.phase !in listOf(com.duel2048.app.game.DuelPhase.IDLE,com.duel2048.app.game.DuelPhase.OVER)
         Screen.CubeDuel -> cube.phase !in listOf(com.duel2048.app.game.DuelPhase.IDLE,com.duel2048.app.game.DuelPhase.OVER)
         Screen.MiniPlay -> mini?.status in listOf("waiting","playing")
+        is Screen.Challenges -> joining!=null
         Screen.Matchmaking,Screen.CubeMatchmaking -> true
         else -> false
     }
@@ -55,6 +58,7 @@ internal fun AppChrome(vm: MainViewModel, screen: Screen, content: @Composable (
         Screen.Watch -> stringResource(R.string.mode_watch)
         Screen.Leaderboard -> stringResource(R.string.leaderboard)
         is Screen.GameModes -> gameTitle(screen.game)
+        is Screen.Challenges -> stringResource(R.string.challenge_title)
         Screen.CubeDuel, Screen.CubeMatchmaking, Screen.CubeResult -> stringResource(R.string.product_cube)
         Screen.MiniPlay -> mini?.title.orEmpty()
         else -> "2048"
@@ -83,6 +87,11 @@ internal fun AppChrome(vm: MainViewModel, screen: Screen, content: @Composable (
                 Column(Modifier.weight(1f).padding(horizontal = 2.dp)) {
                     ShimmerTitle("Duel", fontSize = 15.sp, letterSpacing = 0.sp)
                     Text(title, style = MaterialTheme.typography.bodySmall, color = palette.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+                IconButton(onClick={vm.openChallenges()},enabled=!navigatingLocked) {
+                    BadgedBox(badge={val count=challenges.count { (it.incoming && it.status=="pending") || (it.status=="accepted" && !it.youReady) };if(count>0) Badge { Text(count.toString()) }}) {
+                        Icon(Icons.Default.Share,stringResource(R.string.challenge_title),tint=palette.accent)
+                    }
                 }
                 if(chatRoom != null) IconButton(onClick = { sheet = "chat" }) {
                     Icon(Icons.Default.MailOutline, stringResource(R.string.pvp_chat_title), tint = palette.accent)

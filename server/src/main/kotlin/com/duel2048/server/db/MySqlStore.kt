@@ -50,6 +50,8 @@ class MySqlStore(jdbcUrl: String, user: String, password: String) : UserStore {
 
     private suspend fun <T> db(block: (Connection) -> T): T = withContext(Dispatchers.IO) { pool.connection.use(block) }
 
+    override suspend fun userByName(name: String): UserRecord? = db { c -> selectWhere(c, "name_lower = ?", name.trim().lowercase()) }
+
     override suspend fun userCount(): Int = db { c ->
         c.prepareStatement("SELECT COUNT(*) FROM users").use { ps -> ps.executeQuery().use { rs -> rs.next(); rs.getInt(1) } }
     }

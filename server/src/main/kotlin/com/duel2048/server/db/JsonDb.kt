@@ -43,6 +43,8 @@ class JsonDb(val file: File) : UserStore {
 
     override val description: String get() = "JSON file ${file.absolutePath}"
 
+    override suspend fun userByName(name: String): UserRecord? = mutex.withLock { idByName[name.trim().lowercase()]?.let(users::get) }
+
     override suspend fun userCount(): Int = mutex.withLock { users.size }
 
     override suspend fun register(name: String, password: String): AuthResult = mutex.withLock {

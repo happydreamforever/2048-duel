@@ -109,6 +109,7 @@ fun Application.module(config: ServerConfig = ServerConfig.fromEnv(), db: UserSt
     val lobby = Lobby(config, appScope, db, gameSaves)
     lobby.economy.recoverInterruptedMatches()
     val social = SocialService(config.dataDir, db, lobby)
+    val challenges = ChallengeService(db,lobby,social,config.dataDir)
     val adminKey = System.getenv("ADMIN_KEY")?.takeIf { it.isNotBlank() } ?: "duel-admin"
     appScope.launch { social.pollLoop() }
 
@@ -171,11 +172,31 @@ fun Application.module(config: ServerConfig = ServerConfig.fromEnv(), db: UserSt
             if (wallet == null) call.respond(HttpStatusCode.Unauthorized, "bad token")
             else call.respond(wallet)
         }
+        get("/social/challenges") {
+            val user=db.authByToken(call.request.headers["Authorization"]?.removePrefix("Bearer ").orEmpty())
+            if(user==null) call.respond(HttpStatusCode.Unauthorized,"Sign in to view invitations")
+            else call.respond(challenges.list(user.id))
+        }
+        post("/social/challenges") {
+            val user=db.authByToken(call.request.headers["Authorization"]?.removePrefix("Bearer ").orEmpty())
+            if(user==null) { call.respond(HttpStatusCode.Unauthorized,"Sign in to invite a player");return@post }
+            try {
+                val body=Protocol.json.decodeFromString(com.duel2048.shared.social.ChallengeCreateBody.serializer(),call.receiveText())
+                call.respond(challenges.create(user,body))
+            } catch(e:IllegalArgumentException) { call.respond(HttpStatusCode.BadRequest,e.message ?: "Invalid invitation") }
+        }
+        post("/social/challenges/{id}/{action}") {
+            val user=db.authByToken(call.request.headers["Authorization"]?.removePrefix("Bearer ").orEmpty())
+            if(user==null) { call.respond(HttpStatusCode.Unauthorized,"Sign in to respond");return@post }
+            try { call.respond(challenges.action(user,call.parameters["id"].orEmpty(),call.parameters["action"].orEmpty())) }
+            catch(e:IllegalArgumentException) { call.respond(HttpStatusCode.BadRequest,e.message ?: "Invalid invitation action") }
+        }
         get("/social/mini/{id}") {
             val id = call.parameters["id"].orEmpty()
             val name = call.request.queryParameters["name"].orEmpty()
             val token = call.request.headers["Authorization"]?.removePrefix("Bearer ").orEmpty()
             val user = db.authByToken(token)
+            if(!social.canReadMini(id,user?.id)) { call.respond(HttpStatusCode.Forbidden,"This is a private competition");return@get }
             val room = social.mini(id, user?.name ?: name)
             if (room == null) call.respond(HttpStatusCode.NotFound, "no room")
             else call.respond(if (room.game == "word_puzzle" && user == null) room.copy(foundWords = emptyList()) else room)
@@ -209,7 +230,7 @@ fun Application.module(config: ServerConfig = ServerConfig.fromEnv(), db: UserSt
             val body = Protocol.json.decodeFromString(MiniJoinBody.serializer(), call.receiveText())
             val user = db.authByToken(body.token)
             if (user == null) call.respond(HttpStatusCode.Unauthorized, "Sign in to play online")
-            else try { call.respond(social.joinMini(user.name, body.game, body.mode, body.difficulty, user.id)) }
+            else try { require(!lobby.userBusy(user.id)) { "Finish your current competition first" }; call.respond(social.joinMini(user.name, body.game, body.mode, body.difficulty, user.id)) }
             catch (invalid: IllegalArgumentException) { call.respond(HttpStatusCode.BadRequest, invalid.message ?: "Invalid puzzle request") }
         }
         post("/social/mini/answer") {

@@ -100,7 +100,7 @@ class SocialService(
             if (room.status != before) changed = true
         }
         if (changed) saveRooms()
-        demoRooms() + lobby.liveGames() + rooms.values.filter { it.status == "playing" }.map { it.live() }
+        demoRooms() + lobby.liveGames() + rooms.values.filter { it.status == "playing" && it.privateChallengeId.isBlank() }.map { it.live() }
     }
 
     fun addNote(text: String): AdminNote = synchronized(lock) {
@@ -203,7 +203,7 @@ class SocialService(
         }
         rooms.values.forEach { it.view(who) }
         rooms.values.firstOrNull { it.game==game && it.mode==mode && it.difficulty==difficulty && it.status in listOf("waiting","playing") && (it.host==who || it.opponent==who) }?.let { return it.view(who) }
-        val waiting = rooms.values.firstOrNull { it.game == game && it.difficulty == difficulty && it.mode == "pvp" && it.status == "waiting" && it.host != who }
+        val waiting = rooms.values.firstOrNull { it.game == game && it.difficulty == difficulty && it.mode == "pvp" && it.status == "waiting" && it.privateChallengeId.isBlank() && it.host != who }
         if (mode == "pvp" && waiting != null) {
             val participants = waiting.users + if(userId.isNotBlank()) mapOf(who to userId) else emptyMap()
             lobby.economy.enter(waiting.id,game,mode,participants.values.toList())
@@ -226,6 +226,30 @@ class SocialService(
         }
     }
 
+    fun userBusy(userId:String):Boolean = synchronized(lock) {
+        rooms.values.any { room -> room.view(room.host); userId in room.users.values && room.status in listOf("waiting","playing") }
+    }
+    fun canReadMini(id:String,userId:String?):Boolean = synchronized(lock) {
+        rooms[id]?.let { it.privateChallengeId.isBlank() || userId in it.users.values } ?: true
+    }
+    fun privateRoom(id:String,challengeId:String):MiniRoomView? = synchronized(lock) {
+        rooms[id]?.takeIf { it.privateChallengeId==challengeId }?.let { it.view(it.host) }
+    }
+    fun createPrivate(id:String,game:String,difficulty:String,from:String,fromId:String,to:String,toId:String,challengeId:String):MiniRoomView = synchronized(lock) {
+        rooms[id]?.let { existing ->
+            require(existing.privateChallengeId==challengeId && existing.users[from]==fromId && existing.users[to]==toId) { "Room identity mismatch" }
+            return@synchronized existing.view(from)
+        }
+        require(game in listOf("math","word","word_puzzle") && fromId!=toId) { "Invalid private game" }
+        require(!userBusy(fromId) && !userBusy(toId)) { "A player is already in another competition" }
+        val room=MiniRoom(id,game,"pvp",difficulty,from)
+        room.opponent=to;room.users[from]=fromId;room.users[to]=toId;room.privateChallengeId=challengeId
+        lobby.economy.enter(id,game,"pvp",listOf(fromId,toId))
+        room.status="playing";room.startedAt=System.currentTimeMillis()+3_000
+        rooms[id]=room;saveRooms()
+        room.view(from)
+    }
+
     fun mini(roomId: String, name: String): MiniRoomView? = synchronized(lock) {
         val room = rooms[roomId] ?: return@synchronized null
         val before = room.status
@@ -240,6 +264,7 @@ class SocialService(
         if (name != room.host && name != room.opponent) return null
         room.view(name)
         if (room.status != "playing") { saveRooms(); return room.view(name) }
+        if(room.privateChallengeId.isNotBlank() && System.currentTimeMillis()<room.startedAt) return room.view(name)
         if (room.game == "word_puzzle") {
             val word = WordGrid.selectedWord(room.grid, selectedLetters) ?: return room.view(name)
             if (word in dictionary) {
@@ -313,6 +338,7 @@ class SocialService(
         var winner: String? = saved?.winner
         var startedAt: Long = saved?.startedAt ?: 0
         var spectators: Int = 0
+        var privateChallengeId: String = saved?.privateChallengeId.orEmpty()
         val prompt: String
         val solution: String
         val grid: List<String>
@@ -362,7 +388,7 @@ class SocialService(
         private val possibleWords by lazy { dictionary.filter { WordGrid.findPath(grid, it) != null }.sorted() }
 
         fun checkpoint() = MiniRoomState(id, game, mode, difficulty, host, opponent, status, winner,
-            prompt, solution, grid, seconds, startedAt, choices, puzzleId, incorrectPlayers.toList(), foundWords.mapValues { it.value.toList() },users.toMap())
+            prompt, solution, grid, seconds, startedAt, choices, puzzleId, incorrectPlayers.toList(), foundWords.mapValues { it.value.toList() },users.toMap(),privateChallengeId)
 
         fun view(you: String): MiniRoomView {
             val remaining = if (startedAt > 0) (seconds - (System.currentTimeMillis() - startedAt) / 1000).toInt().coerceAtLeast(0) else seconds
@@ -381,20 +407,21 @@ class SocialService(
                 winner = opponent
             }
             if(status=="over") lobby.economy.settle(id,winner?.let { users[it] },winner==null)
+            val starting=privateChallengeId.isNotBlank() && status=="playing" && startedAt>System.currentTimeMillis()
             return MiniRoomView(
             roomId = id,
             game = game,
             mode = mode,
             difficulty = difficulty,
-            prompt = prompt,
-            status = status,
+            prompt = if(starting) "" else prompt,
+            status = if(starting) "waiting" else status,
             you = you,
             opponent = (if (you == opponent) host else opponent).ifBlank { "waiting" },
             winner = winner,
             solution = if (status == "over") { if (game == "word_puzzle") possibleWords.joinToString(", ") else solution } else "",
-            grid = grid,
-            seconds = remaining,
-            choices = choices,
+            grid = if(starting) emptyList() else grid,
+            seconds = if(starting) ((startedAt-System.currentTimeMillis()+999)/1000).toInt().coerceAtLeast(1) else remaining,
+            choices = if(starting) emptyList() else choices,
             puzzleId = puzzleId,
             answered = you in incorrectPlayers,
             foundWords = foundWords[you].orEmpty().toList().sorted(),
@@ -424,4 +451,4 @@ private data class SocialFile(
 private data class MiniRoomState(val id: String, val game: String, val mode: String, val difficulty: String,
     val host: String, val opponent: String, val status: String, val winner: String?, val prompt: String,
     val solution: String, val grid: List<String>, val seconds: Int, val startedAt: Long,
-    val choices: List<String> = emptyList(), val puzzleId: String = "", val incorrectPlayers: List<String> = emptyList(), val foundWords: Map<String, List<String>> = emptyMap(), val users:Map<String,String> = emptyMap())
+    val choices: List<String> = emptyList(), val puzzleId: String = "", val incorrectPlayers: List<String> = emptyList(), val foundWords: Map<String, List<String>> = emptyMap(), val users:Map<String,String> = emptyMap(), val privateChallengeId:String = "")

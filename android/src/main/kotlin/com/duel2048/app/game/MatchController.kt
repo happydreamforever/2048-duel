@@ -75,6 +75,7 @@ data class PlayerSide(
 }
 
 data class DuelUiState(
+    val privateOpponent: String = "",
     val reconnecting: Boolean = false,
     val phase: DuelPhase = DuelPhase.IDLE,
     val mode: MatchMode = MatchMode.PVP,
@@ -131,17 +132,19 @@ class MatchController(
     private var pingJob: Job? = null
     private var reconnectJob: Job? = null
     private var resumeId: String? = null
+    private var challengeId = ""
     private var serverUrl = ""
 
-    fun start(url: String, token: String, mode: MatchMode, resumeMatchId: String? = null) {
+    fun start(url: String, token: String, mode: MatchMode, resumeMatchId: String? = null, privateChallengeId: String = "", privateOpponent: String = "") {
         stopJobs()
         this.token = token
         serverUrl = url
         resumeId = resumeMatchId
+        challengeId = privateChallengeId
         local = null
         seq = 0
         predictions.clear()
-        _state.value = DuelUiState(phase = DuelPhase.CONNECTING, mode = mode, searchStartedAt = now())
+        _state.value = DuelUiState(phase = DuelPhase.CONNECTING, mode = mode, searchStartedAt = now(), privateOpponent = privateOpponent)
         messageJob = scope.launch { client.messages.collect { onMessage(it) } }
         connectionJob = scope.launch {
             client.connection.collect { c ->
@@ -204,7 +207,7 @@ class MatchController(
                 onStats(msg.stats)
                 if (resumeId != null) client.send(ResumeMatch(checkNotNull(resumeId)))
                 else {
-                    client.send(FindMatch(s.mode))
+                    client.send(FindMatch(s.mode, challengeId = challengeId))
                     _state.update { it.copy(phase = DuelPhase.SEARCHING, searchStartedAt = now()) }
                 }
                 startPings()
@@ -319,7 +322,7 @@ class MatchController(
                 }
             }
             is ErrorMsg -> when (msg.code) {
-                "need_coins", "match_unavailable", "resume_available", "no_match" -> fail(DuelError("server", msg.message))
+                "challenge_error", "private_cancelled", "need_coins", "match_unavailable", "resume_available", "no_match" -> fail(DuelError("server", msg.message))
                 "version" -> fail(DuelError("version", msg.message))
                 "not_logged_in" -> {
                     fail(DuelError("not_logged_in"))

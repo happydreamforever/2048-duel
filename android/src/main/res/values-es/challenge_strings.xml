@@ -1,0 +1,31 @@
+<resources>
+    <string name="challenge_title">Invitaciones</string>
+    <string name="challenge_specific">Jugar con alguien concreto</string>
+    <string name="challenge_specific_hint">Elige un rival y envía una invitación privada.</string>
+    <string name="challenge_your_name">Tu nombre de jugador: %1$s</string>
+    <string name="challenge_rules">Invita a un jugador y espera su aceptación. Después, ambos deben unirse. Cada uno paga 10 monedas solo al unirse los dos. La invitación caduca en dos minutos y no se sustituye al rival por un bot.</string>
+    <string name="challenge_player_name">Nombre de la cuenta rival</string>
+    <string name="challenge_name_hint">Introduce el nombre exacto. El rival puede responder desde Invitaciones en la barra superior.</string>
+    <string name="challenge_selected_level">Nivel elegido: %1$s</string>
+    <string name="challenge_send">Enviar invitación</string>
+    <string name="challenge_empty">Todavía no hay invitaciones.</string>
+    <string name="challenge_from">De %1$s</string>
+    <string name="challenge_to">Para %1$s</string>
+    <string name="challenge_pending">Esperando aceptación</string>
+    <string name="challenge_accepted">Aceptada · ambos deben unirse</string>
+    <string name="challenge_playing">Partida en curso</string>
+    <string name="challenge_declined">Rechazada</string>
+    <string name="challenge_cancelled">Cancelada</string>
+    <string name="challenge_expired">Caducada</string>
+    <string name="challenge_completed">Finalizada</string>
+    <string name="challenge_expires">Caduca en %1$d segundos</string>
+    <string name="challenge_waiting_player">Esperando a que %1$s se una</string>
+    <string name="challenge_accept">Aceptar</string>
+    <string name="challenge_decline">Rechazar</string>
+    <string name="challenge_cancel">Cancelar invitación</string>
+    <string name="challenge_join">Unirse a la partida</string>
+    <string name="challenge_return">Volver a la partida</string>
+    <string name="challenge_rematch">Invitar de nuevo</string>
+    <string name="challenge_refresh">Actualizar invitaciones</string>
+    <string name="challenge_starting">La partida está a punto de comenzar…</string>
+</resources>

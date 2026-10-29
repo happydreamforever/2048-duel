@@ -70,7 +70,7 @@ fun MatchmakingScreen(vm: MainViewModel) {
             }
             Spacer(Modifier.height(20.dp))
             Text(
-                stringResource(
+                if(duel.privateOpponent.isNotBlank()) stringResource(R.string.challenge_waiting_player,duel.privateOpponent) else stringResource(
                     when {
                         duel.phase == DuelPhase.CONNECTING -> R.string.connecting
                         duel.mode == MatchMode.BOT -> R.string.summoning_bot

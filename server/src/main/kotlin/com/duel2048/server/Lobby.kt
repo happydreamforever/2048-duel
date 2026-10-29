@@ -67,6 +67,8 @@ class Lobby(private val config: ServerConfig, private val scope: CoroutineScope,
     private val gameSaves: GameSaveStore = GameSaveStore(java.io.File(config.dataDir, "game-saves")),
     val economy: com.duel2048.server.db.CompetitionStore = com.duel2048.server.db.CompetitionStore(db, config.dataDir)) {
 
+    var challenges: ChallengeService? = null
+    private val privateRooms = ConcurrentHashMap.newKeySet<String>()
     private val log = LoggerFactory.getLogger("Lobby")
     private val players = ConcurrentHashMap<String, PlayerSession>()
     private val matches = ConcurrentHashMap<String, Match>()
@@ -115,7 +117,7 @@ class Lobby(private val config: ServerConfig, private val scope: CoroutineScope,
                 else s.send(ErrorMsg("no_match", "This match is no longer active"))
             }
             is Hello -> {
-                s.name = msg.name.trim().take(16).ifBlank { "Player" }
+                if(s.userId==null) s.name = msg.name.trim().take(16).ifBlank { "Player" }
                 if (msg.clientVersion != Protocol.VERSION) {
                     s.send(ErrorMsg("version", "server speaks protocol v${Protocol.VERSION}, client sent v${msg.clientVersion}"))
                 }
@@ -127,11 +129,22 @@ class Lobby(private val config: ServerConfig, private val scope: CoroutineScope,
                 if (user == null) s.send(AuthFailed("bad_token", "Session expired, please log in again")) else attach(s, user)
             }
             is Logout -> {
+                challenges?.leave(s,cancel=true)
+                fallbackJobs.remove(s.id)?.cancel()
+                queueMutex.withLock { queue2048.remove(s);queueCube.remove(s);s.publicQueued=false }
+                s.match?.forfeit(s.id);s.cubeMatch?.forfeit(s.id)
                 s.userId?.let { db.logout(it) }
                 s.userId = null
             }
             is FindMatch -> if (s.userId == null) {
                 s.send(ErrorMsg("not_logged_in", "Log in first"))
+            } else if(msg.challengeId.isNotBlank()) {
+                try {
+                    require(msg.mode==MatchMode.PVP) { "Invitations are for PvP matches" }
+                    checkNotNull(challenges) { "Private matching unavailable" }.join(s,msg.challengeId,msg.game)
+                } catch(e:IllegalArgumentException) { s.send(ErrorMsg("challenge_error",e.message ?: "Invalid invitation")) }
+            } else if(s.privateChallengeId!=null || players.values.any { it.userId==s.userId && it.privateChallengeId!=null }) {
+                s.send(ErrorMsg("challenge_error","Cancel the private invitation before finding another match"))
             } else if ((players.values + detached.values).any { it !== s && it.userId == s.userId && (it.match != null || it.cubeMatch != null) }) {
                 val old=(players.values+detached.values).first { it!==s && it.userId==s.userId && (it.match!=null || it.cubeMatch!=null) }
                 resume(s,old.match?.id ?: checkNotNull(old.cubeMatch).id)
@@ -141,10 +154,13 @@ class Lobby(private val config: ServerConfig, private val scope: CoroutineScope,
                 findMatch(s, msg.mode)
             }
             is CancelFindMatch -> {
+                challenges?.leave(s,cancel=true)
                 fallbackJobs.remove(s.id)?.cancel()
                 queueMutex.withLock {
                     queue2048.remove(s)
+            s.publicQueued=false
                     queueCube.remove(s)
+            s.publicQueued=false
                 }
             }
             is MoveMsg -> {
@@ -187,6 +203,10 @@ class Lobby(private val config: ServerConfig, private val scope: CoroutineScope,
     }
 
     private fun attach(s: PlayerSession, user: UserRecord) {
+        if(s.userId!=null && s.userId!=user.id && (s.match!=null || s.cubeMatch!=null || s.privateChallengeId!=null || s.publicQueued)) {
+            s.send(AuthFailed("in_match","Leave the current competition before switching accounts"))
+            return
+        }
         s.userId = user.id
         s.name = user.name
         s.send(AuthOk(s.id, user.name, user.token ?: "", user.stats))
@@ -227,11 +247,13 @@ class Lobby(private val config: ServerConfig, private val scope: CoroutineScope,
         var opponent: PlayerSession? = null
         queueMutex.withLock {
             queue2048.remove(s)
+            s.publicQueued=false
             opponent = queue2048.removeFirstOrNull()
-            if (opponent == null) queue2048.addLast(s)
+            if (opponent == null) { queue2048.addLast(s);s.publicQueued=true }
         }
         val opp = opponent
         if (opp != null) {
+            opp.publicQueued=false
             fallbackJobs.remove(opp.id)?.cancel()
             startMatch(s, opp)
         } else {
@@ -240,6 +262,7 @@ class Lobby(private val config: ServerConfig, private val scope: CoroutineScope,
                 delay(config.botFallbackMs)
                 val stillWaiting = queueMutex.withLock { queue2048.remove(s) }
                 fallbackJobs.remove(s.id)
+                if(stillWaiting) s.publicQueued=false
                 if (stillWaiting && s.match == null && s.cubeMatch == null) startMatch(s, null)
             }
         }
@@ -257,11 +280,13 @@ class Lobby(private val config: ServerConfig, private val scope: CoroutineScope,
         var opponent: PlayerSession? = null
         queueMutex.withLock {
             queueCube.remove(s)
+            s.publicQueued=false
             opponent = queueCube.removeFirstOrNull()
-            if (opponent == null) queueCube.addLast(s)
+            if (opponent == null) { queueCube.addLast(s);s.publicQueued=true }
         }
         val opp = opponent
         if (opp != null) {
+            opp.publicQueued=false
             fallbackJobs.remove(opp.id)?.cancel()
             startCubeMatch(s, opp)
         } else {
@@ -270,6 +295,7 @@ class Lobby(private val config: ServerConfig, private val scope: CoroutineScope,
                 delay(config.botFallbackMs)
                 val stillWaiting = queueMutex.withLock { queueCube.remove(s) }
                 fallbackJobs.remove(s.id)
+                if(stillWaiting) s.publicQueued=false
                 if (stillWaiting && s.match == null && s.cubeMatch == null) startCubeMatch(s, null)
             }
         }
@@ -287,7 +313,7 @@ class Lobby(private val config: ServerConfig, private val scope: CoroutineScope,
         }
     }
 
-    private suspend fun startMatch(a: PlayerSession, b: PlayerSession?) {
+    private suspend fun startMatch(a: PlayerSession, b: PlayerSession?, fixedId: String? = null): String? {
         val seed = ThreadLocalRandom.current().nextLong()
         val p1 = Participant(a.info, a, bot = null)
         val p2 = if (b != null) {
@@ -300,14 +326,15 @@ class Lobby(private val config: ServerConfig, private val scope: CoroutineScope,
             )
             Participant(PlayerInfo("bot-" + UUID.randomUUID().toString().substring(0, 4), profile.name, isBot = true), null, profile)
         }
-        val id = "m" + UUID.randomUUID().toString().substring(0, 8)
+        val id = fixedId ?: ("m" + UUID.randomUUID().toString().substring(0, 8))
         val startedAt = System.currentTimeMillis()
-        if (!enterCompetition(id, "2048", a, b)) return
+        if (!enterCompetition(id, "2048", a, b)) return null
         val match = Match(id, p1, p2, seed, config, scope, onCheckpoint = checkpointWriter(a, b)) { finished, over ->
             economy.settle(id, listOfNotNull(a,b).firstOrNull { it.id == over.winnerId }?.userId, over.winnerId == null)
             economy.checkpoint(id, "2048", if(b==null) "bot" else "pvp", "over", a.name, p2.info.name,
                 over.results.firstOrNull { it.playerId==a.id }?.score ?: 0, over.results.firstOrNull { it.playerId==p2.info.id }?.score ?: 0,
                 listOf(p1,p2).firstOrNull { it.info.id==over.winnerId }?.info?.name, "{}")
+            privateRooms.remove(finished.id)
             clearMatch(finished.id)
             matches.remove(finished.id)
             if (a.match === finished) a.match = null
@@ -337,9 +364,10 @@ class Lobby(private val config: ServerConfig, private val scope: CoroutineScope,
         totalMatches.incrementAndGet()
         log.info("match $id: ${p1.info.name} vs ${p2.info.name}${if (p2.bot != null) " (bot)" else ""} seed=$seed")
         match.start()
+        return id
     }
 
-    private suspend fun startCubeMatch(a: PlayerSession, b: PlayerSession?) {
+    private suspend fun startCubeMatch(a: PlayerSession, b: PlayerSession?, fixedId: String? = null): String? {
         val seed = ThreadLocalRandom.current().nextLong()
         val scramble = CubeScramble.generate(seed)
         val botSolution = CubeScramble.inverse(scramble)
@@ -350,14 +378,15 @@ class Lobby(private val config: ServerConfig, private val scope: CoroutineScope,
             val name = BOT_NAMES[ThreadLocalRandom.current().nextInt(BOT_NAMES.size)]
             CubeParticipant(PlayerInfo("bot-" + UUID.randomUUID().toString().substring(0, 4), name, isBot = true), null, botSolution)
         }
-        val id = "c" + UUID.randomUUID().toString().substring(0, 8)
+        val id = fixedId ?: ("c" + UUID.randomUUID().toString().substring(0, 8))
         val startedAt = System.currentTimeMillis()
-        if (!enterCompetition(id, "cube", a, b)) return
+        if (!enterCompetition(id, "cube", a, b)) return null
         val match = CubeMatch(id, p1, p2, seed, scramble, config, scope, onCheckpoint = checkpointWriter(a, b)) { finished, over ->
             economy.settle(id, listOfNotNull(a,b).firstOrNull { it.id == over.winnerId }?.userId, over.winnerId == null)
             economy.checkpoint(id, "cube", if(b==null) "bot" else "pvp", "over", a.name, p2.info.name,
                 over.results.firstOrNull { it.playerId==a.id }?.moves ?: 0, over.results.firstOrNull { it.playerId==p2.info.id }?.moves ?: 0,
                 listOf(p1,p2).firstOrNull { it.info.id==over.winnerId }?.info?.name, "{}")
+            privateRooms.remove(finished.id)
             clearMatch(finished.id)
             cubeMatches.remove(finished.id)
             if (a.cubeMatch === finished) a.cubeMatch = null
@@ -388,6 +417,7 @@ class Lobby(private val config: ServerConfig, private val scope: CoroutineScope,
         totalMatches.incrementAndGet()
         log.info("cube match $id: ${p1.info.name} vs ${p2.info.name}${if (p2.botSolution != null) " (bot)" else ""} seed=$seed")
         match.start()
+        return id
     }
 
     private fun recordCubeStats(session: PlayerSession, over: CubeMatchOver) {
@@ -410,10 +440,13 @@ class Lobby(private val config: ServerConfig, private val scope: CoroutineScope,
 
     private suspend fun disconnect(s: PlayerSession) {
         if (!players.remove(s.id, s)) return
+        challenges?.leave(s)
         fallbackJobs.remove(s.id)?.cancel()
         queueMutex.withLock {
             queue2048.remove(s)
+            s.publicQueued=false
             queueCube.remove(s)
+            s.publicQueued=false
         }
         val userId = s.userId
         if (userId != null && (s.match != null || s.cubeMatch != null)) {
@@ -434,6 +467,22 @@ class Lobby(private val config: ServerConfig, private val scope: CoroutineScope,
         log.info("disconnected ${s.id} (online=${players.size})")
     }
 
+    fun userBusy(userId:String, allowedChallenge:String? = null):Boolean = (players.values+detached.values).any {
+        it.userId==userId && (it.match!=null || it.cubeMatch!=null ||
+            it.privateChallengeId?.let { id -> id!=allowedChallenge }==true || it.publicQueued)
+    }
+    fun isRoomActive(id:String):Boolean = matches.containsKey(id) || cubeMatches.containsKey(id)
+    suspend fun resumePrivate(session:PlayerSession,id:String) = resume(session,id)
+    suspend fun startPrivate(a:PlayerSession,b:PlayerSession,game:String,id:String):String? {
+        require(players[a.id]===a && players[b.id]===b && a.userId!=b.userId) { "Both invited players must be connected" }
+        require(!userBusy(checkNotNull(a.userId),a.privateChallengeId) && !userBusy(checkNotNull(b.userId),b.privateChallengeId)) { "A player is already in another match" }
+        privateRooms.add(id)
+        val result=if(game=="cube") startCubeMatch(a,b,id) else startMatch(a,b,id)
+        if(result==null) privateRooms.remove(id)
+        a.privateChallengeId=null;b.privateChallengeId=null
+        return result
+    }
+
     fun stats(): ServerStats = ServerStats(players.size, queue2048.size + queueCube.size, matches.size + cubeMatches.size, totalMatches.get())
 
     fun onlineNames(): Set<String> = players.values.map { it.name }.filter { it.isNotBlank() }.toSet()
@@ -444,7 +493,7 @@ class Lobby(private val config: ServerConfig, private val scope: CoroutineScope,
     }
 
     fun liveGames(): List<com.duel2048.shared.social.LiveGame> =
-        matches.values.map { it.liveRow() } + cubeMatches.values.map { it.liveRow() }
+        matches.values.filter { it.id !in privateRooms }.map { it.liveRow() } + cubeMatches.values.filter { it.id !in privateRooms }.map { it.liveRow() }
 
     fun canResume(userId: String, matchId: String): Boolean =
         (players.values + detached.values).any { it.userId == userId && (it.match?.id == matchId || it.cubeMatch?.id == matchId) }

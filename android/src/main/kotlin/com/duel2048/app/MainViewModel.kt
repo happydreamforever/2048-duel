@@ -28,6 +28,8 @@ import com.duel2048.shared.social.Economy
 import com.duel2048.shared.social.LiveGame
 import com.duel2048.shared.social.PlayerPresence
 import com.duel2048.shared.social.WordGrid
+import com.duel2048.shared.social.ChallengeView
+import com.duel2048.shared.social.ChallengeCreateBody
 import com.duel2048.shared.social.Puzzles
 import androidx.compose.ui.graphics.Color
 import com.duel2048.shared.cube.CubeMove
@@ -66,6 +68,7 @@ sealed interface Screen {
     data object CubeResult : Screen
     data object Leaderboard : Screen
     data class GameModes(val game: HubGame) : Screen
+    data class Challenges(val game: HubGame? = null, val difficulty: String = "", val opponent: String = "") : Screen
     data object MiniPlay : Screen
     data object Watch : Screen
 }
@@ -89,6 +92,11 @@ enum class HubGame(val title: String, val blurb: String) {
             WORD -> listOf(Color(0xFF1F9D6B), Color(0xFF0E6B8A))
         }
 }
+fun HubGame.gameKey(): String = when(this) {
+    HubGame.TILES -> "2048";HubGame.CUBE -> "cube";HubGame.MATH -> "math";HubGame.WORD -> "word";HubGame.WORD_PUZZLE -> "word_puzzle"
+}
+fun gameFromKey(key:String):HubGame = HubGame.entries.first { it.gameKey()==key }
+
 
 data class MiniUi(
     val title: String,
@@ -187,6 +195,17 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private var watchGame: HubGame? = null
     private var saveIdentity: String? = null
 
+    private val _challenges = MutableStateFlow<List<ChallengeView>>(emptyList())
+    val challenges = _challenges.asStateFlow()
+    private val _challengeBusy = MutableStateFlow(false)
+    val challengeBusy = _challengeBusy.asStateFlow()
+    private val _challengeError = MutableStateFlow<String?>(null)
+    val challengeError = _challengeError.asStateFlow()
+    private val _joiningChallenge = MutableStateFlow<String?>(null)
+    val joiningChallenge = _joiningChallenge.asStateFlow()
+    private var fetchingChallenges = false
+    private var privateMatch: ChallengeView? = null
+
     init {
         viewModelScope.launch {
             settings.map { Triple(it.serverUrl, it.authToken, it.accountName) }.distinctUntilChanged().collect { (url, token, name) ->
@@ -196,6 +215,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                     notesServer=url;noteCursor=0;_notes.value=emptyList()
                 }
                 if (saveIdentity != null && saveIdentity != identity) {
+                    _challenges.value=emptyList();_joiningChallenge.value=null;privateMatch=null
                     if(saveIdentity?.substringAfterLast('|')?.isNotBlank()==true) { _reportDraft.value="";_reportState.value=ReportUiState() }
                     (_session.value as? LocalDuelSession)?.leave()
                     localCubeHolder.value?.leave()
@@ -269,6 +289,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             }
         }
         viewModelScope.launch {
+            while(true) { refreshChallenges();delay(2000) }
+        }
+        viewModelScope.launch {
             while (true) {
                 refreshNotes()
                 pullWallet()
@@ -280,10 +303,12 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     // ------------------------------------------------------------------ online
 
     fun startDuel(mode: MatchMode) {
+        privateMatch=null;_joiningChallenge.value=null
         ensureAccount { token -> _session.value = match; match.start(settings.value.serverUrl, token, mode) }
     }
 
     fun startCubeDuel(mode: MatchMode) {
+        privateMatch=null;_joiningChallenge.value=null
         ensureAccount { token ->
             cubeIsLocal.value = false
             localCubeHolder.value = null
@@ -365,6 +390,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun cancelCubeSearch() {
+        _joiningChallenge.value=null
         cubeMatch.cancel()
         _screen.value = Screen.Home
     }
@@ -381,6 +407,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun playCubeAgain() {
+        if(inviteRematch("cube")) { cubeMatch.dismiss();return }
         if (cubeIsLocal.value) {
             val session = localCubeHolder.value
             val profile = session?.profile ?: TrainingProfile.NORMAL
@@ -497,6 +524,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     // ------------------------------------------------------------------ common
 
     fun cancelSearch() {
+        _joiningChallenge.value=null
         val s = _session.value
         if (s is MatchController) s.cancel() else s.leave()
         _screen.value = Screen.Home
@@ -508,6 +536,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun playAgain() {
+        if(inviteRematch("2048")) { _session.value.dismiss();return }
         when (val s = _session.value) {
             is LocalDuelSession -> {
                 s.dismiss()
@@ -526,9 +555,103 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun openProfile() { _screen.value = Screen.Profile }
     fun syncGames() { viewModelScope.launch { pullWallet() } }
 
+    fun clearChallengeError() { _challengeError.value=null }
+    fun openChallenges(game:HubGame?=null,difficulty:String="",opponent:String="") {
+        if(settings.value.authToken.isBlank()) { ensureAccount { openChallenges(game,difficulty,opponent) };return }
+        _challengeError.value=null
+        _screen.value=Screen.Challenges(game,difficulty,opponent)
+        refreshChallenges();refreshPlayers()
+    }
+    fun refreshChallenges() {
+        val account=settings.value
+        if(account.authToken.isBlank()) { _challenges.value=emptyList();return }
+        if(fetchingChallenges) return
+        fetchingChallenges=true
+        viewModelScope.launch {
+            try {
+                social.challenges(account.serverUrl,account.authToken).onSuccess { list ->
+                    if(settings.value.authToken!=account.authToken || settings.value.serverUrl!=account.serverUrl) return@onSuccess
+                    _challenges.value=list
+                    privateMatch?.let { previous -> list.firstOrNull { it.id==previous.id }?.let { privateMatch=it } }
+                    val selected=list.firstOrNull { it.id==_joiningChallenge.value }
+                    if(selected?.status=="playing") {
+                        if(selected.game !in listOf("2048","cube")) openPrivateMini(selected)
+                        else _joiningChallenge.value=null
+                    } else if(selected?.status in listOf("cancelled","declined","expired","completed")) _joiningChallenge.value=null
+                }.onFailure { if(_screen.value is Screen.Challenges) _challengeError.value=it.message }
+            } finally { fetchingChallenges=false }
+        }
+    }
+    fun createChallenge(game:HubGame,difficulty:String,opponent:String) {
+        if(_challengeBusy.value) return
+        val account=settings.value
+        _challengeBusy.value=true;_challengeError.value=null
+        viewModelScope.launch {
+            try {
+                social.createChallenge(account.serverUrl,account.authToken,ChallengeCreateBody(opponent.trim(),game.gameKey(),difficulty,UUID.randomUUID().toString()))
+                    .onSuccess { if(settings.value.authToken==account.authToken) { _challenges.value=listOf(it)+_challenges.value.filterNot { c->c.id==it.id };_screen.value=Screen.Challenges();refreshChallenges() } }
+                    .onFailure { _challengeError.value=it.message }
+            } finally { _challengeBusy.value=false }
+        }
+    }
+    fun respondChallenge(id:String,action:String) {
+        if(_challengeBusy.value) return
+        if(action=="cancel" && _joiningChallenge.value==id) _joiningChallenge.value=null
+        val account=settings.value
+        _challengeBusy.value=true;_challengeError.value=null
+        viewModelScope.launch {
+            try {
+                social.challengeAction(account.serverUrl,account.authToken,id,action).onSuccess { changed ->
+                    if(settings.value.authToken!=account.authToken) return@onSuccess
+                    _challenges.value=_challenges.value.map { if(it.id==id) changed else it }
+                    if(action=="cancel" || action=="decline") { if(_joiningChallenge.value==id) _joiningChallenge.value=null }
+                    if(changed.status=="playing" && changed.game !in listOf("2048","cube") && _joiningChallenge.value==id) openPrivateMini(changed)
+                }.onFailure { _challengeError.value=it.message }
+            } finally { _challengeBusy.value=false;refreshChallenges() }
+        }
+    }
+    fun joinChallenge(challenge:ChallengeView) {
+        if(_challengeBusy.value || _joiningChallenge.value!=null) return
+        privateMatch=challenge;_joiningChallenge.value=challenge.id;_challengeError.value=null
+        val opponent=if(challenge.incoming) challenge.from else challenge.to
+        if(challenge.game=="2048") {
+            _session.value=match
+            match.start(settings.value.serverUrl,settings.value.authToken,MatchMode.PVP,
+                resumeMatchId=challenge.roomId.takeIf { challenge.status=="playing" },privateChallengeId=challenge.id,privateOpponent=opponent)
+        } else if(challenge.game=="cube") {
+            cubeIsLocal.value=false;localCubeHolder.value=null
+            cubeMatch.start(settings.value.serverUrl,settings.value.authToken,MatchMode.PVP,
+                resumeMatchId=challenge.roomId.takeIf { challenge.status=="playing" },privateChallengeId=challenge.id,privateOpponent=opponent)
+        } else if(challenge.status=="playing") openPrivateMini(challenge)
+        else respondChallenge(challenge.id,"ready")
+    }
+    private fun openPrivateMini(challenge:ChallengeView) {
+        if(_joiningChallenge.value!=challenge.id) return
+        _joiningChallenge.value=null
+        val account=settings.value
+        viewModelScope.launch {
+            social.mini(account.serverUrl,challenge.roomId,account.accountName,account.authToken).onSuccess { room ->
+                if(settings.value.authToken!=account.authToken) return@onSuccess
+                miniJob?.cancel();miniRoom=room.roomId;miniSolution="";privateMatch=challenge
+                _mini.value=MiniUi(gameFromKey(challenge.game).title,room.opponent,room.prompt,room.grid,room.seconds,room.status,
+                    solution=room.solution,won=room.winner==account.accountName,mode="pvp",game=when(challenge.game){"word"->SavedGameType.WORD;"word_puzzle"->SavedGameType.WORD_PUZZLE;else->SavedGameType.MATH},
+                    difficulty=room.difficulty,choices=room.choices,puzzleId=room.puzzleId,foundWords=room.foundWords,score=room.score,opponentScore=room.opponentScore)
+                _screen.value=Screen.MiniPlay;startMiniTimer()
+            }.onFailure { _challengeError.value=it.message }
+        }
+    }
+    private fun inviteRematch(game:String):Boolean {
+        val previous=privateMatch?.takeIf { it.game==game } ?: return false
+        _joiningChallenge.value=null
+        miniJob?.cancel()
+        openChallenges(gameFromKey(game),previous.difficulty,if(previous.incoming) previous.from else previous.to)
+        return true
+    }
+
     fun openGameModes(game: HubGame) { _screen.value = Screen.GameModes(game) }
 
     fun startHub(game: HubGame, mode: HubMode, difficulty: String) {
+        privateMatch=null;_joiningChallenge.value=null
         if (game == HubGame.TILES) {
             when (mode) {
                 HubMode.PVP -> startDuel(MatchMode.PVP)
@@ -815,7 +938,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                         social.mini(settings.value.serverUrl, miniRoom, name, settings.value.authToken).onSuccess { room ->
                             val latest = _mini.value ?: return@onSuccess
                             if (latest.saveId != current.saveId || latest.status == "over" && room.status != "over") return@onSuccess
-                            _mini.value = latest.copy(secondsLeft = room.seconds, status = room.status,
+                            _mini.value = latest.copy(secondsLeft = room.seconds, status = room.status, prompt = room.prompt, grid = room.grid,
                                 opponent = room.opponent, solution = room.solution, won = room.winner == name,
                                 choices = room.choices, puzzleId = room.puzzleId, answered = room.answered,
                                 foundWords = room.foundWords, score = room.score, opponentScore = room.opponentScore)
@@ -838,6 +961,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     fun playMiniAgain() {
         val current = _mini.value ?: return
+        if(inviteRematch(if(current.game==SavedGameType.WORD) "word" else if(current.game==SavedGameType.WORD_PUZZLE) "word_puzzle" else "math")) return
         startMini(if (current.game == SavedGameType.WORD_PUZZLE) HubGame.WORD_PUZZLE else if (current.game == SavedGameType.WORD) HubGame.WORD else HubGame.MATH,
             if (current.mode == "pvp") HubMode.PVP else if (current.guided) HubMode.TRAIN else HubMode.BOT, current.difficulty)
     }

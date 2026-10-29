@@ -1,0 +1,31 @@
+<resources>
+    <string name="challenge_title">招待</string>
+    <string name="challenge_specific">相手を指定して対戦</string>
+    <string name="challenge_specific_hint">対戦相手を選び、非公開の招待を送ります。</string>
+    <string name="challenge_your_name">あなたのプレイヤー名: %1$s</string>
+    <string name="challenge_rules">招待が承認されたら二人とも参加してください。両者が参加した時点で各10コインを支払います。招待は2分で期限切れになり、ボットには切り替わりません。</string>
+    <string name="challenge_player_name">相手のアカウント名</string>
+    <string name="challenge_name_hint">正確なプレイヤー名を入力します。相手は上部バーの招待から返信できます。</string>
+    <string name="challenge_selected_level">選択した難易度: %1$s</string>
+    <string name="challenge_send">招待を送る</string>
+    <string name="challenge_empty">招待はまだありません。</string>
+    <string name="challenge_from">%1$s から</string>
+    <string name="challenge_to">%1$s へ</string>
+    <string name="challenge_pending">承認を待っています</string>
+    <string name="challenge_accepted">承認済み · 二人とも参加してください</string>
+    <string name="challenge_playing">対戦中</string>
+    <string name="challenge_declined">辞退済み</string>
+    <string name="challenge_cancelled">キャンセル済み</string>
+    <string name="challenge_expired">期限切れ</string>
+    <string name="challenge_completed">終了</string>
+    <string name="challenge_expires">あと%1$d秒で期限切れ</string>
+    <string name="challenge_waiting_player">%1$s の参加を待っています</string>
+    <string name="challenge_accept">承認</string>
+    <string name="challenge_decline">辞退</string>
+    <string name="challenge_cancel">招待をキャンセル</string>
+    <string name="challenge_join">対戦に参加</string>
+    <string name="challenge_return">対戦に戻る</string>
+    <string name="challenge_rematch">もう一度招待</string>
+    <string name="challenge_refresh">招待を更新</string>
+    <string name="challenge_starting">対戦を開始します…</string>
+</resources>

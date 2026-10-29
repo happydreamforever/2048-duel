@@ -41,7 +41,7 @@ fun CubeMatchmakingScreen(vm: MainViewModel) {
         CircularProgressIndicator(color = palette.accent)
         Spacer(Modifier.height(24.dp))
         Text(
-            stringResource(R.string.cube_matchmaking),
+            if(cube.privateOpponent.isNotBlank()) stringResource(R.string.challenge_waiting_player,cube.privateOpponent) else stringResource(R.string.cube_matchmaking),
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold,
             color = palette.textPrimary,

@@ -108,7 +108,7 @@ data object Logout : ClientMessage
 
 @Serializable
 @SerialName("find_match")
-data class FindMatch(val mode: MatchMode = MatchMode.PVP, val game: GameType = GameType.DUEL_2048) : ClientMessage
+data class FindMatch(val mode: MatchMode = MatchMode.PVP, val game: GameType = GameType.DUEL_2048, val challengeId: String = "") : ClientMessage
 
 @Serializable
 @SerialName("cancel_find")
