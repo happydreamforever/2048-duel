@@ -255,6 +255,8 @@ class CubeMatch(
         session.send(MatchRestored(snapshot(p)))
     }
 
+    fun canChat(playerId: String): Boolean = !finished && !p1.info.isBot && !p2.info.isBot && participant(playerId) != null
+
     fun liveRow() = com.duel2048.shared.social.LiveGame(
         id, "cube", p1.info.name, p1.moveCount, p2.info.name, p2.moveCount,
     )

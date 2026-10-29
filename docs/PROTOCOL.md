@@ -162,3 +162,22 @@ clients cannot supply coin or score deltas. The server debits room entry on matc
 and settles winners/draws idempotently. `POST /social/coins/purchases` accepts `token`,
 `id` (client-generated request UUID), and `coins` (50, 200, or 500), returning a pending
 `CoinPurchase`. Only administrative payment approval credits its balance.
+
+
+### Application shell and private PvP chat (Android 1.5.0)
+
+`GET /social/chat?room=<matchId>&since=<timestamp>` requires Bearer authentication.
+`POST /social/chat` requires `ChatBody.token`, the actual match ID in `room`, and an exact
+entry from `ChatPhrases.all` in `text`. The server derives the sender name from the token.
+Only participants in active human-versus-human 2048, Cube, Math, Word Quiz, or Word Puzzle
+rooms can read or send. Anonymous requests return 401; nonparticipants, lobby, waiting,
+finished, Bot, and demo rooms return 403; non-preset text returns 400. The UI shows no chat
+outside the competition and dismisses its sheet when eligibility ends. SQL deployments
+persist messages in `chat_messages` for that room.
+
+`POST /social/report` now authenticates `ReportBody.token`, ignores a supplied name, and
+accepts 3–400 trimmed characters. SQL reports go directly into the admin `reports` table.
+The client exposes this as Settings → Help and support, separate from competitive chat.
+`GET /social/notifications?since=0` includes published SQL announcements and server notices.
+The client refreshes the current list and stores its read timestamp per server; editing or
+publishing an older draft can therefore make a notification unread again.

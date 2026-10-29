@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_navigation">Navegación</string>
+    <string name="app_notifications">Notificaciones</string>
+    <string name="app_finish_navigation">Termina o abandona la competición antes de cambiar de página.</string>
+    <string name="app_help_support">Ayuda y soporte</string>
+    <string name="app_contact_support">Contactar con soporte</string>
+    <string name="app_support_hint">Describe un problema o comparte tus comentarios. El informe se envía en privado al equipo de administración.</string>
+    <string name="app_support_message">Tu mensaje</string>
+    <string name="app_support_sent">Informe enviado. Gracias por ayudarnos a mejorar Duel.</string>
+    <string name="app_support_failed">No se pudo enviar el informe. Inténtalo de nuevo.</string>
+    <string name="app_support_sign_in">Inicia sesión para enviar un informe vinculado a tu cuenta.</string>
+    <string name="app_entry_coins">%1$d monedas</string>
+    <string name="app_reward_coins">Premio al ganador de PvP: %1$d monedas. En caso de empate se devuelve la entrada.</string>
+    <string name="app_free">Gratis</string>
+    <string name="app_live">En directo</string>
+    <string name="pvp_chat_title">Chat de la partida</string>
+    <string name="pvp_chat_hint">Solo los dos jugadores de esta sala PvP pueden chatear. Elige una frase o un emoji.</string>
+    <string name="pvp_chat_empty">Deséale suerte a tu rival.</string>
+    <string name="pvp_chat_failed">Chat no disponible. Comprueba la conexión e inténtalo de nuevo.</string>
+    <string name="app_connection_settings">Ajustes de conexión</string>
+</resources>

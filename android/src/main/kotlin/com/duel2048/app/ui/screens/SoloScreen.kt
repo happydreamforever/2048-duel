@@ -64,7 +64,7 @@ fun SoloScreen(vm: MainViewModel) {
     Column(
         Modifier
             .fillMaxSize()
-            .systemBarsPadding()
+
             .padding(16.dp)
             .focusRequester(focus)
             .focusable()
@@ -89,7 +89,7 @@ fun SoloScreen(vm: MainViewModel) {
             BoardView(solo.board, fx = fx, dimmed = solo.gameOver, onSwipe = { vm.solo.swipe(it) })
             if (solo.gameOver) {
                 GlassCard(Modifier.align(Alignment.Center).padding(24.dp)) {
-                    Text(stringResource(R.string.game_over), fontWeight = FontWeight.Black, fontSize = 26.sp, color = palette.danger, modifier = Modifier.align(Alignment.CenterHorizontally))
+                    Text(stringResource(R.string.game_over), fontWeight = FontWeight.Black, fontSize = 21.sp, color = palette.danger, modifier = Modifier.align(Alignment.CenterHorizontally))
                     Text(stringResource(R.string.score_and_tile, solo.score, solo.maxTile), color = palette.textSecondary, modifier = Modifier.align(Alignment.CenterHorizontally))
                     Spacer(Modifier.height(14.dp))
                     NeonButton(stringResource(R.string.new_game), modifier = Modifier.fillMaxWidth()) { vm.solo.newGame() }

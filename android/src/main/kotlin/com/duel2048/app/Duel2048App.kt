@@ -23,6 +23,7 @@ import com.duel2048.app.fx.LocalGameFx
 import com.duel2048.app.fx.SoundFx
 import com.duel2048.app.ui.components.AmbientBackground
 import com.duel2048.app.ui.rememberLocalizedContext
+import com.duel2048.app.ui.screens.AppChrome
 import com.duel2048.app.ui.screens.CubeDuelScreen
 import com.duel2048.app.ui.screens.CubeMatchmakingScreen
 import com.duel2048.app.ui.screens.CubeResultScreen
@@ -68,29 +69,32 @@ fun Duel2048App(vm: MainViewModel) {
         DuelTheme(palette) {
             CompositionLocalProvider(LocalGameFx provides fx, LocalLowEffects provides settings.lowEffects) {
                 Box(Modifier.fillMaxSize()) {
-                    AmbientBackground(palette, animated = !settings.lowEffects)
-                    AnimatedContent(
-                        targetState = screen,
-                        transitionSpec = { ContentTransform(fadeIn() + scaleIn(initialScale = 0.96f), fadeOut()) },
-                        label = "screen",
-                    ) { target ->
-                        when (target) {
-                            Screen.Home -> HomeScreen(vm)
-                            Screen.SavedGames -> SavedGamesScreen(vm)
-                            Screen.Community -> CommunityScreen(vm)
-                            Screen.Profile -> ProfileScreen(vm)
-                            Screen.Login -> LoginScreen(vm)
-                            Screen.Matchmaking -> MatchmakingScreen(vm)
-                            Screen.Duel -> DuelScreen(vm)
-                            Screen.Result -> ResultScreen(vm)
-                            Screen.Solo -> SoloScreen(vm)
-                            Screen.CubeMatchmaking -> CubeMatchmakingScreen(vm)
-                            Screen.CubeDuel -> CubeDuelScreen(vm)
-                            Screen.CubeResult -> CubeResultScreen(vm)
-                            Screen.Leaderboard -> LeaderboardScreen(vm)
-                            is Screen.GameModes -> GameModesScreen(vm, target.game)
-                            Screen.MiniPlay -> MiniPlayScreen(vm)
-                            Screen.Watch -> WatchScreen(vm)
+                    AmbientBackground(palette, animated = false)
+                    AppChrome(vm, screen) {
+                        AnimatedContent(
+                            targetState = screen,
+                            transitionSpec = { ContentTransform(fadeIn() + scaleIn(initialScale = 0.96f), fadeOut()) },
+                            label = "screen",
+                            modifier = Modifier.fillMaxSize(),
+                        ) { target ->
+                            when (target) {
+                                Screen.Home -> HomeScreen(vm)
+                                Screen.SavedGames -> SavedGamesScreen(vm)
+                                Screen.Community -> CommunityScreen(vm)
+                                Screen.Profile -> ProfileScreen(vm)
+                                Screen.Login -> LoginScreen(vm)
+                                Screen.Matchmaking -> MatchmakingScreen(vm)
+                                Screen.Duel -> DuelScreen(vm)
+                                Screen.Result -> ResultScreen(vm)
+                                Screen.Solo -> SoloScreen(vm)
+                                Screen.CubeMatchmaking -> CubeMatchmakingScreen(vm)
+                                Screen.CubeDuel -> CubeDuelScreen(vm)
+                                Screen.CubeResult -> CubeResultScreen(vm)
+                                Screen.Leaderboard -> LeaderboardScreen(vm)
+                                is Screen.GameModes -> GameModesScreen(vm, target.game)
+                                Screen.MiniPlay -> MiniPlayScreen(vm)
+                                Screen.Watch -> WatchScreen(vm)
+                            }
                         }
                     }
                 }

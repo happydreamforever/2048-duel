@@ -438,6 +438,11 @@ class Lobby(private val config: ServerConfig, private val scope: CoroutineScope,
 
     fun onlineNames(): Set<String> = players.values.map { it.name }.filter { it.isNotBlank() }.toSet()
 
+    fun canChat(userId: String, roomId: String): Boolean = (players.values + detached.values).any { session ->
+        session.userId == userId && (session.match?.takeIf { it.id == roomId }?.canChat(session.id) == true ||
+            session.cubeMatch?.takeIf { it.id == roomId }?.canChat(session.id) == true)
+    }
+
     fun liveGames(): List<com.duel2048.shared.social.LiveGame> =
         matches.values.map { it.liveRow() } + cubeMatches.values.map { it.liveRow() }
 

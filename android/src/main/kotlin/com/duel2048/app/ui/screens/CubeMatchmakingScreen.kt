@@ -1,5 +1,7 @@
 package com.duel2048.app.ui.screens
 
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -32,7 +34,7 @@ fun CubeMatchmakingScreen(vm: MainViewModel) {
     BackHandler { vm.cancelCubeSearch() }
 
     Column(
-        Modifier.fillMaxSize().systemBarsPadding().padding(32.dp),
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {

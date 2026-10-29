@@ -117,6 +117,8 @@ data class MiniUi(
     val invalidWord: Boolean = false,
 )
 
+data class ReportUiState(val busy: Boolean = false, val sent: Boolean = false, val error: Boolean = false, val signInRequired: Boolean = false)
+
 data class LoginUiState(val busy: Boolean = false, val error: DuelError? = null)
 
 data class LeaderboardUiState(val loading: Boolean = false, val entries: List<LeaderboardEntry> = emptyList(), val error: DuelError? = null)
@@ -166,6 +168,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private var miniRoom = ""
     private var miniJob: kotlinx.coroutines.Job? = null
     private var noteCursor = 0L
+    private var notesServer = ""
 
     private val _banner = MutableStateFlow<String?>(null)
     val banner: StateFlow<String?> = _banner.asStateFlow()
@@ -188,7 +191,12 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             settings.map { Triple(it.serverUrl, it.authToken, it.accountName) }.distinctUntilChanged().collect { (url, token, name) ->
                 val identity = "$url|$name"
+                if(notesServer!=url) {
+                    if(notesServer.isNotBlank()) { _reportDraft.value="";_reportState.value=ReportUiState() }
+                    notesServer=url;noteCursor=0;_notes.value=emptyList()
+                }
                 if (saveIdentity != null && saveIdentity != identity) {
+                    if(saveIdentity?.substringAfterLast('|')?.isNotBlank()==true) { _reportDraft.value="";_reportState.value=ReportUiState() }
                     (_session.value as? LocalDuelSession)?.leave()
                     localCubeHolder.value?.leave()
                     miniJob?.cancel()
@@ -437,6 +445,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun logout() {
+        _reportDraft.value=""
+        _reportState.value=ReportUiState()
         settingsStore.update { it.copy(authToken = "", accountName = "", accWins = 0, accLosses = 0, accDraws = 0, accBestScore = 0) }
     }
 
@@ -569,32 +579,65 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     fun refreshNotes() {
         viewModelScope.launch {
-            social.notes(settings.value.serverUrl, noteCursor).onSuccess { fresh ->
-                if (fresh.isNotEmpty()) {
-                    noteCursor = fresh.maxOf { it.id }
-                    _notes.value = (_notes.value + fresh).takeLast(30)
+            val server=settings.value.serverUrl
+            social.notes(server, 0).onSuccess { fresh ->
+                if (settings.value.serverUrl==server) {
+                    noteCursor = fresh.maxOfOrNull { it.id } ?: 0L
+                    _notes.value = fresh.distinctBy { it.id }.sortedBy { it.at }.takeLast(30)
                 }
             }
         }
     }
 
-    fun refreshChat() {
+    fun pvpChatRoom(): String? = when(_screen.value) {
+        Screen.Duel -> _session.value.state.value.let { s -> s.matchId?.takeIf { !s.training && s.mode==MatchMode.PVP && s.phase==DuelPhase.PLAYING && s.opponent.info?.isBot==false } }
+        Screen.CubeDuel -> cubeUiState.value.let { s -> s.matchId?.takeIf { !cubeIsLocal.value && s.mode==MatchMode.PVP && s.phase==DuelPhase.PLAYING } }
+        Screen.MiniPlay -> _mini.value?.let { s -> miniRoom.takeIf { it.isNotBlank() && s.mode=="pvp" && s.status=="playing" } }
+        else -> null
+    }
+
+    private val _chatError = MutableStateFlow(false)
+    val chatError = _chatError.asStateFlow()
+    private var displayedChatRoom: String? = null
+    fun refreshChat(room: String) {
+        if(pvpChatRoom()!=room) return
+        if(displayedChatRoom!=room) { displayedChatRoom=room; _chat.value=emptyList(); _chatError.value=false }
         viewModelScope.launch {
-            social.chat(settings.value.serverUrl, "lobby", 0).onSuccess { _chat.value = it }
+            social.chat(settings.value.serverUrl,room,0,settings.value.authToken)
+                .onSuccess { if(displayedChatRoom==room && pvpChatRoom()==room) { _chat.value=it;_chatError.value=false } }
+                .onFailure { if(displayedChatRoom==room) _chatError.value=true }
         }
     }
 
-    fun sendChat(text: String) {
-        val name = settings.value.accountName.ifBlank { settings.value.playerName.ifBlank { "Player" } }
+    fun sendChat(room: String, text: String) {
+        if(pvpChatRoom()!=room || text !in com.duel2048.shared.social.ChatPhrases.all) return
         viewModelScope.launch {
-            social.sendChat(settings.value.serverUrl, name, text, "lobby").onSuccess { refreshChat() }
+            social.sendChat(settings.value.serverUrl,settings.value.accountName,text,room,settings.value.authToken)
+                .onSuccess { refreshChat(room) }.onFailure { _chatError.value=true }
         }
     }
 
+    private val _reportState = MutableStateFlow(ReportUiState())
+    val reportState = _reportState.asStateFlow()
+    private val _reportDraft = MutableStateFlow("")
+    val reportDraft = _reportDraft.asStateFlow()
+    fun updateReportDraft(text: String) { _reportDraft.value=text.take(400) }
+    fun resetReport() {
+        if(!_reportState.value.busy) {
+            if(_reportState.value.sent) _reportDraft.value=""
+            _reportState.value=ReportUiState()
+        }
+    }
     fun sendReport(text: String) {
-        if (text.isBlank()) return
-        val name = settings.value.accountName.ifBlank { settings.value.playerName.ifBlank { "Player" } }
-        viewModelScope.launch { social.report(settings.value.serverUrl, name, text.trim(), "lobby") }
+        if(_reportState.value.busy || text.trim().length !in 3..400) return
+        if(settings.value.authToken.isBlank()) { _reportState.value=ReportUiState(signInRequired=true);return }
+        val account=settings.value
+        _reportState.value=ReportUiState(busy=true)
+        viewModelScope.launch {
+            social.report(account.serverUrl,account.accountName,text.trim(),"support",account.authToken)
+                .onSuccess { if(settings.value.authToken==account.authToken && settings.value.serverUrl==account.serverUrl) _reportState.value=ReportUiState(sent=true) }
+                .onFailure { if(settings.value.authToken==account.authToken && settings.value.serverUrl==account.serverUrl) _reportState.value=ReportUiState(error=true) }
+        }
     }
 
     fun buyCoins(pack: Int) {

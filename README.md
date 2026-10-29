@@ -30,6 +30,24 @@ so the game is always playable.
 - **Community** contains Watch rooms, chat, player search, updates, and rankings.
 - **Profile** contains account access, coins, the shop, settings, and feedback.
 
+Every screen shares one compact floating top toolbar. Its navigation menu opens Play,
+Community, Watch, rankings, and Profile; notification and settings buttons remain in the
+same place. The toolbar stays outside scrolling content. Smaller typography preserves
+Android font scaling, while buttons retain accessible touch targets. Non-game pages and
+settings scroll on small displays. Match navigation is guarded while a paid room is active.
+
+Notifications show published SQL announcements and server notices. The unread marker
+uses update timestamps and is remembered for each configured server. Contact support lives
+under **Settings → Help and support** as a private report form, with validation, draft
+preservation during login, sending status, and confirmation. Connection configuration is
+under the expandable **Connection settings** section, rather than on the sign-in page.
+
+There is no lobby/community chat. A **Match chat** button appears in the top toolbar only
+inside an active PvP competition. Both players can select preset sentences or emoji; there
+is no free-text composer. The server authenticates both sending and reading, checks the
+actual room membership and PvP mode, and rejects spectators, Bot/demo rooms, waiting or
+finished rooms, and arbitrary text. Chat automatically closes when the competition ends.
+
 Saved-game browsing and local progress backups have been removed. Online matches use
 server-owned checkpoints to keep players synchronized. A brief connection interruption
 can automatically resume the same match without another entry fee. Online cube/2048
@@ -37,7 +55,7 @@ sessions have a 90-second reconnect window within the same server process. If th
 restarts, interrupted cube/2048 entries are refunded; minigame rooms restore their board,
 players, found words, and absolute timer from SQL. Back up the SQL database and DATA_DIR.
 
-Protocol version remains 7; update both server and APK to Android **1.4.0 (6)**.
+Protocol version remains 7; update both server and APK to Android **1.5.0 (7)**.
 
 ```powershell
 .\gradlew.bat :shared:test :server:test :android:assembleDebug
@@ -117,12 +135,12 @@ payment reference and review note. Approval credits the shared wallet once and w
 an audit entry. The app refreshes wallet balances automatically. No payment provider
 or invented monetary prices are configured.
 
-APK version: **1.4.0 (6)**. Release builds require the existing release signing key;
+APK version: **1.5.0 (7)**. Release builds require the existing release signing key;
 keep `keystore.properties` and the keystore private so updates retain their signature.
 
 ## Visual effects in the client
 
-- Living background: gradient, faint grid, drifting glow orbs and twinkling stars.
+- Calm page background with a faint gradient/grid; effects are kept inside game views.
 - Keyed tile animation: slide tween, merge pop with glow flash, spring spawn, garbage "slam".
 - Particle bursts and shock rings on every merge, scaled by tile value and combo.
 - Floating score / combo / attack texts, board shake and colour flash on hits.
@@ -132,18 +150,6 @@ keep `keystore.properties` and the keystore private so updates retain their sign
 - Procedurally synthesized sound effects (no audio assets) and a small haptic vocabulary.
 - A **Reduce effects** switch (settings) turns off ambient animation, particles, shimmer and glow for weak devices.
 - Four languages (English, 日本語, 中文, Español) selectable in settings; strings live in `android/src/main/res/values-*/strings.xml`.
-
-## Screenshots
-
-Captured on an API 35 emulator (software renderer, so **Reduce effects** was on: no particles or glow here).
-
-| Home (logged in) | Login | Duel | Result | Solo |
-|---|---|---|---|---|
-| ![home](docs/screenshots/home.png) | ![login](docs/screenshots/login.png) | ![duel](docs/screenshots/duel.png) | ![result](docs/screenshots/result.png) | ![solo](docs/screenshots/solo.png) |
-
-| Training chooser | Training duel (offline) | Countdown | Leaderboard |
-|---|---|---|---|
-| ![training sheet](docs/screenshots/training-sheet.png) | ![training](docs/screenshots/training.png) | ![countdown](docs/screenshots/countdown.png) | ![leaderboard](docs/screenshots/leaderboard.png) |
 
 ## Requirements
 

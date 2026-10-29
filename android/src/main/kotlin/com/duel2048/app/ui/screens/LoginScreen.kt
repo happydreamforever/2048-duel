@@ -50,10 +50,9 @@ fun LoginScreen(vm: MainViewModel) {
     val palette = LocalPalette.current
     var name by remember { mutableStateOf(settings.accountName.ifBlank { settings.playerName }) }
     var password by remember { mutableStateOf("") }
-    var showSettings by remember { mutableStateOf(false) }
     BackHandler { vm.cancelLogin() }
 
-    Box(Modifier.fillMaxSize().systemBarsPadding().imePadding()) {
+    Box(Modifier.fillMaxSize().imePadding()) {
         Column(
             Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -65,20 +64,6 @@ fun LoginScreen(vm: MainViewModel) {
             Spacer(Modifier.height(22.dp))
             GlassCard(Modifier.fillMaxWidth()) {
                 val colors = duelFieldColors()
-                OutlinedTextField(
-                    value = settings.serverUrl,
-                    onValueChange = { v -> vm.updateSettings { it.copy(serverUrl = v) } },
-                    label = { Text(stringResource(R.string.server_url)) },
-                    singleLine = true,
-                    colors = colors,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                Text(
-                    stringResource(R.string.server_hint),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = palette.textSecondary,
-                    modifier = Modifier.padding(top = 4.dp, bottom = 8.dp),
-                )
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it.take(16) },
@@ -121,13 +106,7 @@ fun LoginScreen(vm: MainViewModel) {
                 Text(stringResource(R.string.play_offline), color = palette.textSecondary, fontWeight = FontWeight.Bold)
             }
         }
-        // Declared after the scrolling column so it stays on top and receives taps.
-        IconButton(onClick = { showSettings = true }, modifier = Modifier.align(Alignment.TopEnd).padding(8.dp)) {
-            Icon(Icons.Default.Settings, contentDescription = stringResource(R.string.settings), tint = palette.textSecondary)
-        }
+
     }
 
-    if (showSettings) {
-        SettingsSheet(settings, onDismiss = { showSettings = false }) { vm.updateSettings(it) }
-    }
 }

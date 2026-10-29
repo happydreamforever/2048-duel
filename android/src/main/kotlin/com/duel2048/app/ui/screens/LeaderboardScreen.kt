@@ -56,7 +56,7 @@ fun LeaderboardScreen(vm: MainViewModel) {
     val palette = LocalPalette.current
     BackHandler { vm.goHome() }
 
-    Column(Modifier.fillMaxSize().systemBarsPadding().padding(horizontal = 16.dp, vertical = 8.dp)) {
+    Column(Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 8.dp)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = { vm.goHome() }) { Icon(Icons.Default.Home, contentDescription = stringResource(R.string.home), tint = palette.textSecondary) }
             Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {

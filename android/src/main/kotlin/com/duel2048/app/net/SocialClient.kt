@@ -32,15 +32,15 @@ class SocialClient {
     suspend fun notes(ws: String, since: Long): Result<List<AdminNote>> =
         get(ws, "/social/notifications?since=$since", ListSerializer(AdminNote.serializer()))
     suspend fun live(ws: String): Result<List<LiveGame>> = get(ws, "/social/live", ListSerializer(LiveGame.serializer()))
-    suspend fun chat(ws: String, room: String, since: Long): Result<List<ChatLine>> =
-        get(ws, "/social/chat?room=$room&since=$since", ListSerializer(ChatLine.serializer()))
+    suspend fun chat(ws: String, room: String, since: Long, token: String): Result<List<ChatLine>> =
+        get(ws, "/social/chat?room=$room&since=$since", ListSerializer(ChatLine.serializer()), token)
     suspend fun wallet(ws: String, token: String): Result<WalletView> = get(ws, "/social/wallet", WalletView.serializer(),token)
 
-    suspend fun sendChat(ws: String, name: String, text: String, room: String): Result<ChatLine> =
-        post(ws, "/social/chat", Protocol.json.encodeToString(ChatBody.serializer(), ChatBody(name = name, text = text, room = room)), ChatLine.serializer())
+    suspend fun sendChat(ws: String, name: String, text: String, room: String, token: String): Result<ChatLine> =
+        post(ws, "/social/chat", Protocol.json.encodeToString(ChatBody.serializer(), ChatBody(token = token, name = name, text = text, room = room)), ChatLine.serializer())
 
-    suspend fun report(ws: String, name: String, text: String, game: String): Result<Unit> =
-        postUnit(ws, "/social/report", Protocol.json.encodeToString(ReportBody.serializer(), ReportBody(name = name, text = text, game = game)))
+    suspend fun report(ws: String, name: String, text: String, game: String, token: String): Result<Unit> =
+        postUnit(ws, "/social/report", Protocol.json.encodeToString(ReportBody.serializer(), ReportBody(token = token, name = name, text = text, game = game)))
 
     suspend fun purchaseCoins(ws: String, token: String, id: String, coins: Int): Result<com.duel2048.shared.social.CoinPurchase> =
         post(ws,"/social/coins/purchases",Protocol.json.encodeToString(com.duel2048.shared.social.CoinPurchaseBody.serializer(),com.duel2048.shared.social.CoinPurchaseBody(token,id,coins)),com.duel2048.shared.social.CoinPurchase.serializer())

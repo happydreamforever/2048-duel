@@ -83,7 +83,14 @@ class SocialService(
             .map { PlayerPresence(it, it in online) }
     }
 
-    fun notifications(since: Long): List<AdminNote> = synchronized(lock) { state.notes.filter { it.id > since } }
+    fun notifications(since: Long): List<AdminNote> = synchronized(lock) {
+        val published = if(db is com.duel2048.server.db.MySqlStore) db.connection { c ->
+            c.prepareStatement("SELECT id,text,updated_at FROM announcements WHERE status='published' ORDER BY updated_at DESC,id DESC LIMIT 30").use { ps ->
+                ps.executeQuery().use { rs -> buildList { while(rs.next()) add(AdminNote(1_000_000_000L+rs.getLong(1),rs.getString(2),rs.getLong(3))) } }
+            }
+        } else emptyList()
+        (state.notes+published).filter { it.id>since }.sortedBy { it.at }.takeLast(30)
+    }
 
     fun live(): List<LiveGame> = synchronized(lock) {
         var changed = false
@@ -104,24 +111,54 @@ class SocialService(
     }
 
     fun report(name: String, text: String, game: String) = synchronized(lock) {
-        state = state.copy(reports = state.reports + ReportRow(name, text.take(400), game, System.currentTimeMillis()))
-        save()
-        log.info("report from $name ($game): $text")
+        if(db is com.duel2048.server.db.MySqlStore) {
+            db.connection { c ->
+                c.prepareStatement("INSERT INTO reports(player_name,game,message,created_at,updated_at) VALUES (?,?,?,?,?)").use { ps ->
+                    ps.setString(1,name);ps.setString(2,game);ps.setString(3,text);ps.setLong(4,System.currentTimeMillis());ps.setLong(5,System.currentTimeMillis());ps.executeUpdate()
+                }
+            }
+        } else {
+            state=state.copy(reports=state.reports+ReportRow(name,text.take(400),game,System.currentTimeMillis()))
+            save()
+        }
+        log.info("support report received from $name ($game)")
     }
 
-    fun chat(name: String, text: String, room: String): ChatLine? {
-        val allowed = com.duel2048.shared.social.ChatPhrases.all
-        if (text !in allowed) return null
-        val line = ChatLine(System.currentTimeMillis(), name.ifBlank { "Player" }, text, room.ifBlank { "lobby" })
+    fun canChat(userId: String, roomId: String): Boolean {
+        if(lobby.canChat(userId,roomId)) return true
+        return synchronized(lock) {
+            val room=rooms[roomId] ?: return@synchronized false
+            val before=room.status
+            room.view(room.host)
+            if(before!=room.status) saveRooms()
+            room.mode=="pvp" && room.status=="playing" && userId in room.users.values
+        }
+    }
+
+    fun chat(user: com.duel2048.server.db.UserRecord, text: String, room: String): ChatLine? {
+        if(text !in com.duel2048.shared.social.ChatPhrases.all || !canChat(user.id,room)) return null
+        val line=ChatLine(System.currentTimeMillis(),user.name,text,room)
         synchronized(lock) {
-            state = state.copy(chat = (state.chat + line).takeLast(200))
-            save()
+            if(db is com.duel2048.server.db.MySqlStore) db.connection { c ->
+                c.prepareStatement("INSERT INTO chat_messages(player_name,message,room,created_at) VALUES (?,?,?,?)").use { ps ->
+                    ps.setString(1,user.name);ps.setString(2,text);ps.setString(3,room);ps.setLong(4,line.at);ps.executeUpdate()
+                }
+            } else {
+                state=state.copy(chat=(state.chat+line).takeLast(200));save()
+            }
         }
         return line
     }
 
-    fun chatSince(room: String, since: Long): List<ChatLine> =
-        synchronized(lock) { state.chat.filter { it.room == room && it.at > since } }
+    fun chatSince(room: String, since: Long): List<ChatLine> = synchronized(lock) {
+        if(db is com.duel2048.server.db.MySqlStore) db.connection { c ->
+            c.prepareStatement("SELECT player_name,message,room,created_at FROM chat_messages WHERE room=? AND created_at>? ORDER BY id DESC LIMIT 50").use { ps ->
+                ps.setString(1,room);ps.setLong(2,since);ps.executeQuery().use { rs -> buildList {
+                    while(rs.next()) add(ChatLine(rs.getLong(4),rs.getString(1),rs.getString(2),rs.getString(3)))
+                }.reversed() }
+            }
+        } else state.chat.filter { it.room==room && it.at>since }.takeLast(50)
+    }
 
     private fun demoRooms(): List<LiveGame> {
         val tick = System.currentTimeMillis()/1000

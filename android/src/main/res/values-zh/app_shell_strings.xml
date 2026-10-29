@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_navigation">导航</string>
+    <string name="app_notifications">通知</string>
+    <string name="app_finish_navigation">请先结束或离开当前比赛，再切换页面。</string>
+    <string name="app_help_support">帮助与支持</string>
+    <string name="app_contact_support">联系支持</string>
+    <string name="app_support_hint">描述遇到的问题或分享建议。报告仅发送给管理团队。</string>
+    <string name="app_support_message">你的消息</string>
+    <string name="app_support_sent">报告已发送，感谢帮助我们改进 Duel。</string>
+    <string name="app_support_failed">报告发送失败，请重试。</string>
+    <string name="app_support_sign_in">请登录后发送与账户关联的报告。</string>
+    <string name="app_entry_coins">%1$d 金币</string>
+    <string name="app_reward_coins">PvP 胜者奖励：%1$d 金币。平局时退还入场费。</string>
+    <string name="app_free">免费</string>
+    <string name="app_live">直播</string>
+    <string name="pvp_chat_title">比赛聊天</string>
+    <string name="pvp_chat_hint">仅此 PvP 房间的两位玩家可以聊天。请选择预设短语或表情。</string>
+    <string name="pvp_chat_empty">向对手说声好运吧。</string>
+    <string name="pvp_chat_failed">聊天暂不可用，请检查网络后重试。</string>
+    <string name="app_connection_settings">连接设置</string>
+</resources>

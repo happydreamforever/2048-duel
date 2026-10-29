@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_navigation">ナビゲーション</string>
+    <string name="app_notifications">通知</string>
+    <string name="app_finish_navigation">ページを切り替える前に対戦を終了するか退出してください。</string>
+    <string name="app_help_support">ヘルプとサポート</string>
+    <string name="app_contact_support">サポートに連絡</string>
+    <string name="app_support_hint">問題やご意見をお知らせください。報告は管理チームにのみ送信されます。</string>
+    <string name="app_support_message">メッセージ</string>
+    <string name="app_support_sent">報告を送信しました。Duel の改善へのご協力ありがとうございます。</string>
+    <string name="app_support_failed">報告を送信できませんでした。もう一度お試しください。</string>
+    <string name="app_support_sign_in">アカウントに関連付けた報告を送るにはログインしてください。</string>
+    <string name="app_entry_coins">%1$d コイン</string>
+    <string name="app_reward_coins">PvP 勝者への報酬：%1$d コイン。引き分けは参加費を返金します。</string>
+    <string name="app_free">無料</string>
+    <string name="app_live">ライブ</string>
+    <string name="pvp_chat_title">対戦チャット</string>
+    <string name="pvp_chat_hint">この PvP ルームの二人だけがチャットできます。定型文や絵文字を選んでください。</string>
+    <string name="pvp_chat_empty">対戦相手にエールを送りましょう。</string>
+    <string name="pvp_chat_failed">チャットを利用できません。接続を確認して再試行してください。</string>
+    <string name="app_connection_settings">接続設定</string>
+</resources>

@@ -1,5 +1,7 @@
 package com.duel2048.app.ui.screens
 
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloat
@@ -56,17 +58,17 @@ fun MatchmakingScreen(vm: MainViewModel) {
     BackHandler { vm.cancelSearch() }
 
     val elapsedMs = (now - duel.searchStartedAt).coerceAtLeast(0)
-    Box(Modifier.fillMaxSize().systemBarsPadding()) {
+    Box(Modifier.fillMaxSize()) {
         Column(
-            Modifier.fillMaxSize().padding(32.dp),
+            Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
             Box(contentAlignment = Alignment.Center) {
-                Radar(Modifier.size(230.dp))
-                Avatar(settings.accountName.ifBlank { settings.playerName.ifBlank { "?" } }, 64.dp)
+                Radar(Modifier.size(144.dp))
+                Avatar(settings.accountName.ifBlank { settings.playerName.ifBlank { "?" } }, 48.dp)
             }
-            Spacer(Modifier.height(36.dp))
+            Spacer(Modifier.height(20.dp))
             Text(
                 stringResource(
                     when {

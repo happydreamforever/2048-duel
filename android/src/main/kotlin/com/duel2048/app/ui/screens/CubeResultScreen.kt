@@ -1,5 +1,7 @@
 package com.duel2048.app.ui.screens
 
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -34,17 +36,17 @@ fun CubeResultScreen(vm: MainViewModel) {
     BackHandler { vm.goHome() }
 
     Column(
-        Modifier.fillMaxSize().systemBarsPadding().padding(24.dp),
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Spacer(Modifier.height(48.dp))
+        Spacer(Modifier.height(16.dp))
         Text(
             when {
                 cube.won -> stringResource(R.string.cube_result_win)
                 cube.draw -> stringResource(R.string.cube_result_draw)
                 else -> stringResource(R.string.cube_result_loss)
             },
-            fontSize = 36.sp,
+            fontSize = 28.sp,
             fontWeight = FontWeight.Black,
             color = when {
                 cube.won -> palette.success

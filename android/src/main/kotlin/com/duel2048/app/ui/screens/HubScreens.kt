@@ -22,6 +22,14 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.*
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -57,51 +65,49 @@ import com.duel2048.shared.social.ChatPhrases
 import com.duel2048.shared.social.Economy
 import kotlinx.coroutines.delay
 
-@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun GameModesScreen(vm: MainViewModel, game: HubGame) {
-    val palette = LocalPalette.current
+    val palette=LocalPalette.current
     BackHandler { vm.goHome() }
-    var difficulty by remember(game) { mutableStateOf(if (game in listOf(HubGame.WORD, HubGame.WORD_PUZZLE)) "4" else if (game == HubGame.MATH) "medium" else "normal") }
-    Column(
-        Modifier.fillMaxSize().systemBarsPadding().verticalScroll(rememberScrollState()).padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        TextButton(onClick = { vm.goHome() }) { Text(stringResource(R.string.back), color = palette.accent) }
-        Text(gameTitle(game), style = MaterialTheme.typography.headlineMedium, color = palette.textPrimary, fontWeight = FontWeight.Black)
-        Text(stringResource(R.string.product_mode_subtitle), color = palette.textSecondary)
-        Text(stringResource(R.string.mode_cost, Economy.joinCost("pvp"), Economy.joinCost("bot")), color = palette.textSecondary)
-        if (game in HubGame.entries) {
-            Text(stringResource(R.string.difficulty), color = palette.accent, fontWeight = FontWeight.Bold)
-            androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                val options = if (game == HubGame.WORD_PUZZLE) com.duel2048.shared.social.WordGrid.sizes.map(Int::toString) else if (game == HubGame.WORD) com.duel2048.shared.social.Puzzles.wordLengths.map(Int::toString) else if (game == HubGame.MATH) listOf("easy", "medium", "hard", "very_hard") else listOf("easy", "normal", "hard")
-                options.forEach { id ->
-                    val on = id == difficulty
-                    Text(
-                        if (game == HubGame.WORD_PUZZLE) "$id × $id" else difficultyLabel(id),
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(if (on) palette.accent else palette.surface)
-                            .clickable { difficulty = id }
-                            .padding(horizontal = 12.dp, vertical = 8.dp),
-                        color = if (on) Color.White else palette.textPrimary,
-                        fontWeight = FontWeight.Bold,
-                    )
-                }
+    var difficulty by remember(game) { mutableStateOf(if(game in listOf(HubGame.WORD,HubGame.WORD_PUZZLE)) "4" else if(game==HubGame.MATH) "medium" else "normal") }
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal=16.dp,vertical=12.dp), verticalArrangement=Arrangement.spacedBy(12.dp)) {
+        TextButton(onClick={vm.goHome()}) { Icon(Icons.Default.ArrowBack,null);Spacer(Modifier.width(6.dp));Text(stringResource(R.string.product_play)) }
+        Text(gameTitle(game),style=MaterialTheme.typography.titleLarge,color=palette.textPrimary)
+        Text(stringResource(R.string.product_mode_subtitle),style=MaterialTheme.typography.bodySmall,color=palette.textSecondary)
+        GlassCard(Modifier.fillMaxWidth()) {
+            Text(stringResource(R.string.difficulty),style=MaterialTheme.typography.titleSmall,color=palette.textPrimary)
+            val options=when(game) {
+                HubGame.WORD_PUZZLE -> com.duel2048.shared.social.WordGrid.sizes.map(Int::toString)
+                HubGame.WORD -> com.duel2048.shared.social.Puzzles.wordLengths.map(Int::toString)
+                HubGame.MATH -> listOf("easy","medium","hard","very_hard")
+                else -> listOf("easy","normal","hard")
+            }
+            FlowRow(horizontalArrangement=Arrangement.spacedBy(6.dp)) {
+                options.forEach { id -> FilterChip(selected=id==difficulty,onClick={difficulty=id},label={Text(if(game==HubGame.WORD_PUZZLE) "$id × $id" else difficultyLabel(id),style=MaterialTheme.typography.labelMedium)}) }
             }
         }
-        if (game == HubGame.TILES) NeonButton(stringResource(R.string.product_solo), subtitle = stringResource(R.string.solo_zen), modifier = Modifier.fillMaxWidth()) { vm.openSolo() }
-        NeonButton(stringResource(R.string.mode_pvp), subtitle = stringResource(R.string.mode_pvp_sub), modifier = Modifier.fillMaxWidth()) {
-            vm.startHub(game, HubMode.PVP, difficulty)
-        }
-        NeonButton(stringResource(R.string.mode_bot), subtitle = stringResource(R.string.mode_bot_sub), colors = listOf(Color(0xFF4A6FA5), Color(0xFF1B3A5C)), modifier = Modifier.fillMaxWidth()) {
-            vm.startHub(game, HubMode.BOT, difficulty)
-        }
-        NeonButton(stringResource(R.string.mode_train), subtitle = stringResource(R.string.mode_train_sub), colors = listOf(Color(0xFF1F9D6B), Color(0xFF0E6B8A)), modifier = Modifier.fillMaxWidth()) {
-            vm.startHub(game, HubMode.TRAIN, difficulty)
-        }
-        NeonButton(stringResource(R.string.mode_watch), subtitle = stringResource(R.string.mode_watch_sub), colors = listOf(Color(0xFF5C4A7A), Color(0xFF2A2140)), modifier = Modifier.fillMaxWidth()) {
-            vm.startHub(game, HubMode.WATCH, difficulty)
+        ModeChoice(stringResource(R.string.mode_pvp),stringResource(R.string.mode_pvp_sub),Icons.Default.Person,stringResource(R.string.app_entry_coins,10),true) { vm.startHub(game,HubMode.PVP,difficulty) }
+        ModeChoice(stringResource(R.string.mode_bot),stringResource(R.string.mode_bot_sub),Icons.Default.PlayArrow,stringResource(R.string.app_entry_coins,5)) { vm.startHub(game,HubMode.BOT,difficulty) }
+        ModeChoice(stringResource(R.string.mode_train),stringResource(R.string.mode_train_sub),Icons.Default.Refresh,stringResource(R.string.app_free)) { vm.startHub(game,HubMode.TRAIN,difficulty) }
+        ModeChoice(stringResource(R.string.mode_watch),stringResource(R.string.mode_watch_sub),Icons.Default.Star,stringResource(R.string.app_live)) { vm.startHub(game,HubMode.WATCH,difficulty) }
+        if(game==HubGame.TILES) TextButton(onClick={vm.openSolo()},modifier=Modifier.fillMaxWidth()) { Text(stringResource(R.string.product_solo)) }
+        Text(stringResource(R.string.app_reward_coins,25),style=MaterialTheme.typography.bodySmall,color=palette.textSecondary)
+    }
+}
+
+@Composable
+private fun ModeChoice(title:String,subtitle:String,icon:ImageVector,badge:String,primary:Boolean=false,onClick:()->Unit) {
+    val palette=LocalPalette.current
+    Surface(shape=RoundedCornerShape(16.dp),color=if(primary) palette.accent.copy(alpha=0.1f) else palette.surface,
+        border=BorderStroke(1.dp,if(primary) palette.accent.copy(alpha=0.45f) else palette.surfaceBorder),modifier=Modifier.fillMaxWidth()) {
+        Row(Modifier.clickable(onClick=onClick).padding(14.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)) {
+            Icon(icon,null,tint=palette.accent,modifier=Modifier.size(22.dp))
+            Column(Modifier.weight(1f)) {
+                Text(title,style=MaterialTheme.typography.titleSmall,color=palette.textPrimary)
+                Text(subtitle,style=MaterialTheme.typography.bodySmall,color=palette.textSecondary)
+            }
+            Text(badge,style=MaterialTheme.typography.labelSmall,color=palette.accent)
         }
     }
 }
@@ -118,7 +124,7 @@ fun WatchScreen(vm: MainViewModel) {
             delay(2000)
         }
     }
-    Column(Modifier.fillMaxSize().systemBarsPadding().verticalScroll(rememberScrollState()).padding(24.dp)) {
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp)) {
         Text(stringResource(R.string.mode_watch), style = MaterialTheme.typography.headlineMedium, color = palette.textPrimary, fontWeight = FontWeight.Black)
         Spacer(Modifier.height(8.dp))
         if (live.isEmpty()) {
@@ -144,8 +150,8 @@ fun WatchScreen(vm: MainViewModel) {
                 if(shown.demo) Text("DEMO ROOM · simulated players · no entry fee or rewards",color=palette.gold)
                 Text(watchStatus,color=palette.accent)
                 Text(shown.game.uppercase(), color = palette.accent, fontWeight = FontWeight.Black)
-                Text("${shown.playerA}  ${shown.scoreA}", color = palette.textPrimary, fontSize = 22.sp, fontWeight = FontWeight.Bold)
-                Text("${shown.playerB}  ${shown.scoreB}", color = palette.textSecondary, fontSize = 22.sp)
+                Text("${shown.playerA}  ${shown.scoreA}", color = palette.textPrimary, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                Text("${shown.playerB}  ${shown.scoreB}", color = palette.textSecondary, fontSize = 18.sp)
             }
             frame?.let { snapshot ->
                 if(snapshot.grid.isNotEmpty()) {
@@ -154,7 +160,7 @@ fun WatchScreen(vm: MainViewModel) {
                         Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(4.dp)) {
                             letters.forEachIndexed { col,letter ->
                                 Box(Modifier.weight(1f).aspectRatio(1f).background(if(row*snapshot.grid.size+col in snapshot.selected) palette.accent.copy(alpha=0.35f) else palette.surface),contentAlignment=Alignment.Center) {
-                                    Text(letter.toString(),color=palette.textPrimary,fontWeight=FontWeight.Bold,fontSize=22.sp)
+                                    Text(letter.toString(),color=palette.textPrimary,fontWeight=FontWeight.Bold,fontSize=18.sp)
                                 }
                             }
                         }
@@ -187,13 +193,13 @@ fun MiniPlayScreen(vm: MainViewModel) {
         return
     }
     Column(
-        Modifier.fillMaxSize().systemBarsPadding().verticalScroll(rememberScrollState()).padding(24.dp),
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text(gameTitle(if (state.game == com.duel2048.shared.protocol.SavedGameType.WORD_PUZZLE) HubGame.WORD_PUZZLE else if (state.game == com.duel2048.shared.protocol.SavedGameType.WORD) HubGame.WORD else HubGame.MATH), color = palette.accent, fontWeight = FontWeight.Black, fontSize = 22.sp)
+        Text(gameTitle(if (state.game == com.duel2048.shared.protocol.SavedGameType.WORD_PUZZLE) HubGame.WORD_PUZZLE else if (state.game == com.duel2048.shared.protocol.SavedGameType.WORD) HubGame.WORD else HubGame.MATH), color = palette.accent, fontWeight = FontWeight.Black, fontSize = 18.sp)
         Text(stringResource(R.string.vs_name, state.opponent), color = palette.textSecondary)
-        Text("${state.secondsLeft}s", color = palette.gold, fontWeight = FontWeight.Black, fontSize = 32.sp)
-        Text(state.prompt, color = palette.textPrimary, fontWeight = FontWeight.Black, fontSize = if (state.grid.isEmpty()) 28.sp else 22.sp)
+        Text("${state.secondsLeft}s", color = palette.gold, fontWeight = FontWeight.Black, fontSize = 24.sp)
+        Text(state.prompt, color = palette.textPrimary, fontWeight = FontWeight.Black, fontSize = if (state.grid.isEmpty()) 22.sp else 18.sp)
         if (state.game == com.duel2048.shared.protocol.SavedGameType.WORD_PUZZLE) {
             Text(stringResource(R.string.word_grid_score, state.score, state.opponentScore), color = palette.gold, fontWeight = FontWeight.Bold)
             if (state.foundWords.isNotEmpty()) Text(stringResource(R.string.word_grid_found, state.foundWords.joinToString(", ")), color = palette.success)
@@ -208,7 +214,7 @@ fun MiniPlayScreen(vm: MainViewModel) {
                 if (state.game == com.duel2048.shared.protocol.SavedGameType.WORD_PUZZLE && state.mode != "train" && state.score == state.opponentScore) stringResource(R.string.word_grid_draw) else if (state.won) stringResource(R.string.you_win) else stringResource(R.string.mini_game_over),
                 color = if (state.won) palette.success else palette.danger,
                 fontWeight = FontWeight.Black,
-                fontSize = 28.sp,
+                fontSize = 22.sp,
             )
             if (state.solution.isNotBlank()) Text(stringResource(R.string.solution_line, state.solution), color = palette.gold)
             NeonButton(stringResource(R.string.play_again), modifier = Modifier.fillMaxWidth()) { vm.playMiniAgain() }
@@ -241,37 +247,32 @@ fun SearchSheet(vm: MainViewModel, onDismiss: () -> Unit) {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-fun ChatSheet(vm: MainViewModel, onDismiss: () -> Unit) {
-    val palette = LocalPalette.current
+fun ChatSheet(vm: MainViewModel, room: String, onDismiss: () -> Unit) {
+    val palette=LocalPalette.current
     val lines by vm.chat.collectAsStateWithLifecycle()
-    LaunchedEffect(Unit) {
-        while (true) {
-            vm.refreshChat()
-            delay(2500)
-        }
-    }
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true), containerColor = palette.bgTop) {
-        Column(Modifier.padding(horizontal = 20.dp).padding(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(stringResource(R.string.chat), color = palette.accent, fontWeight = FontWeight.Black)
-            lines.takeLast(8).forEach { line ->
-                Text("${line.from}: ${line.text}", color = palette.textPrimary)
-            }
-            ChatPhrases.all.chunked(4).forEach { row ->
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    row.forEach { phrase ->
-                        Text(
-                            phrase,
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(palette.surface)
-                                .border(1.dp, palette.surfaceBorder, RoundedCornerShape(12.dp))
-                                .clickable { vm.sendChat(phrase) }
-                                .padding(horizontal = 10.dp, vertical = 8.dp),
-                            color = palette.textPrimary,
-                        )
+    val error by vm.chatError.collectAsStateWithLifecycle()
+    val listState=rememberLazyListState()
+    LaunchedEffect(room) { while(true) { vm.refreshChat(room);delay(2000) } }
+    LaunchedEffect(lines.size) { if(lines.isNotEmpty()) listState.animateScrollToItem(lines.lastIndex) }
+    ModalBottomSheet(onDismissRequest=onDismiss,sheetState=rememberModalBottomSheetState(skipPartiallyExpanded=true),containerColor=palette.bgTop) {
+        Column(Modifier.fillMaxWidth().padding(horizontal=20.dp).padding(bottom=20.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
+            Text(stringResource(R.string.pvp_chat_title),style=MaterialTheme.typography.titleMedium,color=palette.textPrimary)
+            Text(stringResource(R.string.pvp_chat_hint),style=MaterialTheme.typography.bodySmall,color=palette.textSecondary)
+            if(lines.isEmpty()) Text(stringResource(R.string.pvp_chat_empty),style=MaterialTheme.typography.bodySmall,color=palette.textSecondary)
+            else LazyColumn(state=listState,modifier=Modifier.fillMaxWidth().heightIn(max=180.dp),verticalArrangement=Arrangement.spacedBy(6.dp)) {
+                items(lines) { line -> Surface(color=palette.surface,shape=RoundedCornerShape(10.dp)) {
+                    Column(Modifier.fillMaxWidth().padding(10.dp)) {
+                        Text(line.from,style=MaterialTheme.typography.labelSmall,color=palette.accent)
+                        Text(line.text,style=MaterialTheme.typography.bodyMedium,color=palette.textPrimary)
                     }
+                } }
+            }
+            if(error) Text(stringResource(R.string.pvp_chat_failed),style=MaterialTheme.typography.bodySmall,color=palette.danger)
+            Column(Modifier.heightIn(max=260.dp).verticalScroll(rememberScrollState())) {
+                FlowRow(horizontalArrangement=Arrangement.spacedBy(6.dp)) {
+                    ChatPhrases.all.forEach { phrase -> AssistChip(onClick={vm.sendChat(room,phrase)},label={Text(phrase,style=MaterialTheme.typography.labelMedium)}) }
                 }
             }
         }
@@ -300,13 +301,19 @@ fun ShopSheet(vm: MainViewModel, onDismiss: () -> Unit) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NotesSheet(vm: MainViewModel, onDismiss: () -> Unit) {
-    val palette = LocalPalette.current
+    val palette=LocalPalette.current
     val notes by vm.notes.collectAsStateWithLifecycle()
-    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = palette.bgTop) {
-        Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(stringResource(R.string.admin_notes), color = palette.accent, fontWeight = FontWeight.Black)
-            if (notes.isEmpty()) Text(stringResource(R.string.no_notes), color = palette.textSecondary)
-            notes.forEach { Text(it.text, color = palette.textPrimary) }
+    ModalBottomSheet(onDismissRequest=onDismiss,containerColor=palette.bgTop) {
+        Column(Modifier.fillMaxWidth().padding(horizontal=20.dp).padding(bottom=24.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
+            Text(stringResource(R.string.app_notifications),style=MaterialTheme.typography.titleMedium,color=palette.textPrimary)
+            if(notes.isEmpty()) Text(stringResource(R.string.no_notes),style=MaterialTheme.typography.bodyMedium,color=palette.textSecondary)
+            LazyColumn(Modifier.heightIn(max=420.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
+                items(notes.reversed(),key={it.id}) { note -> GlassCard(Modifier.fillMaxWidth()) {
+                    Text(java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.SHORT,java.text.DateFormat.SHORT).format(java.util.Date(note.at)),style=MaterialTheme.typography.labelSmall,color=palette.textSecondary)
+                    Spacer(Modifier.height(6.dp))
+                    Text(note.text,style=MaterialTheme.typography.bodyMedium,color=palette.textPrimary)
+                } }
+            }
         }
     }
 }
@@ -314,15 +321,26 @@ fun NotesSheet(vm: MainViewModel, onDismiss: () -> Unit) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ReportSheet(vm: MainViewModel, onDismiss: () -> Unit) {
-    val palette = LocalPalette.current
-    var text by remember { mutableStateOf("") }
-    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = palette.bgTop) {
-        Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text(stringResource(R.string.report_admin), color = palette.danger, fontWeight = FontWeight.Black)
-            OutlinedTextField(text, { text = it }, modifier = Modifier.fillMaxWidth())
-            NeonButton(stringResource(R.string.send_report), modifier = Modifier.fillMaxWidth(), colors = listOf(palette.danger, Color(0xFF5A2030))) {
-                vm.sendReport(text)
-                onDismiss()
+    val palette=LocalPalette.current
+    val state by vm.reportState.collectAsStateWithLifecycle()
+    val text by vm.reportDraft.collectAsStateWithLifecycle()
+    ModalBottomSheet(onDismissRequest=onDismiss,sheetState=rememberModalBottomSheetState(skipPartiallyExpanded=true),containerColor=palette.bgTop) {
+        Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).imePadding().padding(horizontal=20.dp).padding(bottom=24.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
+            Text(stringResource(R.string.app_contact_support),style=MaterialTheme.typography.titleMedium,color=palette.textPrimary)
+            Text(stringResource(R.string.app_support_hint),style=MaterialTheme.typography.bodySmall,color=palette.textSecondary)
+            if(state.sent) {
+                Text(stringResource(R.string.app_support_sent),style=MaterialTheme.typography.bodyMedium,color=palette.success)
+                Button(onClick=onDismiss,modifier=Modifier.fillMaxWidth()) { Text(stringResource(R.string.ok)) }
+            } else {
+                OutlinedTextField(value=text,onValueChange=vm::updateReportDraft,enabled=!state.busy,
+                    label={Text(stringResource(R.string.app_support_message))},supportingText={Text("${text.length}/400")},
+                    minLines=4,maxLines=7,modifier=Modifier.fillMaxWidth(),colors=duelFieldColors())
+                if(state.error) Text(stringResource(R.string.app_support_failed),style=MaterialTheme.typography.bodySmall,color=palette.danger)
+                if(state.signInRequired) Text(stringResource(R.string.app_support_sign_in),style=MaterialTheme.typography.bodySmall,color=palette.gold)
+                Button(onClick={vm.sendReport(text)},enabled=!state.busy&&text.trim().length>=3,modifier=Modifier.fillMaxWidth()) {
+                    if(state.busy) CircularProgressIndicator(Modifier.size(16.dp),strokeWidth=2.dp) else Text(stringResource(R.string.send_report))
+                }
+                if(state.signInRequired) TextButton(onClick={onDismiss();vm.openLogin()},modifier=Modifier.fillMaxWidth()) { Text(stringResource(R.string.log_in)) }
             }
         }
     }

@@ -39,7 +39,7 @@ internal fun PuzzleAnswerControls(vm: MainViewModel, state: MiniUi) {
             val assembled = (if (gridGame) WordGrid.selectedWord(state.grid, state.selectedLetters) else Puzzles.selectedWord(state.grid, state.selectedLetters)).orEmpty()
             Text(stringResource(if (gridGame) R.string.word_grid_help else R.string.puzzle_letters_help), color = palette.textSecondary)
             Text(if (gridGame) assembled.ifEmpty { "—" } else (assembled.toList().map { it.toString() } + List((expectedLetters - assembled.length).coerceAtLeast(0)) { "_" }).joinToString(" "),
-                color = palette.accent, fontSize = 28.sp, fontWeight = FontWeight.Bold)
+                color = palette.accent, fontSize = 22.sp, fontWeight = FontWeight.Bold)
             if (gridGame) {
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     state.grid.forEachIndexed { row, letters ->
@@ -57,7 +57,7 @@ internal fun PuzzleAnswerControls(vm: MainViewModel, state: MiniUi) {
                                     .semantics { contentDescription = "${letter}, row ${row + 1}, column ${col + 1}" + if (order >= 0) ", selected ${order + 1}" else "" },
                                     contentAlignment = Alignment.Center) {
                                     Text(letter.toString(), color = if (canSelect || order >= 0) palette.textPrimary else palette.textSecondary,
-                                        fontSize = if (state.grid.size == 8) 17.sp else 22.sp, fontWeight = FontWeight.Bold)
+                                        fontSize = if (state.grid.size == 8) 17.sp else 18.sp, fontWeight = FontWeight.Bold)
                                     if (order >= 0) Text("${order + 1}", color = palette.accent, fontSize = 9.sp,
                                         modifier = Modifier.align(Alignment.TopEnd).padding(end = 2.dp))
                                 }
@@ -71,7 +71,7 @@ internal fun PuzzleAnswerControls(vm: MainViewModel, state: MiniUi) {
                     OutlinedButton(onClick = { vm.selectMiniLetter(index) },
                         enabled = enabled && !used && state.selectedLetters.size < expectedLetters,
                         modifier = Modifier.padding(vertical = 4.dp).size(52.dp), contentPadding = PaddingValues(0.dp)) {
-                        Text(letter.toString(), fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                        Text(letter.toString(), fontSize = 18.sp, fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -93,7 +93,7 @@ internal fun PuzzleAnswerControls(vm: MainViewModel, state: MiniUi) {
                         contentColor = if (answer == selectedAnswer) palette.accent else palette.textPrimary)) {
                     RadioButton(selected = answer == selectedAnswer, onClick = null)
                     Spacer(Modifier.width(12.dp))
-                    Text(answer, fontSize = 20.sp, modifier = Modifier.weight(1f))
+                    Text(answer, fontSize = 17.sp, modifier = Modifier.weight(1f))
                 }
             }
         }

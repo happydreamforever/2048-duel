@@ -1,5 +1,6 @@
 package com.duel2048.app.ui.screens
 
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -20,8 +21,12 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.Divider
 import androidx.compose.material3.TextFieldColors
 import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -49,12 +54,13 @@ internal fun duelFieldColors(): TextFieldColors {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun SettingsSheet(settings: UserSettings, onDismiss: () -> Unit, onChange: ((UserSettings) -> UserSettings) -> Unit) {
+internal fun SettingsSheet(settings: UserSettings, onDismiss: () -> Unit, onReport: (() -> Unit)? = null, connectionEnabled: Boolean = true, onChange: ((UserSettings) -> UserSettings) -> Unit) {
     val palette = LocalPalette.current
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val fieldColors = duelFieldColors()
+    var connectionOpen by rememberSaveable { mutableStateOf(false) }
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = palette.bgTop) {
-        Column(Modifier.padding(horizontal = 24.dp).padding(bottom = 32.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        Column(Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).padding(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             Text(stringResource(R.string.settings_title), style = MaterialTheme.typography.titleMedium, color = palette.textSecondary)
             OutlinedTextField(
                 value = settings.playerName,
@@ -64,15 +70,6 @@ internal fun SettingsSheet(settings: UserSettings, onDismiss: () -> Unit, onChan
                 colors = fieldColors,
                 modifier = Modifier.fillMaxWidth(),
             )
-            OutlinedTextField(
-                value = settings.serverUrl,
-                onValueChange = { v -> onChange { it.copy(serverUrl = v) } },
-                label = { Text(stringResource(R.string.server_url)) },
-                singleLine = true,
-                colors = fieldColors,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Text(stringResource(R.string.server_hint), style = MaterialTheme.typography.labelSmall, color = palette.textSecondary)
 
             Text(stringResource(R.string.language), color = palette.textPrimary, style = MaterialTheme.typography.bodyLarge)
             Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -93,6 +90,25 @@ internal fun SettingsSheet(settings: UserSettings, onDismiss: () -> Unit, onChan
             ToggleRow(stringResource(R.string.haptics), settings.haptics) { v -> onChange { it.copy(haptics = v) } }
             ToggleRow(stringResource(R.string.sound_effects), settings.sound) { v -> onChange { it.copy(sound = v) } }
             ToggleRow(stringResource(R.string.reduce_effects), settings.lowEffects) { v -> onChange { it.copy(lowEffects = v) } }
+            if(onReport != null) {
+                Divider(color = palette.surfaceBorder)
+                Text(stringResource(R.string.app_help_support), style = MaterialTheme.typography.titleSmall, color = palette.textPrimary)
+                TextButton(onClick = onReport, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.app_contact_support)) }
+            }
+            Divider(color = palette.surfaceBorder)
+            TextButton(onClick = { connectionOpen = !connectionOpen }, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.app_connection_settings)) }
+            if(connectionOpen) {
+            OutlinedTextField(
+                value = settings.serverUrl,
+                enabled = connectionEnabled,
+                onValueChange = { v -> onChange { it.copy(serverUrl = v) } },
+                label = { Text(stringResource(R.string.server_url)) },
+                singleLine = true,
+                colors = fieldColors,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Text(stringResource(R.string.server_hint), style = MaterialTheme.typography.labelSmall, color = palette.textSecondary)
+            }
             Spacer(Modifier.navigationBarsPadding())
         }
     }

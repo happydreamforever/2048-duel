@@ -125,7 +125,7 @@ fun DuelScreen(vm: MainViewModel) {
     Column(
         Modifier
             .fillMaxSize()
-            .systemBarsPadding()
+
             .padding(horizontal = 16.dp, vertical = 8.dp)
             .focusRequester(focus)
             .focusable()
@@ -325,7 +325,7 @@ private fun ResultFlash(duel: DuelUiState) {
         Text(
             title,
             modifier = Modifier.graphicsLayer { scaleX = scale.value; scaleY = scale.value },
-            fontSize = 54.sp,
+            fontSize = 32.sp,
             fontWeight = FontWeight.Black,
             color = color,
             textAlign = TextAlign.Center,

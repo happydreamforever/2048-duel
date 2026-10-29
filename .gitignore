@@ -29,3 +29,10 @@ android/keystore/
 server.env
 # database credentials (copy from database.json.example)
 database.json
+
+# Local visual verification artifacts must never be committed.
+**/screenshots/
+**/screenshot*.png
+**/screenshot*.jpg
+**/screenshot*.jpeg
+**/screenshot*.webp

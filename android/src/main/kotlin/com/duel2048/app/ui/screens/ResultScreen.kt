@@ -87,7 +87,7 @@ fun ResultScreen(vm: MainViewModel) {
     Box(Modifier.fillMaxSize()) {
         if (won) ParticleLayer(confetti, Modifier.fillMaxSize())
         Column(
-            Modifier.fillMaxSize().systemBarsPadding().verticalScroll(rememberScrollState()).padding(24.dp),
+            Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
@@ -101,7 +101,7 @@ fun ResultScreen(vm: MainViewModel) {
             Text(
                 title,
                 modifier = Modifier.graphicsLayer { scaleX = scale.value; scaleY = scale.value },
-                fontSize = 56.sp,
+                fontSize = 32.sp,
                 fontWeight = FontWeight.Black,
                 color = color,
                 style = TextStyle(shadow = Shadow(color.copy(alpha = 0.9f), Offset.Zero, 40f)),

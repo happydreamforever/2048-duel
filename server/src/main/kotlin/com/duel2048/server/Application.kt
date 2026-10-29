@@ -159,7 +159,11 @@ fun Application.module(config: ServerConfig = ServerConfig.fromEnv(), db: UserSt
         get("/social/chat") {
             val room = call.request.queryParameters["room"] ?: "lobby"
             val since = call.request.queryParameters["since"]?.toLongOrNull() ?: 0L
-            call.respond(social.chatSince(room, since))
+            val token=call.request.headers["Authorization"]?.removePrefix("Bearer ").orEmpty()
+            val user=db.authByToken(token)
+            if(user==null) call.respond(HttpStatusCode.Unauthorized,"Sign in to chat")
+            else if(!social.canChat(user.id,room)) call.respond(HttpStatusCode.Forbidden,"Chat is only available to players in this active PvP room")
+            else call.respond(social.chatSince(room,since))
         }
         get("/social/wallet") {
             val token = call.request.headers["Authorization"]?.removePrefix("Bearer ") ?: call.request.queryParameters["token"].orEmpty()
@@ -178,12 +182,18 @@ fun Application.module(config: ServerConfig = ServerConfig.fromEnv(), db: UserSt
         }
         post("/social/report") {
             val body = Protocol.json.decodeFromString(ReportBody.serializer(), call.receiveText())
-            social.report(body.name.ifBlank { "player" }, body.text, body.game)
+            val user=db.authByToken(body.token)
+            if(user==null) { call.respond(HttpStatusCode.Unauthorized,"Sign in to send a report");return@post }
+            if(body.text.trim().length !in 3..400) { call.respond(HttpStatusCode.BadRequest,"Reports must contain 3–400 characters");return@post }
+            social.report(user.name, body.text.trim(), body.game.take(32))
             call.respondText("{\"ok\":true}", ContentType.Application.Json)
         }
         post("/social/chat") {
             val body = Protocol.json.decodeFromString(ChatBody.serializer(), call.receiveText())
-            val line = social.chat(body.name, body.text, body.room)
+            val user=db.authByToken(body.token)
+            if(user==null) { call.respond(HttpStatusCode.Unauthorized,"Sign in to chat");return@post }
+            if(!social.canChat(user.id,body.room)) { call.respond(HttpStatusCode.Forbidden,"Chat is only available in your active PvP room");return@post }
+            val line = social.chat(user, body.text, body.room)
             if (line == null) call.respond(HttpStatusCode.BadRequest, "phrase not allowed")
             else call.respond(line)
         }

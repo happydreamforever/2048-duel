@@ -54,13 +54,13 @@ import kotlin.math.abs
 @Composable
 fun GlassCard(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
     val palette = LocalPalette.current
-    val shape = RoundedCornerShape(24.dp)
+    val shape = RoundedCornerShape(16.dp)
     Column(
         modifier
             .clip(shape)
             .background(palette.surface)
             .border(1.dp, palette.surfaceBorder, shape)
-            .padding(20.dp),
+            .padding(16.dp),
         content = content,
     )
 }
@@ -80,22 +80,10 @@ fun NeonButton(
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     val scale by animateFloatAsState(if (pressed) 0.96f else 1f, spring(stiffness = Spring.StiffnessMedium), label = "press")
-    val shape = RoundedCornerShape(18.dp)
+    val shape = RoundedCornerShape(12.dp)
     Box(
         modifier
             .graphicsLayer { scaleX = scale; scaleY = scale; alpha = if (enabled) 1f else 0.5f }
-            .drawBehind {
-                val r = 18.dp.toPx()
-                for (i in 1..3) {
-                    val pad = i * 5.dp.toPx()
-                    drawRoundRect(
-                        gradient.last().copy(alpha = 0.16f / i),
-                        topLeft = Offset(-pad, -pad),
-                        size = Size(size.width + 2 * pad, size.height + 2 * pad),
-                        cornerRadius = CornerRadius(r + pad),
-                    )
-                }
-            }
             .clip(shape)
             .background(Brush.horizontalGradient(gradient))
             .border(1.dp, Color.White.copy(alpha = 0.22f), shape)
@@ -104,7 +92,7 @@ fun NeonButton(
         contentAlignment = Alignment.Center,
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(text, fontWeight = FontWeight.Black, letterSpacing = 2.sp, color = textColor, fontSize = 16.sp)
+            Text(text, fontWeight = FontWeight.SemiBold, color = textColor, fontSize = 14.sp)
             if (subtitle != null) {
                 Text(subtitle, color = textColor.copy(alpha = 0.8f), fontSize = 11.sp, textAlign = TextAlign.Center)
             }

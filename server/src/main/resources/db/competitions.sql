@@ -33,3 +33,21 @@ CREATE TABLE IF NOT EXISTS game_saves (
  payload LONGTEXT NOT NULL,updated_at BIGINT NOT NULL,PRIMARY KEY(user_id,save_id),
  FOREIGN KEY(user_id) REFERENCES users(id),KEY idx_saves_updated(updated_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS chat_messages (
+ id BIGINT AUTO_INCREMENT PRIMARY KEY,player_name VARCHAR(16) NOT NULL,message VARCHAR(100) NOT NULL,
+ room VARCHAR(100) NOT NULL,created_at BIGINT NOT NULL,KEY idx_chat_room(room,created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS reports (
+ id BIGINT AUTO_INCREMENT PRIMARY KEY,event_key CHAR(64) NULL UNIQUE,player_name VARCHAR(16) NOT NULL,
+ game VARCHAR(32) NOT NULL,message VARCHAR(400) NOT NULL,
+ status ENUM('open','in_review','resolved','dismissed') NOT NULL DEFAULT 'open',
+ admin_note VARCHAR(1000) NOT NULL DEFAULT '',created_at BIGINT NOT NULL,updated_at BIGINT NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS announcements (
+ id BIGINT AUTO_INCREMENT PRIMARY KEY,text VARCHAR(280) NOT NULL,
+ status ENUM('draft','published','archived') NOT NULL DEFAULT 'draft',
+ published_at BIGINT NULL,created_at BIGINT NOT NULL,updated_at BIGINT NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

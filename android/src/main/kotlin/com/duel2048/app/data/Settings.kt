@@ -32,6 +32,8 @@ data class UserSettings(
     /** Silent guest identity created on first online match so play never demands login. */
     val guestName: String = "",
     val guestPass: String = "",
+    val lastReadNoticeAt: Long = 0,
+    val lastNoticeServer: String = "",
 ) {
     val loggedIn: Boolean get() = authToken.isNotBlank()
 
@@ -89,6 +91,8 @@ class SettingsStore(context: Context) {
         language = prefs.getString("lang", "") ?: "",
         guestName = prefs.getString("guestName", "") ?: "",
         guestPass = prefs.getString("guestPass", "") ?: "",
+        lastReadNoticeAt = prefs.getLong("lastReadNoticeAt", 0),
+        lastNoticeServer = prefs.getString("lastNoticeServer", "") ?: "",
     )
 
     fun update(transform: (UserSettings) -> UserSettings) {
@@ -115,6 +119,8 @@ class SettingsStore(context: Context) {
             .putString("lang", s.language)
             .putString("guestName", s.guestName)
             .putString("guestPass", s.guestPass)
+            .putLong("lastReadNoticeAt", s.lastReadNoticeAt)
+            .putString("lastNoticeServer", s.lastNoticeServer)
             .apply()
     }
 }

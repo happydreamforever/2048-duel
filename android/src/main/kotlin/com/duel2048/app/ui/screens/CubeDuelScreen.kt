@@ -56,7 +56,7 @@ internal fun CubeDuelOverlay(
     playerView: @Composable () -> Unit,
 ) {
     val palette = LocalPalette.current
-    Column(Modifier.fillMaxSize().systemBarsPadding().padding(8.dp)) {
+    Column(Modifier.fillMaxSize().padding(8.dp)) {
         Text(
             stringResource(if (cube.training) R.string.cube_training_title else R.string.cube_duel_title),
             style = MaterialTheme.typography.titleMedium,
@@ -67,7 +67,7 @@ internal fun CubeDuelOverlay(
         if (cube.reconnecting) {
             Text(stringResource(R.string.product_reconnecting), color = palette.gold)
         } else if (cube.countdown != null) {
-            Text("${cube.countdown}", fontSize = 36.sp, fontWeight = FontWeight.Black, color = palette.gold, modifier = Modifier.align(Alignment.CenterHorizontally))
+            Text("${cube.countdown}", fontSize = 28.sp, fontWeight = FontWeight.Black, color = palette.gold, modifier = Modifier.align(Alignment.CenterHorizontally))
         } else if (cube.phase == DuelPhase.PLAYING) {
             val rem = cube.remainingNow(System.currentTimeMillis()) / 1000
             Text(stringResource(R.string.cube_timer, rem), color = palette.textSecondary, modifier = Modifier.align(Alignment.CenterHorizontally))
