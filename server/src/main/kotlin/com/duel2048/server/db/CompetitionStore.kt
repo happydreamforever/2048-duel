@@ -77,6 +77,18 @@ class CompetitionStore(private val users: UserStore, dataDir: String) {
         }
     }
     fun enter(room: String, game: String, mode: String, ids: List<String>) = tx { c ->
+        // Lock accounts before their wallets, matching the admin deletion lock order.
+        // The eligibility check and debit commit together for every competition type.
+        if (c != null) ids.distinct().sorted().forEach { id ->
+            val exists = c.prepareStatement("SELECT id FROM users WHERE id=? FOR UPDATE").use { ps ->
+                ps.setString(1,id); ps.executeQuery().use { it.next() }
+            }
+            require(exists) { "A player account is unavailable" }
+            val deleted = c.prepareStatement("SELECT deleted_at FROM admin_deleted_records WHERE entity_type='players' AND record_id=? FOR UPDATE").use { ps ->
+                ps.setString(1,id); ps.executeQuery().use { it.next() && it.getObject(1) != null }
+            }
+            require(!deleted) { "A player account is unavailable" }
+        }
         ids.distinct().sorted().forEach { id ->
             change(c,id,-Economy.joinCost(mode),0,"entry:$room:$id","$game $mode room entry $room")
             if (c == null) data = data.copy(entries=data.entries+("$room:$id" to Entry(room,id,game,mode,Economy.joinCost(mode))))

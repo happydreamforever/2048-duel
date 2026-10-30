@@ -143,6 +143,14 @@ The game also creates the compatible runtime tables on startup. Existing file-ba
 wallet balances are imported only when a SQL wallet does not already exist.
 `DB=json` remains a local development mode; its records do not appear in the SQL admin.
 
+Admin soft deletion uses shared `admin_deleted_records` markers. Deleted SQL players cannot
+sign in, authenticate with old tokens, appear in player discovery/leaderboards, or enter new
+competitions. Their wallets, history, and settlements for already-started matches remain intact.
+Restore through the admin's Deleted records view; names remain reserved throughout. Deploy
+both the updated game server and admin (`npm run db:migrate`, migration `004_soft_delete.sql`)
+against the same SQL database. No APK update is needed for this administration feature.
+
+
 Open **Community → Watch** (or Watch within any game), select **Demo_A vs Demo_B**,
 and look for **DEMO ROOM** and the changing **server signal** number. These clearly
 marked mock rooms are streamed over `/social/watch/{id}` every second. They never

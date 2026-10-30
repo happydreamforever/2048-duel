@@ -40,6 +40,7 @@ data class MatchRecord(
 /** Persistence used by the lobby. MySQL in production, JSON file for local development. */
 interface UserStore {
     val description: String
+    suspend fun isAvailable(userId: String): Boolean = true
     suspend fun userCount(): Int
     suspend fun register(name: String, password: String): AuthResult
     suspend fun login(name: String, password: String): AuthResult

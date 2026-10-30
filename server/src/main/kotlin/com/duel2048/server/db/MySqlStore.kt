@@ -41,6 +41,7 @@ class MySqlStore(jdbcUrl: String, user: String, password: String) : UserStore {
             c.createStatement().use { st ->
                 st.execute(USERS_DDL)
                 st.execute(MATCHES_DDL)
+                st.execute(DELETED_RECORDS_DDL)
             }
         }
         log.info("connected to $jdbcUrl, schema ready")
@@ -52,8 +53,12 @@ class MySqlStore(jdbcUrl: String, user: String, password: String) : UserStore {
 
     override suspend fun userByName(name: String): UserRecord? = db { c -> selectWhere(c, "name_lower = ?", name.trim().lowercase()) }
 
+    override suspend fun isAvailable(userId: String): Boolean = db { c ->
+        selectWhere(c, "id = ?", userId) != null
+    }
+
     override suspend fun userCount(): Int = db { c ->
-        c.prepareStatement("SELECT COUNT(*) FROM users").use { ps -> ps.executeQuery().use { rs -> rs.next(); rs.getInt(1) } }
+        c.prepareStatement("SELECT COUNT(*) FROM users WHERE $AVAILABLE").use { ps -> ps.executeQuery().use { rs -> rs.next(); rs.getInt(1) } }
     }
 
     override suspend fun register(name: String, password: String): AuthResult {
@@ -97,9 +102,10 @@ class MySqlStore(jdbcUrl: String, user: String, password: String) : UserStore {
         // Preserve the account session across devices; explicit logout revokes it.
         val token = user.token ?: Passwords.newToken()
         val now = System.currentTimeMillis()
-        c.prepareStatement("UPDATE users SET token = ?, last_login_at = ? WHERE id = ?").use { ps ->
+        val changed = c.prepareStatement("UPDATE users SET token = ?, last_login_at = ? WHERE $AVAILABLE AND id = ?").use { ps ->
             ps.setString(1, token); ps.setLong(2, now); ps.setString(3, user.id); ps.executeUpdate()
         }
+        if (changed == 0) return@db AuthResult.Failed("bad_credentials", "Wrong name or password")
         AuthResult.Ok(user.copy(token = token, lastLoginAt = now))
     }
 
@@ -113,7 +119,7 @@ class MySqlStore(jdbcUrl: String, user: String, password: String) : UserStore {
     override suspend fun updateStats(userId: String, transform: (AccountStats) -> AccountStats): UserRecord? = db { c ->
         c.autoCommit = false
         try {
-            val user = selectWhere(c, "id = ? FOR UPDATE", userId) ?: run { c.rollback(); return@db null }
+            val user = selectWhere(c, "id = ? FOR UPDATE", userId, includeDeleted = true) ?: run { c.rollback(); return@db null }
             val st = transform(user.stats)
             c.prepareStatement(
                 "UPDATE users SET wins = ?, losses = ?, draws = ?, matches = ?, best_score = ?, best_tile = ?, garbage_sent = ? WHERE id = ?",
@@ -133,7 +139,7 @@ class MySqlStore(jdbcUrl: String, user: String, password: String) : UserStore {
     }
 
     override suspend fun names(): List<String> = db { c ->
-        c.prepareStatement("SELECT name FROM users ORDER BY name ASC").use { ps ->
+        c.prepareStatement("SELECT name FROM users WHERE $AVAILABLE ORDER BY name ASC").use { ps ->
             ps.executeQuery().use { rs ->
                 val out = ArrayList<String>()
                 while (rs.next()) out += rs.getString(1)
@@ -144,7 +150,7 @@ class MySqlStore(jdbcUrl: String, user: String, password: String) : UserStore {
 
     override suspend fun leaderboard(limit: Int): List<LeaderboardEntry> = db { c ->
         c.prepareStatement(
-            "SELECT name, wins, losses, draws, matches, best_score, best_tile FROM users ORDER BY wins DESC, best_score DESC, name ASC LIMIT ?",
+            "SELECT name, wins, losses, draws, matches, best_score, best_tile FROM users WHERE $AVAILABLE ORDER BY wins DESC, best_score DESC, name ASC LIMIT ?",
         ).use { ps ->
             ps.setInt(1, limit.coerceIn(1, 100))
             ps.executeQuery().use { rs ->
@@ -175,8 +181,8 @@ class MySqlStore(jdbcUrl: String, user: String, password: String) : UserStore {
 
     override fun close() = pool.close()
 
-    private fun selectWhere(c: Connection, where: String, arg: String): UserRecord? =
-        c.prepareStatement("SELECT $COLUMNS FROM users WHERE $where").use { ps ->
+    private fun selectWhere(c: Connection, where: String, arg: String, includeDeleted: Boolean = false): UserRecord? =
+        c.prepareStatement("SELECT $COLUMNS FROM users WHERE ${if (includeDeleted) "1=1" else AVAILABLE} AND $where").use { ps ->
             ps.setString(1, arg)
             ps.executeQuery().use { rs -> if (rs.next()) map(rs) else null }
         }
@@ -197,6 +203,16 @@ class MySqlStore(jdbcUrl: String, user: String, password: String) : UserStore {
     )
 
     companion object {
+        private const val AVAILABLE = "NOT EXISTS (SELECT 1 FROM admin_deleted_records trash WHERE trash.entity_type='players' AND trash.record_id=users.id AND trash.deleted_at IS NOT NULL)"
+        val DELETED_RECORDS_DDL = """
+            CREATE TABLE IF NOT EXISTS admin_deleted_records (
+              entity_type VARCHAR(32) NOT NULL,record_id VARCHAR(100) NOT NULL,
+              deleted_at BIGINT NULL,changed_at BIGINT NOT NULL DEFAULT 0,
+              deleted_by CHAR(32) NULL,reason VARCHAR(255) NOT NULL DEFAULT '',
+              PRIMARY KEY(entity_type,record_id),KEY idx_deleted_type(entity_type,deleted_at)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        """.trimIndent()
+
         private const val COLUMNS = "id, name, name_lower, password_hash, salt, token, created_at, last_login_at, wins, losses, draws, matches, best_score, best_tile, garbage_sent"
 
         val USERS_DDL = """

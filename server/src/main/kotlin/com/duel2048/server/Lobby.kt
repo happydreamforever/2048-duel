@@ -109,6 +109,14 @@ class Lobby(private val config: ServerConfig, private val scope: CoroutineScope,
 
     private suspend fun dispatch(s: PlayerSession, msg: ClientMessage) {
         if (players[s.id] !== s) return
+        if ((msg is FindMatch || msg is ResumeMatch) && s.userId?.let { !db.isAvailable(it) } == true) {
+            challenges?.leave(s,cancel=true)
+            fallbackJobs.remove(s.id)?.cancel()
+            queueMutex.withLock { queue2048.remove(s);queueCube.remove(s);s.publicQueued=false }
+            // Retain the account ID so an already-started match can record its result.
+            s.send(AuthFailed("bad_token", "Account unavailable. Please sign in again"))
+            return
+        }
         when (msg) {
             is ResumeMatch -> resume(s, msg.matchId)
             is RequestMatchState -> {
@@ -301,7 +309,12 @@ class Lobby(private val config: ServerConfig, private val scope: CoroutineScope,
         }
     }
 
-    private fun enterCompetition(id: String, game: String, a: PlayerSession, b: PlayerSession?): Boolean {
+    private suspend fun enterCompetition(id: String, game: String, a: PlayerSession, b: PlayerSession?): Boolean {
+        if (listOfNotNull(a,b).any { it.userId?.let { id -> !db.isAvailable(id) } == true }) {
+            a.send(ErrorMsg("not_logged_in", "A player account is unavailable"))
+            b?.send(ErrorMsg("not_logged_in", "A player account is unavailable"))
+            return false
+        }
         return try {
             economy.enter(id,game,if(b==null) "bot" else "pvp",listOfNotNull(a.userId,b?.userId))
             economy.checkpoint(id,game,if(b==null) "bot" else "pvp","playing",a.name,b?.name ?: "Bot",0,0,null,"{}")
