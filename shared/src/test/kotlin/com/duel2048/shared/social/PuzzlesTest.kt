@@ -5,6 +5,14 @@ import kotlin.random.Random
 import kotlin.test.*
 
 class PuzzlesTest {
+    @Test fun `math rules reject negative results and misleading hard choices`() {
+        assertFailsWith<IllegalArgumentException> { MathRules.validate("easy",MathProblem("bad","1 - 2","-1",listOf("-1","0","1","2"))) }
+        assertFailsWith<IllegalArgumentException> { MathRules.validate("very_hard",MathProblem("bad","100 + 100","200",listOf("198","200","201","210"))) }
+        assertFailsWith<IllegalArgumentException> { MathRules.validate("hard",MathProblem("bad","100 + 100","200",listOf("200","201","202","203"))) }
+        MathRules.validate("very_hard",MathProblem("ok","50 + 50","100",listOf("100","101","102","103"))) // digit boundary
+        MathRules.validate("very_hard",MathProblem("zero","1 - 1","0",listOf("0","1","2","3")))
+    }
+
     @Test
     fun `every math dataset has valid arithmetic and four distinct choices`() {
         for (level in Puzzles.mathLevels) {
@@ -17,6 +25,8 @@ class PuzzlesTest {
                 val result = when (op) { "+" -> a + b; "-" -> a - b; "*" -> a * b; "/" -> {
                     assertEquals(0.toBigInteger(), a.remainder(b)); a / b
                 }; else -> error("Unknown operator") }
+                assertTrue(result.signum() >= 0, problem.id)
+                MathRules.validate(level,problem)
                 assertEquals(result.toString(), problem.answer, problem.id)
                 assertEquals(4, problem.choices.distinct().size)
                 assertEquals(1, problem.choices.count { it == problem.answer })

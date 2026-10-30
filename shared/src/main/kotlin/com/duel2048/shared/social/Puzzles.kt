@@ -13,7 +13,7 @@ class PuzzleCatalog(private val resourceRoot: String) {
             val options = row.drop(3)
             require(options.size == 4 && options.distinct().size == 4 && row[2] in options) { "Invalid choices in $level: ${row[0]}" }
             options.forEach { it.toBigInteger() }
-            MathProblem(row[0], row[1], row[2], options)
+            MathRules.validate(level, MathProblem(row[0], row[1], row[2], options))
         }.also { require(it.map { p -> p.id }.distinct().size == it.size) { "Duplicate problem id in $level" } }
     } }
     private val wordData by lazy { Puzzles.wordLengths.associateWith { length ->

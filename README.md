@@ -57,7 +57,7 @@ sessions have a 90-second reconnect window within the same server process. If th
 restarts, interrupted cube/2048 entries are refunded; minigame rooms restore their board,
 players, found words, and absolute timer from SQL. Back up the SQL database and DATA_DIR.
 
-Protocol version remains 7; update both server and APK to Android **1.6.0 (9)**.
+Protocol version remains 7; update both server and APK to Android **1.6.1 (10)**.
 
 ```powershell
 .\gradlew.bat :shared:test :server:test :android:assembleDebug
@@ -171,7 +171,7 @@ payment reference and review note. Approval credits the shared wallet once and w
 an audit entry. The app refreshes wallet balances automatically. No payment provider
 or invented monetary prices are configured.
 
-APK version: **1.6.0 (9)**. Release builds require the existing release signing key;
+APK version: **1.6.1 (10)**. Release builds require the existing release signing key;
 keep `keystore.properties` and the keystore private so updates retain their signature.
 
 ## Visual effects in the client
@@ -276,6 +276,12 @@ adb shell settings put global duel2048_lowfx 1
 adb shell settings put global duel2048_server ws://10.0.2.2:8080/ws
 adb shell settings put global duel2048_lang ja
 ```
+
+## Math problem rules
+
+Math questions and all four answer choices must be nonnegative whole numbers. Subtraction operands are ordered to avoid negative results, and division is exact. Hard distractors stay within 10 of the correct answer; Very Hard within 3. On both levels, options have the same digit count as the answer and include lower and higher values wherever the digit range allows. Bundled match and training CSVs follow these rules.
+
+The admin's Math problems page can generate a previewed set of 1–100 problems (default 10), balanced across the four operations, and save it as drafts for review and publication. In SQL mode, new math rooms select valid active, nondeleted SQL questions when `math_problems` exists. Publish at least one valid question per level; an empty managed level returns an error rather than serving unpublished content. Without a managed math table, or in JSON development, the server uses its packaged match CSVs. A selected problem is checkpointed, so later edits never change a running round. Apply the admin's migration `005_math_rules_generation.sql` and deploy both updated servers. APK 1.6.1 updates the small offline training catalog.
 
 ## Accounts and the MySQL / MariaDB database
 

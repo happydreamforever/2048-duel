@@ -120,6 +120,10 @@ Math/word room creation and answers require `token` in the request body. The ser
 the authenticated account name, verifies room membership on answers, and persists room
 content, participants, results, and the absolute start timestamp in `social.json`.
 
+### Math catalog rules
+
+New math problems use nonnegative operands, integer results, and four nonnegative distinct options. Hard choices differ from the answer by at most 10; Very Hard by at most 3. Both levels require the answer's digit count and values below/above the answer where possible. SQL rooms use valid active, nondeleted `math_problems` entries when that table exists; an empty level returns 400 until valid drafts are published. JSON development and SQL installations without the managed math table use packaged match CSVs. The selected content remains checkpointed throughout the room.
+
 ### Dataset puzzle matches
 
 `POST /social/mini/join` accepts `game` (`math` or `word`), `mode` (`pvp` or `bot`),

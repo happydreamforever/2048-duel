@@ -37,6 +37,7 @@ class SocialService(
     private var seenNote = 0L
     private val rooms = ConcurrentHashMap<String, MiniRoom>()
     private val puzzles = PuzzleCatalog("/datasets/matches")
+    private val mathCatalog = MatchMathCatalog(db, puzzles)
     private val dictionary by lazy { WordGrid.dictionary(puzzles) }
 
     init {
@@ -370,7 +371,7 @@ class SocialService(
                 choices = emptyList()
                 puzzleId = word.id
             } else {
-                val problem = puzzles.math(difficulty, Random.Default)
+                val problem = mathCatalog.choose(difficulty)
                 prompt = problem.prompt
                 solution = problem.answer
                 choices = problem.choices
