@@ -1,0 +1,19 @@
+Generated with built-in image_gen; imagegen skill. Production game-card assets, not UI screenshots. Converted to RGBA WebP, maximum 512 px.
+
+art_tiles
+A compact glossy 3D cluster of three 2048 number tiles, purple 2, coral 4 and warm amber 2048, centered with generous transparent margin.
+
+art_cube
+A beautiful small glossy scrambled 3×3×3 Rubik-style cube with precisely 3x3 square stickers per visible face in white,yellow,red,green,blue,orange; centered on transparency.
+
+art_math
+A glossy compact cluster of cyan and violet square arithmetic symbol tiles + × ÷ and a blue number24 tile; centered on transparency.
+
+art_word
+Four amber glossy letter tiles W O R D arranged as a playful compact cluster, warm golden glow; centered on transparency.
+
+art_grid
+A small teal 4x4 letter grid, first row C A T E, remaining rows D O G S / R L I O / B E A R; only C-A-T horizontal path lit, orthogonal connection, glossy game icon; centered transparency.
+
+art_robot
+A friendly premium glossy little robot avatar bust, white shell with violet and cyan edges, rounded navy glass face with kind glowing cyan eyes, no text; centered on transparency.

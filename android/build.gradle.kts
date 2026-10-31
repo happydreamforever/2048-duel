@@ -24,8 +24,8 @@ android {
         applicationId = "com.duel2048.app"
         minSdk = libs.versions.minSdk.get().toInt()
         targetSdk = libs.versions.targetSdk.get().toInt()
-        versionCode = 10
-        versionName = "1.6.1"
+        versionCode = 11
+        versionName = "2.0.0"
         vectorDrawables { useSupportLibrary = true }
     }
 
@@ -65,6 +65,8 @@ android {
     packagingOptions {
         excludes += "/META-INF/{AL2.0,LGPL2.1}"
     }
+
+    testOptions { unitTests.isIncludeAndroidResources = true }
 
     lint {
         // lintVital pulls extra tooling jars (trove4j, etc.) that may be missing from a partial
@@ -110,4 +112,8 @@ dependencies {
     implementation(libs.filament.gltfio)
     debugImplementation(libs.compose.ui.tooling)
     testImplementation(libs.junit)
+    testImplementation("org.robolectric:robolectric:4.11.1")
+    testImplementation(platform(libs.compose.bom))
+    testImplementation("androidx.compose.ui:ui-test-junit4")
+    debugImplementation("androidx.compose.ui:ui-test-manifest")
 }

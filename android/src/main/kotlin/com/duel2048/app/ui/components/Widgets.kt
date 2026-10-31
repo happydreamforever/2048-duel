@@ -54,13 +54,13 @@ import kotlin.math.abs
 @Composable
 fun GlassCard(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
     val palette = LocalPalette.current
-    val shape = RoundedCornerShape(24.dp)
+    val shape = RoundedCornerShape(16.dp)
     Column(
         modifier
             .clip(shape)
             .background(palette.surface)
             .border(1.dp, palette.surfaceBorder, shape)
-            .padding(16.dp),
+            .padding(12.dp),
         content = content,
     )
 }
@@ -80,11 +80,17 @@ fun NeonButton(
     val lowEffects = LocalLowEffects.current
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
-    val scale by animateFloatAsState(if (pressed) 0.96f else 1f, spring(stiffness = Spring.StiffnessMedium), label = "press")
+    val scale by
+        animateFloatAsState(
+            if (pressed) 0.96f else 1f, spring(stiffness = Spring.StiffnessMedium), label = "press")
     val shape = RoundedCornerShape(18.dp)
     Box(
         modifier
-            .graphicsLayer { scaleX = scale; scaleY = scale; alpha = if (enabled) 1f else 0.5f }
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+                alpha = if (enabled) 1f else 0.5f
+            }
             .drawBehind {
                 if (!lowEffects && enabled) {
                     for (i in 1..3) {
@@ -101,14 +107,22 @@ fun NeonButton(
             .clip(shape)
             .background(Brush.horizontalGradient(gradient))
             .border(1.dp, Color.White.copy(alpha = 0.22f), shape)
-            .clickable(interactionSource = interaction, indication = null, enabled = enabled, onClick = onClick)
-            .padding(horizontal = 22.dp, vertical = 14.dp),
+            .clickable(
+                interactionSource = interaction,
+                indication = null,
+                enabled = enabled,
+                onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
         contentAlignment = Alignment.Center,
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(text, fontWeight = FontWeight.SemiBold, color = textColor, fontSize = 14.sp)
             if (subtitle != null) {
-                Text(subtitle, color = textColor.copy(alpha = 0.8f), fontSize = 11.sp, textAlign = TextAlign.Center)
+                Text(
+                    subtitle,
+                    color = textColor.copy(alpha = 0.8f),
+                    fontSize = 11.sp,
+                    textAlign = TextAlign.Center)
             }
         }
     }
@@ -117,31 +131,52 @@ fun NeonButton(
 /** Title text with a light band sweeping across a gradient. */
 @OptIn(androidx.compose.ui.text.ExperimentalTextApi::class)
 @Composable
-fun ShimmerTitle(text: String, fontSize: TextUnit, modifier: Modifier = Modifier, letterSpacing: TextUnit = (-2).sp) {
+fun ShimmerTitle(
+    text: String,
+    fontSize: TextUnit,
+    modifier: Modifier = Modifier,
+    letterSpacing: TextUnit = (-2).sp
+) {
     val palette = LocalPalette.current
     val low = LocalLowEffects.current
-    val shift by rememberInfiniteTransition(label = "shimmer").animateFloat(
-        0f, 1f, infiniteRepeatable(tween(2800, easing = LinearEasing)), label = "s",
-    )
-    val brush = if (low) {
-        Brush.linearGradient(listOf(palette.accent, palette.accent2))
-    } else {
-        Brush.linearGradient(
-            listOf(palette.accent, Color.White, palette.accent2, palette.accent),
-            start = Offset(shift * 900f - 500f, 0f),
-            end = Offset(shift * 900f + 100f, 260f),
-        )
-    }
+    val shift by
+        rememberInfiniteTransition(label = "shimmer")
+            .animateFloat(
+                0f,
+                1f,
+                infiniteRepeatable(tween(2800, easing = LinearEasing)),
+                label = "s",
+            )
+    val brush =
+        if (low) {
+            Brush.linearGradient(listOf(palette.accent, palette.accent2))
+        } else {
+            Brush.linearGradient(
+                listOf(palette.accent, Color.White, palette.accent2, palette.accent),
+                start = Offset(shift * 900f - 500f, 0f),
+                end = Offset(shift * 900f + 100f, 260f),
+            )
+        }
     Text(
         text,
         modifier = modifier,
-        style = TextStyle(brush = brush, fontSize = fontSize, fontWeight = FontWeight.Black, letterSpacing = letterSpacing),
+        style =
+            TextStyle(
+                brush = brush,
+                fontSize = fontSize,
+                fontWeight = FontWeight.Black,
+                letterSpacing = letterSpacing),
     )
 }
 
 /** Number that counts up and pops when it changes. */
 @Composable
-fun ScoreCounter(value: Int, modifier: Modifier = Modifier, style: TextStyle = MaterialTheme.typography.headlineMedium, color: Color = LocalPalette.current.textPrimary) {
+fun ScoreCounter(
+    value: Int,
+    modifier: Modifier = Modifier,
+    style: TextStyle = MaterialTheme.typography.headlineMedium,
+    color: Color = LocalPalette.current.textPrimary
+) {
     val animated by animateIntAsState(value, tween(320), label = "score")
     val pop = remember { Animatable(1f) }
     LaunchedEffect(value) {
@@ -152,7 +187,11 @@ fun ScoreCounter(value: Int, modifier: Modifier = Modifier, style: TextStyle = M
     }
     Text(
         animated.toString(),
-        modifier = modifier.graphicsLayer { scaleX = pop.value; scaleY = pop.value },
+        modifier =
+            modifier.graphicsLayer {
+                scaleX = pop.value
+                scaleY = pop.value
+            },
         style = style,
         color = color,
         maxLines = 1,
@@ -160,7 +199,12 @@ fun ScoreCounter(value: Int, modifier: Modifier = Modifier, style: TextStyle = M
 }
 
 @Composable
-fun Avatar(name: String, size: androidx.compose.ui.unit.Dp, modifier: Modifier = Modifier, isBot: Boolean = false) {
+fun Avatar(
+    name: String,
+    size: androidx.compose.ui.unit.Dp,
+    modifier: Modifier = Modifier,
+    isBot: Boolean = false
+) {
     val palette = LocalPalette.current
     val h = abs(name.hashCode())
     val c1 = palette.orbColors[h % palette.orbColors.size]
@@ -186,7 +230,12 @@ fun Avatar(name: String, size: androidx.compose.ui.unit.Dp, modifier: Modifier =
 }
 
 @Composable
-fun StatPill(label: String, value: String, modifier: Modifier = Modifier, valueColor: Color = LocalPalette.current.textPrimary) {
+fun StatPill(
+    label: String,
+    value: String,
+    modifier: Modifier = Modifier,
+    valueColor: Color = LocalPalette.current.textPrimary
+) {
     val palette = LocalPalette.current
     Column(
         modifier
@@ -204,10 +253,17 @@ fun StatPill(label: String, value: String, modifier: Modifier = Modifier, valueC
 @Composable
 fun StatRow(label: String, value: String, valueColor: Color = LocalPalette.current.textPrimary) {
     val palette = LocalPalette.current
-    Row(Modifier.fillMaxWidth().padding(vertical = 3.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-        Text(label, style = MaterialTheme.typography.labelSmall, color = palette.textSecondary)
-        Text(value, style = MaterialTheme.typography.titleMedium, color = valueColor, maxLines = 1)
-    }
+    Row(
+        Modifier.fillMaxWidth().padding(vertical = 3.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically) {
+            Text(label, style = MaterialTheme.typography.labelSmall, color = palette.textSecondary)
+            Text(
+                value,
+                style = MaterialTheme.typography.titleMedium,
+                color = valueColor,
+                maxLines = 1)
+        }
 }
 
 fun formatClock(ms: Long): String {

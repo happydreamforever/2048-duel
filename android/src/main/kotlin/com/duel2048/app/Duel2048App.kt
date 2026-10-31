@@ -22,24 +22,12 @@ import com.duel2048.app.fx.Haptics
 import com.duel2048.app.fx.LocalGameFx
 import com.duel2048.app.fx.SoundFx
 import com.duel2048.app.ui.components.AmbientBackground
+import com.duel2048.app.ui.landscape.*
 import com.duel2048.app.ui.rememberLocalizedContext
-import com.duel2048.app.ui.screens.ChallengeScreen
 import com.duel2048.app.ui.screens.AppChrome
 import com.duel2048.app.ui.screens.CubeDuelScreen
-import com.duel2048.app.ui.screens.CubeMatchmakingScreen
-import com.duel2048.app.ui.screens.CubeResultScreen
 import com.duel2048.app.ui.screens.DuelScreen
-import com.duel2048.app.ui.screens.GameModesScreen
-import com.duel2048.app.ui.screens.HomeScreen
 import com.duel2048.app.ui.screens.SavedGamesScreen
-import com.duel2048.app.ui.screens.CommunityScreen
-import com.duel2048.app.ui.screens.ProfileScreen
-import com.duel2048.app.ui.screens.LeaderboardScreen
-import com.duel2048.app.ui.screens.MiniPlayScreen
-import com.duel2048.app.ui.screens.WatchScreen
-import com.duel2048.app.ui.screens.LoginScreen
-import com.duel2048.app.ui.screens.MatchmakingScreen
-import com.duel2048.app.ui.screens.ResultScreen
 import com.duel2048.app.ui.screens.SoloScreen
 import com.duel2048.app.ui.theme.DuelTheme
 import com.duel2048.app.ui.theme.LocalLowEffects
@@ -68,39 +56,56 @@ fun Duel2048App(vm: MainViewModel) {
         LocalConfiguration provides localized.resources.configuration,
     ) {
         DuelTheme(palette) {
-            CompositionLocalProvider(LocalGameFx provides fx, LocalLowEffects provides settings.lowEffects) {
-                Box(Modifier.fillMaxSize()) {
-                    AmbientBackground(palette, animated = !settings.lowEffects)
-                    AppChrome(vm, screen) {
-                        AnimatedContent(
-                            targetState = screen,
-                            transitionSpec = { ContentTransform(fadeIn() + scaleIn(initialScale = 0.96f), fadeOut()) },
-                            label = "screen",
-                            modifier = Modifier.fillMaxSize(),
-                        ) { target ->
-                            when (target) {
-                                Screen.Home -> HomeScreen(vm)
-                                Screen.SavedGames -> SavedGamesScreen(vm)
-                                Screen.Community -> CommunityScreen(vm)
-                                Screen.Profile -> ProfileScreen(vm)
-                                Screen.Login -> LoginScreen(vm)
-                                Screen.Matchmaking -> MatchmakingScreen(vm)
-                                Screen.Duel -> DuelScreen(vm)
-                                Screen.Result -> ResultScreen(vm)
-                                Screen.Solo -> SoloScreen(vm)
-                                Screen.CubeMatchmaking -> CubeMatchmakingScreen(vm)
-                                Screen.CubeDuel -> CubeDuelScreen(vm)
-                                Screen.CubeResult -> CubeResultScreen(vm)
-                                Screen.Leaderboard -> LeaderboardScreen(vm)
-                                is Screen.GameModes -> GameModesScreen(vm, target.game)
-                                is Screen.Challenges -> ChallengeScreen(vm, target)
-                                Screen.MiniPlay -> MiniPlayScreen(vm)
-                                Screen.Watch -> WatchScreen(vm)
+            CompositionLocalProvider(
+                LocalGameFx provides fx, LocalLowEffects provides settings.lowEffects) {
+                    Box(Modifier.fillMaxSize()) {
+                        AmbientBackground(palette, animated = !settings.lowEffects)
+                        AppChrome(vm, screen) {
+                            AnimatedContent(
+                                targetState = screen,
+                                transitionSpec = {
+                                    ContentTransform(
+                                        fadeIn(
+                                            androidx.compose.animation.core.tween(
+                                                if (settings.lowEffects) 0 else 200)) +
+                                            scaleIn(
+                                                initialScale =
+                                                    if (settings.lowEffects) 1f else 0.98f),
+                                        fadeOut(
+                                            androidx.compose.animation.core.tween(
+                                                if (settings.lowEffects) 0 else 140)))
+                                },
+                                label = "screen",
+                                modifier = Modifier.fillMaxSize(),
+                            ) { target ->
+                                when (target) {
+                                    Screen.Home -> LandscapeDashboard(vm)
+                                    Screen.SavedGames -> SavedGamesScreen(vm)
+                                    Screen.Community ->
+                                        LandscapeUtilities(vm, "players", vm::goHome)
+                                    Screen.Profile -> LandscapeUtilities(vm, "profile", vm::goHome)
+                                    Screen.Login -> {
+                                        LandscapeDashboard(vm)
+                                        LandscapeAuth(vm)
+                                    }
+                                    Screen.Matchmaking -> LandscapeQueue(vm, false)
+                                    Screen.Duel -> DuelScreen(vm)
+                                    Screen.Result -> LandscapeResult(vm, false)
+                                    Screen.Solo -> SoloScreen(vm)
+                                    Screen.CubeMatchmaking -> LandscapeQueue(vm, true)
+                                    Screen.CubeDuel -> CubeDuelScreen(vm)
+                                    Screen.CubeResult -> LandscapeResult(vm, true)
+                                    Screen.Leaderboard ->
+                                        LandscapeUtilities(vm, "leaderboard", vm::goHome)
+                                    is Screen.GameModes -> LandscapeDashboard(vm)
+                                    is Screen.Challenges -> LandscapeInvitations(vm, target)
+                                    Screen.MiniPlay -> LandscapeMini(vm)
+                                    Screen.Watch -> LandscapeWatch(vm)
+                                }
                             }
                         }
                     }
                 }
-            }
         }
     }
 }

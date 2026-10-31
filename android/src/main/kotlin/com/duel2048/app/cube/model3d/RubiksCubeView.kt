@@ -46,6 +46,12 @@ class RubiksCubeView(context: Context) : TextureView(context) {
     /** Opponent views render the same cube but accept orbit only, never turns. */
     var gesturesEnabled = true
 
+    /** Presentation only: restore the default camera angle without touching cubies or moves. */
+    fun resetView() {
+        camera.orbitBy(32f - camera.azimuth, 24f - camera.elevation)
+        dirty = true
+    }
+
     fun restorePosition(notations: List<String>) {
         animator.setPosition(notations)
         dirty = true

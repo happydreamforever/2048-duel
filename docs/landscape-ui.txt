@@ -1,0 +1,12 @@
+Landscape presentation implementation 2.0.0
+
+Design reference: /home/dev/codes/48/design/ (27 mockups; not embedded in Git).
+Production artwork: android/src/main/res/drawable-nodpi/art_*.webp.
+
+Navigation: root dashboard plus one gameplay/utility destination. Local utility overlays replace one another, and waiting/play/results are competition states. The original ViewModel still owns matchmaking and state transitions. Native back actions and explicit leave confirmations invoke the same cancellation/leave operations. No public/global player chat has been added.
+
+Gameplay safety: shared/ and server/ remain unmodified. MatchController, CubeMatchController, LocalDuelSession, LocalCubeSession, SoloController, cube math/geometry/animator, protocol and datasets remain unmodified. A camera-only reset was added to the renderer; new buttons invoke the same controller + animation callbacks as gesture input. Purchase busy state is presentation feedback only and does not change pricing, credit or entry rules.
+
+Live room rendering uses only available server signals. 2048/cube spectator boards are not faked. Per-game leaderboard filters are not invented when only aggregate ranks are available. Device-local result history is explicitly labelled and scoped to account/server. Purchase history is not invented. Support drafts and result display do not alter match state.
+
+Testing: JVM/shared/server regressions and six Robolectric Compose interaction checks. Temporary image captures stay in /tmp/duel-landscape-review. No screenshots are committed. No physical device or hardware-accelerated emulator is available on this host; the native renderer still uses its existing geometry and lifecycle integration.

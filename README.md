@@ -57,7 +57,7 @@ sessions have a 90-second reconnect window within the same server process. If th
 restarts, interrupted cube/2048 entries are refunded; minigame rooms restore their board,
 players, found words, and absolute timer from SQL. Back up the SQL database and DATA_DIR.
 
-Protocol version remains 7; update both server and APK to Android **1.6.1 (10)**.
+Protocol version remains 7. Android **2.0.0 (11)** updates the UI without requiring a server change.
 
 ```powershell
 .\gradlew.bat :shared:test :server:test :android:assembleDebug
@@ -171,7 +171,7 @@ payment reference and review note. Approval credits the shared wallet once and w
 an audit entry. The app refreshes wallet balances automatically. No payment provider
 or invented monetary prices are configured.
 
-APK version: **1.6.1 (10)**. Release builds require the existing release signing key;
+APK version: **2.0.0 (11)**. Release builds require the existing release signing key;
 keep `keystore.properties` and the keystore private so updates retain their signature.
 
 ## Visual effects in the client
@@ -276,6 +276,18 @@ adb shell settings put global duel2048_lowfx 1
 adb shell settings put global duel2048_server ws://10.0.2.2:8080/ws
 adb shell settings put global duel2048_lang ja
 ```
+
+## Landscape client UI (2.0.0)
+
+The Android client now uses the approved landscape design: a floating utility bar, five illustrated game cards, inline mode/difficulty selection, and a first-launch login popup for signed-out users. Registration and guest practice stay on the dashboard. Gameplay, results, queues, watching, invitations, settings, help, support and account views return directly to the dashboard; utilities replace each other rather than building a nested back stack. Existing guest authentication behavior is retained.
+
+All five PvP game fields share a collapsible preset-phrase/emoji chat rail. Offline training, bot matches and spectators cannot send player chat. The cube uses the same Filament renderer and input mapping, with visible face and middle-slice buttons wired to the same move callback. Camera reset changes only the view angle. Game engines, controllers, datasets, protocol, matching, timers, scoring and competition economy are unchanged.
+
+Six generated illustrations ship as small WebP files in `drawable-nodpi`. Mockup screenshots remain outside Git. Motion includes existing ambient/board effects, screen transitions, button feedback and subtle art drift; Reduce Effects disables decorative motion. Core new labels follow the existing English/Spanish/Japanese/Chinese language setting. Dialogs/forms support landscape keyboard insets and internal scrolling, and compact dashboards retain all five game actions.
+
+Match history is an account/server-scoped **device-local presentation history** of completed results observed by this client. It is not a replacement for authoritative server history or online state synchronization. The current server exposes live scores and word grids to spectators; the UI renders those real signals rather than inventing unavailable 2048/cube board snapshots. Purchase requests retain the existing administrator-approval workflow; no sample prices or fake purchase records are shown.
+
+`./gradlew :android:testDebugUnitTest` includes Robolectric/Compose checks for launch login, direct utility return, compact dashboard visibility, native math submission, orthogonal-only letter selection, all cube face/slice button notations, inverse turns and reconnect-disabled input. UI tests may optionally write local review captures when `DUEL_UI_PREVIEW_DIR` points under `/tmp/`; they never save screenshots in the repository. Robolectric verifies the Compose flows; native Filament device rendering is still best checked on Android hardware.
 
 ## Math problem rules
 

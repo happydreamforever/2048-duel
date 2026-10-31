@@ -765,13 +765,19 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     fun buyCoins(pack: Int) {
         if(settings.value.authToken.isBlank()) { ensureAccount { buyCoins(pack) }; return }
+        if(_purchaseBusy.value) return
+        _purchaseBusy.value=true
         viewModelScope.launch {
+            try {
             social.purchaseCoins(settings.value.serverUrl,settings.value.authToken,UUID.randomUUID().toString(),pack)
                 .onSuccess { _purchaseMessage.value = "Purchase request sent. Coins will be credited after payment is confirmed by an admin." }
                 .onFailure { _purchaseMessage.value = "Purchase request failed. Please try again." }
             pullWallet()
+            } finally { _purchaseBusy.value=false }
         }
     }
+    private val _purchaseBusy=MutableStateFlow(false)
+    val purchaseBusy=_purchaseBusy.asStateFlow()
     private val _purchaseMessage = MutableStateFlow("")
     val purchaseMessage = _purchaseMessage.asStateFlow()
 
